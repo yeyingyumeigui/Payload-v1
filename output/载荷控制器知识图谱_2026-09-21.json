@@ -1,0 +1,986 @@
+{
+ "version": 1,
+ "exportedAt": "2026-09-21",
+ "name": "载荷控制器知识图谱（v1）",
+ "scope": "Ka 通信载荷管控分系统：硬件平台、管控软件、外部接口、控制环路、受控对象",
+ "description": "载荷控制器专题知识图谱：硬件平台（SoC/存储/电源/三类总线接口）、管控软件七功能、四类外部接口、七条控制环路与六个受控对象；chain 给出环路节点序，relations 给出部署/供电/接口实现/外部接口关系",
+ "sourceFile": "载荷控制器知识图谱_2026-09-21.json",
+ "schema": {
+  "ontologies": "id / name / description / parentId / order / category / chain?",
+  "attributes": "id / ontologyId / name / description / symbol",
+  "constraints": "id / formula / description / members[{attributeId, role}]",
+  "relations": "id / from / to / type / description",
+  "category枚举": [
+   "载荷总体",
+   "分系统",
+   "分组",
+   "体制",
+   "单机",
+   "链路",
+   "指标",
+   "软件",
+   "接口"
+  ],
+  "chain语义": "有序节点 id 列表（控制环→经过的功能/硬件/对象）"
+ },
+ "ontologies": [
+  {
+   "id": "payload_ctrl",
+   "name": "载荷控制器",
+   "description": "Ka 通信载荷管控分系统知识图谱：负责波束权值、信道交换、反射面展开、ATP 指向、激光功率的统一控制与遥测采集；由硬件平台、管控软件、外部接口、控制环路与受控对象五部分构成",
+   "parentId": null,
+   "order": 0,
+   "category": "载荷总体"
+  },
+  {
+   "id": "hw",
+   "name": "硬件平台",
+   "description": "星载抗辐照硬件：主处理、存储、二次电源与三类总线接口",
+   "parentId": "payload_ctrl",
+   "order": 0,
+   "category": "分系统"
+  },
+  {
+   "id": "sw",
+   "name": "管控软件",
+   "description": "载荷管控应用软件功能集，部署于主处理单元",
+   "parentId": "payload_ctrl",
+   "order": 1,
+   "category": "分系统"
+  },
+  {
+   "id": "ifc",
+   "name": "外部接口",
+   "description": "控制器对外电气/协议接口集合",
+   "parentId": "payload_ctrl",
+   "order": 2,
+   "category": "分系统"
+  },
+  {
+   "id": "loops",
+   "name": "控制环路",
+   "description": "闭环控制与管控流程，chain 给出环路经过的功能/硬件/对象",
+   "parentId": "payload_ctrl",
+   "order": 3,
+   "category": "分系统"
+  },
+  {
+   "id": "objs",
+   "name": "受控对象",
+   "description": "被管控的载荷单机（接口侧视图）",
+   "parentId": "payload_ctrl",
+   "order": 4,
+   "category": "分系统"
+  },
+  {
+   "id": "cpu",
+   "name": "主处理单元",
+   "description": "抗辐照星载 SoC：运行全部管控软件，完成控制律计算与任务调度",
+   "parentId": "hw",
+   "order": 0,
+   "category": "单机"
+  },
+  {
+   "id": "mem",
+   "name": "存储单元",
+   "description": "程序、波束权值表、路由表与遥测固态记录存储",
+   "parentId": "hw",
+   "order": 1,
+   "category": "单机"
+  },
+  {
+   "id": "pwr",
+   "name": "二次电源模块",
+   "description": "平台一次电源转控制器内部二次电源，含滤波与保护",
+   "parentId": "hw",
+   "order": 2,
+   "category": "单机"
+  },
+  {
+   "id": "bi1553",
+   "name": "1553B总线接口",
+   "description": "控制总线接口：波束权值、指向指令、遥测采集的主通道",
+   "parentId": "hw",
+   "order": 3,
+   "category": "单机"
+  },
+  {
+   "id": "bi422",
+   "name": "RS422串行接口",
+   "description": "专用指令线：展开机构时序、激光器开关等互锁指令",
+   "parentId": "hw",
+   "order": 4,
+   "category": "单机"
+  },
+  {
+   "id": "bisw",
+   "name": "SpaceWire接口",
+   "description": "高速数据通道：DTP 路由表装载与激光用户数据中转",
+   "parentId": "hw",
+   "order": 5,
+   "category": "单机"
+  },
+  {
+   "id": "tm_tc",
+   "name": "平台遥测遥控接口",
+   "description": "与卫星平台间的遥测下传与遥控上行接口",
+   "parentId": "hw",
+   "order": 6,
+   "category": "单机"
+  },
+  {
+   "id": "f_beam",
+   "name": "波束管理",
+   "description": "波束调度与幅相权值计算、加载与回读校验",
+   "parentId": "sw",
+   "order": 0,
+   "category": "软件"
+  },
+  {
+   "id": "f_route",
+   "name": "信道交换配置",
+   "description": "DTP 交换矩阵路由表生成、装载与在轨重构",
+   "parentId": "sw",
+   "order": 1,
+   "category": "软件"
+  },
+  {
+   "id": "f_deploy",
+   "name": "展开时序控制",
+   "description": "拼块反射面展开指令序列、互锁判断与锁定确认",
+   "parentId": "sw",
+   "order": 2,
+   "category": "软件"
+  },
+  {
+   "id": "f_atp",
+   "name": "指向控制",
+   "description": "ATP 粗/精指向指令生成与跟踪遥测闭环",
+   "parentId": "sw",
+   "order": 3,
+   "category": "软件"
+  },
+  {
+   "id": "f_laser",
+   "name": "激光功率管理",
+   "description": "激光器开关序列、光功率调节与老化补偿",
+   "parentId": "sw",
+   "order": 4,
+   "category": "软件"
+  },
+  {
+   "id": "f_tm",
+   "name": "遥测采集处理",
+   "description": "各单机遥测轮询采集、限幅检查、打包与固态记录",
+   "parentId": "sw",
+   "order": 5,
+   "category": "软件"
+  },
+  {
+   "id": "f_fdir",
+   "name": "状态监测与重构",
+   "description": "故障检测、隔离与降级重构（FDIR），驱动路由/波束降级策略",
+   "parentId": "sw",
+   "order": 6,
+   "category": "软件"
+  },
+  {
+   "id": "i_bus1553",
+   "name": "1553B控制总线",
+   "description": "控制器至波束赋形网络、ATP、功放的控制总线",
+   "parentId": "ifc",
+   "order": 0,
+   "category": "接口"
+  },
+  {
+   "id": "i_422",
+   "name": "RS422指令线",
+   "description": "控制器至展开机构、激光器的专用指令与互锁线",
+   "parentId": "ifc",
+   "order": 1,
+   "category": "接口"
+  },
+  {
+   "id": "i_sw",
+   "name": "SpaceWire数据通道",
+   "description": "控制器至交换矩阵、激光调制解调的高速数据通道",
+   "parentId": "ifc",
+   "order": 2,
+   "category": "接口"
+  },
+  {
+   "id": "i_plat",
+   "name": "平台接口",
+   "description": "与平台间的遥测遥控、一次电源与时统接口",
+   "parentId": "ifc",
+   "order": 3,
+   "category": "接口"
+  },
+  {
+   "id": "loop_beam",
+   "name": "波束控制环",
+   "description": "权值计算→1553B 下发→赋形网络生效→遥测回读闭环",
+   "parentId": "loops",
+   "order": 0,
+   "category": "链路",
+   "chain": [
+    "f_beam",
+    "bi1553",
+    "o_bfn"
+   ]
+  },
+  {
+   "id": "loop_route",
+   "name": "路由配置环",
+   "description": "路由表生成→SpaceWire 装载→交换矩阵生效",
+   "parentId": "loops",
+   "order": 1,
+   "category": "链路",
+   "chain": [
+    "f_route",
+    "bisw",
+    "o_dswitch"
+   ]
+  },
+  {
+   "id": "loop_deploy",
+   "name": "展开控制环",
+   "description": "时序指令→RS422 专用线→展开机构动作与互锁回传",
+   "parentId": "loops",
+   "order": 2,
+   "category": "链路",
+   "chain": [
+    "f_deploy",
+    "bi422",
+    "o_deploy"
+   ]
+  },
+  {
+   "id": "loop_atp",
+   "name": "指向控制环",
+   "description": "指向指令→1553B→ATP 执行→跟踪误差遥测回读",
+   "parentId": "loops",
+   "order": 3,
+   "category": "链路",
+   "chain": [
+    "f_atp",
+    "bi1553",
+    "o_atp"
+   ]
+  },
+  {
+   "id": "loop_laser",
+   "name": "激光管理环",
+   "description": "功率指令→RS422→激光器调节→光功率遥测回读",
+   "parentId": "loops",
+   "order": 4,
+   "category": "链路",
+   "chain": [
+    "f_laser",
+    "bi422",
+    "o_laser"
+   ]
+  },
+  {
+   "id": "loop_tm",
+   "name": "遥测环",
+   "description": "总线轮询采集→打包处理→平台接口下传",
+   "parentId": "loops",
+   "order": 5,
+   "category": "链路",
+   "chain": [
+    "f_tm",
+    "bi1553",
+    "tm_tc"
+   ]
+  },
+  {
+   "id": "loop_fdir",
+   "name": "重构环",
+   "description": "遥测诊断→故障定位→路由/波束降级重构",
+   "parentId": "loops",
+   "order": 6,
+   "category": "链路",
+   "chain": [
+    "f_tm",
+    "f_fdir",
+    "f_route"
+   ]
+  },
+  {
+   "id": "o_bfn",
+   "name": "波束赋形网络（受控）",
+   "description": "天线分系统单机：接收权值并回读生效状态",
+   "parentId": "objs",
+   "order": 0,
+   "category": "单机"
+  },
+  {
+   "id": "o_dswitch",
+   "name": "星上交换矩阵（受控）",
+   "description": "转发器分系统单机：接收路由表并回传交换状态",
+   "parentId": "objs",
+   "order": 1,
+   "category": "单机"
+  },
+  {
+   "id": "o_deploy",
+   "name": "反射面展开机构（受控）",
+   "description": "天线分系统单机：执行展开序列并回传互锁",
+   "parentId": "objs",
+   "order": 2,
+   "category": "单机"
+  },
+  {
+   "id": "o_atp",
+   "name": "ATP捕获跟踪机构（受控）",
+   "description": "激光分系统单机：执行指向指令并回传跟踪误差",
+   "parentId": "objs",
+   "order": 3,
+   "category": "单机"
+  },
+  {
+   "id": "o_laser",
+   "name": "通信激光器（受控）",
+   "description": "激光分系统单机：执行功率指令并回传光功率",
+   "parentId": "objs",
+   "order": 4,
+   "category": "单机"
+  },
+  {
+   "id": "o_pa",
+   "name": "功率放大器（受控）",
+   "description": "转发器分系统单机：接收偏置/增益挡位指令并回传遥测",
+   "parentId": "objs",
+   "order": 5,
+   "category": "单机"
+  }
+ ],
+ "attributes": [
+  {
+   "id": "a-c-mass",
+   "ontologyId": "payload_ctrl",
+   "name": "控制器质量",
+   "description": "控制器整机质量（kg）",
+   "symbol": "M_ctrl"
+  },
+  {
+   "id": "a-c-mbud",
+   "ontologyId": "payload_ctrl",
+   "name": "平台分配质量",
+   "description": "平台分配给控制器的质量上限（kg）",
+   "symbol": "M_bud"
+  },
+  {
+   "id": "a-c-power",
+   "ontologyId": "payload_ctrl",
+   "name": "控制器功耗",
+   "description": "控制器整机功耗（W）",
+   "symbol": "P_ctrl"
+  },
+  {
+   "id": "a-c-mtbf",
+   "ontologyId": "payload_ctrl",
+   "name": "任务可靠性",
+   "description": "控制器任务期 MTBF（h）",
+   "symbol": "MTBF"
+  },
+  {
+   "id": "a-c-soft",
+   "ontologyId": "payload_ctrl",
+   "name": "软件规模",
+   "description": "管控软件规模（kLOC）",
+   "symbol": "S_loc"
+  },
+  {
+   "id": "a-cpu-mips",
+   "ontologyId": "cpu",
+   "name": "处理算力",
+   "description": "主处理单元可用算力（MIPS）",
+   "symbol": "C_mips"
+  },
+  {
+   "id": "a-cpu-req",
+   "ontologyId": "cpu",
+   "name": "需求算力",
+   "description": "各控制环算力需求之和（MIPS）",
+   "symbol": "C_req"
+  },
+  {
+   "id": "a-mem-cap",
+   "ontologyId": "mem",
+   "name": "存储容量",
+   "description": "存储单元总容量（GB）",
+   "symbol": "Cap_mem"
+  },
+  {
+   "id": "a-pwr-out",
+   "ontologyId": "pwr",
+   "name": "供电能力",
+   "description": "二次电源模块供电能力（W）",
+   "symbol": "P_pwr"
+  },
+  {
+   "id": "a-1553-rate",
+   "ontologyId": "bi1553",
+   "name": "1553B速率",
+   "description": "1553B 总线速率（Mbps）",
+   "symbol": "R_1553"
+  },
+  {
+   "id": "a-422-rate",
+   "ontologyId": "bi422",
+   "name": "串行指令速率",
+   "description": "RS422 指令线速率（kbps）",
+   "symbol": "R_422"
+  },
+  {
+   "id": "a-sw-rate",
+   "ontologyId": "bisw",
+   "name": "SpaceWire速率",
+   "description": "SpaceWire 通道速率（Mbps）",
+   "symbol": "R_sw"
+  },
+  {
+   "id": "a-tm-down",
+   "ontologyId": "tm_tc",
+   "name": "遥测下传速率",
+   "description": "平台遥测下传速率（kbps）",
+   "symbol": "R_tm"
+  },
+  {
+   "id": "a-beam-cyc",
+   "ontologyId": "f_beam",
+   "name": "波束调度周期",
+   "description": "波束权值刷新周期（ms）",
+   "symbol": "T_beam"
+  },
+  {
+   "id": "a-beam-n",
+   "ontologyId": "f_beam",
+   "name": "管理波束数",
+   "description": "在管 Ka 波束数",
+   "symbol": "N_beamw"
+  },
+  {
+   "id": "a-route-t",
+   "ontologyId": "f_route",
+   "name": "路由重构时间",
+   "description": "路由表重构与装载耗时（s）",
+   "symbol": "T_route"
+  },
+  {
+   "id": "a-dep-t",
+   "ontologyId": "f_deploy",
+   "name": "展开时序时长",
+   "description": "反射面展开指令序列时长（s）",
+   "symbol": "T_dep"
+  },
+  {
+   "id": "a-atp-cyc",
+   "ontologyId": "f_atp",
+   "name": "指向控制周期",
+   "description": "ATP 指向指令更新周期（ms）",
+   "symbol": "T_atp"
+  },
+  {
+   "id": "a-tm-cyc",
+   "ontologyId": "f_tm",
+   "name": "遥测采集周期",
+   "description": "全单机遥测轮询周期（s）",
+   "symbol": "T_tm"
+  },
+  {
+   "id": "a-fdir-t",
+   "ontologyId": "f_fdir",
+   "name": "故障检测时间",
+   "description": "故障检测与确认时间（s）",
+   "symbol": "T_det"
+  },
+  {
+   "id": "a-atp-res",
+   "ontologyId": "o_atp",
+   "name": "ATP机构响应时间",
+   "description": "ATP 机构指令响应时间（ms）",
+   "symbol": "T_res"
+  },
+  {
+   "id": "a-bfn-set",
+   "ontologyId": "o_bfn",
+   "name": "权值加载时间",
+   "description": "赋形网络单轮权值加载耗时（ms）",
+   "symbol": "T_set"
+  },
+  {
+   "id": "a-dep-win",
+   "ontologyId": "o_deploy",
+   "name": "展开允许窗口",
+   "description": "平台允许的展开时间窗（s）",
+   "symbol": "T_win"
+  },
+  {
+   "id": "a-loop-t",
+   "ontologyId": "loop_beam",
+   "name": "波束环闭环周期",
+   "description": "波束控制环闭环周期（ms）",
+   "symbol": "T_loop"
+  }
+ ],
+ "constraints": [
+  {
+   "id": "k-1",
+   "formula": "(N_beamw*L_w/T_beam + L_tm/T_tm + L_atp/T_atp) / R_1553 <= 0.7",
+   "description": "1553B 总线负载率约束：各周期消息流之和不超过总线速率的 70%",
+   "members": [
+    {
+     "attributeId": "a-1553-rate",
+     "role": "R_1553"
+    },
+    {
+     "attributeId": "a-beam-cyc",
+     "role": "T_beam"
+    },
+    {
+     "attributeId": "a-beam-n",
+     "role": "N_beamw"
+    },
+    {
+     "attributeId": "a-tm-cyc",
+     "role": "T_tm"
+    },
+    {
+     "attributeId": "a-atp-cyc",
+     "role": "T_atp"
+    }
+   ]
+  },
+  {
+   "id": "k-2",
+   "formula": "C_req = Σ k_i/T_i <= C_mips",
+   "description": "算力预算：各控制环计算需求之和不超过主处理单元可用算力",
+   "members": [
+    {
+     "attributeId": "a-cpu-req",
+     "role": "C_req"
+    },
+    {
+     "attributeId": "a-cpu-mips",
+     "role": "C_mips"
+    },
+    {
+     "attributeId": "a-beam-cyc",
+     "role": "T_beam"
+    },
+    {
+     "attributeId": "a-atp-cyc",
+     "role": "T_atp"
+    }
+   ]
+  },
+  {
+   "id": "k-3",
+   "formula": "S_loc*u + P_tab + R_rec <= Cap_mem",
+   "description": "存储预算：程序、权值/路由表与遥测记录之和不超过存储容量",
+   "members": [
+    {
+     "attributeId": "a-c-soft",
+     "role": "S_loc"
+    },
+    {
+     "attributeId": "a-mem-cap",
+     "role": "Cap_mem"
+    }
+   ]
+  },
+  {
+   "id": "k-4",
+   "formula": "P_ctrl <= P_pwr",
+   "description": "功耗预算：整机功耗不超过二次电源供电能力",
+   "members": [
+    {
+     "attributeId": "a-c-power",
+     "role": "P_ctrl"
+    },
+    {
+     "attributeId": "a-pwr-out",
+     "role": "P_pwr"
+    }
+   ]
+  },
+  {
+   "id": "k-5",
+   "formula": "T_loop = max(T_beam, T_tm) + T_set",
+   "description": "波束环闭环周期由调度周期、遥测周期与权值加载时间决定",
+   "members": [
+    {
+     "attributeId": "a-loop-t",
+     "role": "T_loop"
+    },
+    {
+     "attributeId": "a-beam-cyc",
+     "role": "T_beam"
+    },
+    {
+     "attributeId": "a-bfn-set",
+     "role": "T_set"
+    }
+   ]
+  },
+  {
+   "id": "k-6",
+   "formula": "T_det + T_route <= T_safe",
+   "description": "重构时效：故障检测加重构时间需小于系统允许的安全中断时间",
+   "members": [
+    {
+     "attributeId": "a-fdir-t",
+     "role": "T_det"
+    },
+    {
+     "attributeId": "a-route-t",
+     "role": "T_route"
+    }
+   ]
+  },
+  {
+   "id": "k-7",
+   "formula": "T_dep <= T_win",
+   "description": "展开时序时长需在平台允许窗口内完成",
+   "members": [
+    {
+     "attributeId": "a-dep-t",
+     "role": "T_dep"
+    },
+    {
+     "attributeId": "a-dep-win",
+     "role": "T_win"
+    }
+   ]
+  },
+  {
+   "id": "k-8",
+   "formula": "T_atp <= T_res / 10",
+   "description": "指向控制周期需远小于 ATP 机构响应时间，保证闭环稳定",
+   "members": [
+    {
+     "attributeId": "a-atp-cyc",
+     "role": "T_atp"
+    },
+    {
+     "attributeId": "a-atp-res",
+     "role": "T_res"
+    }
+   ]
+  },
+  {
+   "id": "k-9",
+   "formula": "M_ctrl <= M_bud",
+   "description": "控制器质量不得超平台分配上限",
+   "members": [
+    {
+     "attributeId": "a-c-mass",
+     "role": "M_ctrl"
+    },
+    {
+     "attributeId": "a-c-mbud",
+     "role": "M_bud"
+    }
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "id": "r-1",
+   "from": "loop_beam",
+   "to": "f_beam",
+   "type": "链路组成单机",
+   "description": "波束控制环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-2",
+   "from": "loop_beam",
+   "to": "bi1553",
+   "type": "链路组成单机",
+   "description": "波束控制环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-3",
+   "from": "loop_beam",
+   "to": "o_bfn",
+   "type": "链路组成单机",
+   "description": "波束控制环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-4",
+   "from": "loop_route",
+   "to": "f_route",
+   "type": "链路组成单机",
+   "description": "路由配置环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-5",
+   "from": "loop_route",
+   "to": "bisw",
+   "type": "链路组成单机",
+   "description": "路由配置环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-6",
+   "from": "loop_route",
+   "to": "o_dswitch",
+   "type": "链路组成单机",
+   "description": "路由配置环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-7",
+   "from": "loop_deploy",
+   "to": "f_deploy",
+   "type": "链路组成单机",
+   "description": "展开控制环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-8",
+   "from": "loop_deploy",
+   "to": "bi422",
+   "type": "链路组成单机",
+   "description": "展开控制环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-9",
+   "from": "loop_deploy",
+   "to": "o_deploy",
+   "type": "链路组成单机",
+   "description": "展开控制环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-10",
+   "from": "loop_atp",
+   "to": "f_atp",
+   "type": "链路组成单机",
+   "description": "指向控制环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-11",
+   "from": "loop_atp",
+   "to": "bi1553",
+   "type": "链路组成单机",
+   "description": "指向控制环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-12",
+   "from": "loop_atp",
+   "to": "o_atp",
+   "type": "链路组成单机",
+   "description": "指向控制环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-13",
+   "from": "loop_laser",
+   "to": "f_laser",
+   "type": "链路组成单机",
+   "description": "激光管理环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-14",
+   "from": "loop_laser",
+   "to": "bi422",
+   "type": "链路组成单机",
+   "description": "激光管理环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-15",
+   "from": "loop_laser",
+   "to": "o_laser",
+   "type": "链路组成单机",
+   "description": "激光管理环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-16",
+   "from": "loop_tm",
+   "to": "f_tm",
+   "type": "链路组成单机",
+   "description": "遥测环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-17",
+   "from": "loop_tm",
+   "to": "bi1553",
+   "type": "链路组成单机",
+   "description": "遥测环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-18",
+   "from": "loop_tm",
+   "to": "tm_tc",
+   "type": "链路组成单机",
+   "description": "遥测环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-19",
+   "from": "loop_fdir",
+   "to": "f_tm",
+   "type": "链路组成单机",
+   "description": "重构环 的经过节点（有序 1/3）"
+  },
+  {
+   "id": "r-20",
+   "from": "loop_fdir",
+   "to": "f_fdir",
+   "type": "链路组成单机",
+   "description": "重构环 的经过节点（有序 2/3）"
+  },
+  {
+   "id": "r-21",
+   "from": "loop_fdir",
+   "to": "f_route",
+   "type": "链路组成单机",
+   "description": "重构环 的经过节点（有序 3/3）"
+  },
+  {
+   "id": "r-22",
+   "from": "f_beam",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "波束管理 部署运行于主处理单元"
+  },
+  {
+   "id": "r-23",
+   "from": "f_route",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "信道交换配置 部署运行于主处理单元"
+  },
+  {
+   "id": "r-24",
+   "from": "f_deploy",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "展开时序控制 部署运行于主处理单元"
+  },
+  {
+   "id": "r-25",
+   "from": "f_atp",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "指向控制 部署运行于主处理单元"
+  },
+  {
+   "id": "r-26",
+   "from": "f_laser",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "激光功率管理 部署运行于主处理单元"
+  },
+  {
+   "id": "r-27",
+   "from": "f_tm",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "遥测采集处理 部署运行于主处理单元"
+  },
+  {
+   "id": "r-28",
+   "from": "f_fdir",
+   "to": "cpu",
+   "type": "软件部署",
+   "description": "状态监测与重构 部署运行于主处理单元"
+  },
+  {
+   "id": "r-29",
+   "from": "f_tm",
+   "to": "mem",
+   "type": "数据存放",
+   "description": "遥测固态记录与参数表存放于存储单元"
+  },
+  {
+   "id": "r-30",
+   "from": "cpu",
+   "to": "mem",
+   "type": "存储访问",
+   "description": "主处理单元经内部总线访问程序与参数存储"
+  },
+  {
+   "id": "r-31",
+   "from": "pwr",
+   "to": "cpu",
+   "type": "供电",
+   "description": "二次电源为主处理单元供电"
+  },
+  {
+   "id": "r-32",
+   "from": "pwr",
+   "to": "bisw",
+   "type": "供电",
+   "description": "二次电源为高速接口供电"
+  },
+  {
+   "id": "r-33",
+   "from": "bi1553",
+   "to": "i_bus1553",
+   "type": "接口实现",
+   "description": "1553B 接口单元实现控制总线物理/协议层"
+  },
+  {
+   "id": "r-34",
+   "from": "bi422",
+   "to": "i_422",
+   "type": "接口实现",
+   "description": "RS422 接口单元实现专用指令线"
+  },
+  {
+   "id": "r-35",
+   "from": "bisw",
+   "to": "i_sw",
+   "type": "接口实现",
+   "description": "SpaceWire 接口单元实现高速数据通道"
+  },
+  {
+   "id": "r-36",
+   "from": "tm_tc",
+   "to": "i_plat",
+   "type": "接口实现",
+   "description": "平台接口单元实现遥测遥控/一次电源/时统接入"
+  },
+  {
+   "id": "r-37",
+   "from": "i_bus1553",
+   "to": "o_bfn",
+   "type": "外部接口",
+   "description": "控制总线连接波束赋形网络（权值下发/状态回读）"
+  },
+  {
+   "id": "r-38",
+   "from": "i_bus1553",
+   "to": "o_atp",
+   "type": "外部接口",
+   "description": "控制总线连接 ATP（指向指令/跟踪误差）"
+  },
+  {
+   "id": "r-39",
+   "from": "i_bus1553",
+   "to": "o_pa",
+   "type": "外部接口",
+   "description": "控制总线连接功放（偏置/增益挡位与遥测）"
+  },
+  {
+   "id": "r-40",
+   "from": "i_sw",
+   "to": "o_dswitch",
+   "type": "外部接口",
+   "description": "SpaceWire 连接交换矩阵（路由表装载/交换状态）"
+  },
+  {
+   "id": "r-41",
+   "from": "i_422",
+   "to": "o_deploy",
+   "type": "外部接口",
+   "description": "专用指令线连接展开机构（时序指令/互锁回传）"
+  },
+  {
+   "id": "r-42",
+   "from": "i_422",
+   "to": "o_laser",
+   "type": "外部接口",
+   "description": "专用指令线连接激光器（开关/功率与光功率回传"
+  }
+ ]
+}

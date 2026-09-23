@@ -1,0 +1,4 @@
+  File "D:\ZWL\文生载荷Workbuddy\tools\build_pingcode_plan.py", line 85
+    dict(id="E0", name="E0 敏捷研发机制与质量保障体系", sprint="Sprint 0 · 启动准备",
+        ^
+SyntaxError: '(' was never closed

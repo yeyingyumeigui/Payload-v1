@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CASE1 GEO Ka 高通量通信（DTP 柔性）</title>
+<style id="page-style">
+:root { --ink:#1a2233; --muted:#5a6a85; --line:#dde5f0; --accent:#1f5eff;
+        --bg:#f5f7fb; --card:#ffffff; --ok:#1a7f4b; --bad:#c2372c; --warn:#b07a1f; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+       font-family:"Source Han Serif SC","Noto Serif CJK SC","SimSun","宋体",serif;
+       font-size:15px; line-height:1.85; }
+.toolbar { position:sticky; top:0; z-index:50; display:flex; gap:10px; align-items:center;
+           padding:10px 24px; background:#0f1c3f; color:#fff; }
+.toolbar .title { font-weight:700; margin-right:auto; font-size:15px;
+                  font-family:"Source Han Sans SC","Microsoft YaHei",sans-serif; }
+.toolbar button { border:1px solid rgba(255,255,255,.45); background:transparent;
+           color:#fff; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:13px;
+           font-family:"Source Han Sans SC","Microsoft YaHei",sans-serif; }
+.toolbar button:hover { background:rgba(255,255,255,.15); }
+.page { max-width:920px; margin:24px auto 64px; background:var(--card);
+        padding:56px 64px; border:1px solid var(--line); border-radius:8px;
+        box-shadow:0 2px 14px rgba(15,28,63,.06); }
+h1 { text-align:center; font-size:26px; line-height:1.5; margin:.2em 0 .8em;
+     font-family:"Source Han Serif SC","SimSun",serif; }
+h2 { font-size:19px; margin:1.8em 0 .6em; padding-left:10px;
+     border-left:4px solid var(--accent); }
+h3 { font-size:16px; margin:1.4em 0 .5em; }
+p { margin:.5em 0; text-align:justify; }
+blockquote { margin:.8em 0; padding:8px 14px; background:#f0f4fb;
+             border-left:3px solid var(--accent); color:var(--muted); font-size:14px; }
+table { border-collapse:collapse; width:100%; margin:.8em 0; font-size:13.5px; }
+th,td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+th { background:#eef2f9; font-weight:700; white-space:nowrap; }
+tr:nth-child(even) td { background:#fafbfe; }
+pre { background:#0f1c3f; color:#dfe7f5; padding:14px 16px; border-radius:6px;
+      overflow-x:auto; font-size:12.5px; line-height:1.6; }
+code { font-family:"Cascadia Code",Consolas,monospace; }
+p code, li code, td code { background:#eef2f9; color:#27408b; padding:1px 5px;
+      border-radius:4px; font-size:13px; }
+ul { margin:.4em 0 .8em; padding-left:1.6em; }
+li { margin:.25em 0; }
+details { margin:.6em 0; border:1px solid var(--line); border-radius:6px; padding:8px 12px; }
+summary { cursor:pointer; color:var(--accent); font-weight:600; }
+svg { max-width:100%; height:auto; display:block; margin:12px auto; }
+.toc { background:#f7f9fd; border:1px solid var(--line); border-radius:8px;
+       padding:16px 28px; margin:0 0 28px; }
+.toc-title { text-align:center; font-weight:700; font-size:17px; margin-bottom:8px;
+       letter-spacing:.5em; text-indent:.5em; }
+.toc ul { list-style:none; padding:0; margin:0; }
+.toc li { margin:3px 0; }
+.toc-3 { padding-left:1.6em; }
+.toc a { color:var(--ink); text-decoration:none; }
+.toc a:hover { color:var(--accent); }
+.meta { text-align:center; color:var(--muted); font-size:13px; margin-bottom:28px; }
+
+/* 公文风格变体：标题三号小标宋居中，正文小四仿宋/宋体，首行缩进两字符 */
+body.gongwen { font-size:12pt; }
+body.gongwen .page { max-width:800px; padding:64px 72px; }
+body.gongwen h1 { font-family:"STZhongsong","华文中宋","SimSun",serif;
+       font-size:16pt; /* 三号 */ font-weight:700; text-align:center; }
+body.gongwen h2 { font-family:"SimHei","黑体",sans-serif; font-size:14pt;
+       border-left:none; padding-left:0; }
+body.gongwen h3 { font-family:"KaiTi","楷体",serif; font-size:12pt; font-weight:700; }
+body.gongwen p { font-family:"FangSong","仿宋","SimSun",serif; font-size:12pt; /* 小四 */
+       text-indent:2em; line-height:1.9; }
+body.gongwen p.num { text-indent:0; }
+body.gongwen blockquote p, body.gongwen td p, body.gongwen th p { text-indent:0; }
+body.gongwen table { font-size:10.5pt; }
+body.gongwen .toc p { text-indent:0; }
+
+@media print {
+  .toolbar { display:none; }
+  body { background:#fff; }
+  .page { box-shadow:none; border:none; margin:0; max-width:none; padding:10mm 6mm; }
+  h2 { break-after:avoid; }
+  table, pre, blockquote, svg { break-inside:avoid; }
+}
+</style>
+
+</head>
+<body>
+<div class="toolbar">
+  <span class="title">CASE1 GEO Ka 高通量通信（DTP 柔性）</span>
+  <button onclick="downloadDoc()">下载 DOC</button>
+  <button onclick="window.print()">打印 / 存 PDF</button>
+</div>
+<div class="page">
+<nav class="toc"><div class="toc-title">目 录</div><ul>
+<li class="toc-2"><a href="#一-需求分析">一、需求分析</a></li>
+<li class="toc-2"><a href="#二-选型需求与判据">二、选型需求与判据</a></li>
+<li class="toc-3"><a href="#选型需求-天线五要素">选型需求（天线五要素）</a></li>
+<li class="toc-2"><a href="#三-载荷方案">三、载荷方案</a></li>
+<li class="toc-3"><a href="#转发体制-柔性载荷-DTP-数字透明处理">转发体制：柔性载荷 (DTP 数字透明处理)</a></li>
+<li class="toc-3"><a href="#天线选型-五要素评分">天线选型（五要素评分）</a></li>
+<li class="toc-3"><a href="#单机选型-货架产品优先">单机选型（货架产品优先）</a></li>
+<li class="toc-2"><a href="#四-平台方案">四、平台方案</a></li>
+<li class="toc-3"><a href="#平台选型-五因子评分">平台选型（五因子评分）</a></li>
+<li class="toc-2"><a href="#五-发射方案">五、发射方案</a></li>
+<li class="toc-3"><a href="#运载火箭选型-四因子评分">运载火箭选型（四因子评分）</a></li>
+<li class="toc-2"><a href="#六-指标汇总与平台校核">六、指标汇总与平台校核</a></li>
+<li class="toc-3"><a href="#载荷指标汇总与平台校核">载荷指标汇总与平台校核</a></li>
+<li class="toc-2"><a href="#七-链路预算与余量校核">七、链路预算与余量校核</a></li>
+<li class="toc-3"><a href="#链路预算与余量校核">链路预算与余量校核</a></li>
+<li class="toc-2"><a href="#八-方案三重校验">八、方案三重校验</a></li>
+<li class="toc-3"><a href="#方案三重校验">方案三重校验</a></li>
+<li class="toc-2"><a href="#九-风险与异常处置">九、风险与异常处置</a></li>
+<li class="toc-2"><a href="#十-结论">十、结论</a></li>
+</ul></nav>
+<blockquote>文生载荷智能体自动生成 | 2026-09-20 | 版本 V0.1（骨架）</blockquote>
+<blockquote></blockquote>
+<blockquote>原始需求：设计GEO Ka频段高通量通信载荷，EIRP&gt;=62dBW，G/T&gt;=12，48个波束相控阵，DTP柔性体制，容量50Gbps，寿命15年</blockquote>
+<h2 id="一-需求分析">一、需求分析</h2>
+<ul>
+<li>载荷类型=communication</li>
+<li>轨道=GEO</li>
+<li>频段=Ka</li>
+<li>关键技术=相控阵天线、数字透明处理</li>
+<li>转发体制=dtp</li>
+<li>天线形态=相控阵</li>
+<li>指标[eirp_dbw=62、gt_dbk=12、life_years=15、capacity_gbps=50、beam_num=48]</li>
+</ul>
+<h2 id="二-选型需求与判据">二、选型需求与判据</h2>
+<h3 id="选型需求-天线五要素">选型需求（天线五要素）</h3>
+<table>
+<thead><tr><th>要素</th><th>取值</th><th>来源</th></tr></thead><tbody>
+<tr><td>EIRP</td><td>62.0 dBW</td><td>用户指定</td></tr>
+<tr><td>G/T</td><td>12.0 dB/K</td><td>用户指定</td></tr>
+<tr><td>质量约束</td><td>未指定</td><td>未指定（按平台能力校核）</td></tr>
+<tr><td>功耗约束</td><td>未指定</td><td>未指定（按平台能力校核）</td></tr>
+<tr><td>参考包络</td><td>650 kg / 6000 W</td><td>GEO 轨道典型值（仅用于评分排序）</td></tr>
+<tr><td>工作模式</td><td>在轨重构</td><td>由关键技术推断</td></tr>
+<tr><td>目标轨道</td><td>GEO</td><td>用户指定</td></tr>
+<tr><td>任务寿命</td><td>15 年</td><td>用户指定</td></tr>
+<tr><td>转发体制</td><td>柔性载荷 (DTP 数字透明处理)</td><td>用户指定</td></tr>
+<tr><td>工作频段</td><td>Ka</td><td>用户指定</td></tr>
+<tr><td>容量需求</td><td>50 Gbps</td><td>用户指定</td></tr>
+<tr><td>波束数</td><td>48 个</td><td>用户指定</td></tr>
+</tbody></table>
+<h2 id="三-载荷方案">三、载荷方案</h2>
+<h3 id="转发体制-柔性载荷-DTP-数字透明处理">转发体制：柔性载荷 (DTP 数字透明处理)</h3>
+<p>数字信道化 + 星上交换矩阵，波束/带宽/功率可在轨重构。</p>
+<p><strong>载荷链路组成：</strong></p>
+<pre><code>
+  接收天线 → LNA → 下变频 → ADC/数字信道化 → 交换矩阵 → DAC → 上变频 → MPA 功率池 → 发射天线
+</code></pre>
+<table>
+<thead><tr><th>优势</th><th>局限</th></tr></thead><tbody>
+<tr><td>波束与功率在轨重构</td><td>功耗与质量代价高</td></tr>
+<tr><td>子带级灵活调度</td><td>算法与硬件耦合复杂</td></tr>
+<tr><td>功率池单管故障可重构</td><td>货架化程度仍在提升</td></tr>
+</tbody></table>
+<p><strong>适用场景</strong>：商业航天批产、多任务复用、需求频繁变更场景</p>
+<h3 id="天线选型-五要素评分">天线选型（五要素评分）</h3>
+<table>
+<thead><tr><th>排序</th><th>型号</th><th>名称</th><th>频段</th><th>EIRP能力</th><th>G/T</th><th>质量</th><th>功耗</th><th>波束数</th><th>评分</th><th>货架水平</th></tr></thead><tbody>
+<tr><td>★首选</td><td>ANT-AESA-KA-HTS</td><td>Ka 频段多波束相控阵天线</td><td>Ka</td><td>62 dBW</td><td>12.0</td><td>180 kg</td><td>2200 W</td><td>48</td><td><strong>101.5</strong></td><td>飞行继承（低轨宽带星座批量在轨）</td></tr>
+<tr><td>2</td><td>ANT-REFL-KA-RA</td><td>Ka 频段可展开反射阵天线</td><td>Ka</td><td>60 dBW</td><td>13.0</td><td>260 kg</td><td>320 W</td><td>32</td><td><strong>95.0</strong></td><td>货架（在研转货架）</td></tr>
+<tr><td>3</td><td>ANT-REFL-KA-25</td><td>Ka 频段 2.5m 单反射面天线</td><td>Ka</td><td>58 dBW</td><td>14.0</td><td>95 kg</td><td>150 W</td><td>4</td><td><strong>80.0</strong></td><td>飞行继承货架</td></tr>
+</tbody></table>
+<p><strong>首选理由：</strong></p>
+<ul>
+<li>EIRP 能力 62 dBW ≥ 需求 62 dBW</li>
+<li>G/T 12.0 dB/K ≥ 需求 12.0 dB/K</li>
+<li>质量 180 kg ≤ 参考包络 650 kg（占用 28%）</li>
+<li>功耗 2200 W ≤ 参考包络 6000 W</li>
+<li>支持工作模式：在轨重构</li>
+</ul>
+<h3 id="单机选型-货架产品优先">单机选型（货架产品优先）</h3>
+<table>
+<thead><tr><th>序号</th><th>型号</th><th>名称</th><th>品类</th><th>频段</th><th>质量</th><th>功耗</th><th>货架水平</th><th>供应商</th></tr></thead><tbody>
+<tr><td>1</td><td>LNA-KA-01</td><td>Ka 频段低噪声放大器</td><td>LNA</td><td>Ka</td><td>2.5 kg</td><td>28 W</td><td>飞行继承货架</td><td>CN-国内</td></tr>
+<tr><td>2</td><td>DCONV-KAKU-01</td><td>Ka/Ku 下变频器</td><td>DCONV</td><td>Ka/Ku</td><td>3.0 kg</td><td>45 W</td><td>飞行继承</td><td>CN-国内</td></tr>
+<tr><td>3</td><td>IMUX-OMUX-KA-16</td><td>Ka 16 通道输入/输出多工器</td><td>OMUX</td><td>Ka</td><td>18.0 kg</td><td>0 W</td><td>飞行继承货架</td><td>INT-国际</td></tr>
+<tr><td>4</td><td>DTP-PROC-01</td><td>数字透明处理器（DTP）</td><td>DTP</td><td>全频段</td><td>28.0 kg</td><td>380 W</td><td>货架（在研转货架，FlexSat 类）</td><td>GAL-银河航天</td></tr>
+<tr><td>5</td><td>UCONV-KAKU-01</td><td>Ka/Ku 上变频器</td><td>UCONV</td><td>Ka/Ku</td><td>3.2 kg</td><td>48 W</td><td>飞行继承</td><td>CN-国内</td></tr>
+<tr><td>6</td><td>MPA-8X8-KA</td><td>Ka 8×8 多功放矩阵</td><td>MPA</td><td>Ka</td><td>42.0 kg</td><td>320 W</td><td>飞行继承（功率池单管重构）</td><td>INT-国际</td></tr>
+<tr><td>7</td><td>CIRC-KA-01</td><td>Ka 频段环行器/隔离器</td><td>CIRC</td><td>Ka</td><td>0.8 kg</td><td>0 W</td><td>飞行继承货架</td><td>CN-国内</td></tr>
+<tr><td>8</td><td>SWITCH-SP8T-01</td><td>SP8T 微波开关矩阵</td><td>SWITCH</td><td>全频段</td><td>2.0 kg</td><td>18 W</td><td>飞行继承货架</td><td>CN-国内</td></tr>
+<tr><td>9</td><td>BCN-TX-01</td><td>信标发射机</td><td>BCN</td><td>S</td><td>1.5 kg</td><td>30 W</td><td>飞行继承货架</td><td>CN-国内</td></tr>
+<tr><td>10</td><td>TTC-TRP-01</td><td>测控应答机</td><td>TTC</td><td>S</td><td>4.5 kg</td><td>55 W</td><td>飞行继承货架</td><td>CN-国内</td></tr>
+</tbody></table>
+<p><strong>单机合计</strong>：10 台货架品，质量 105.5 kg，功耗 924 W</p>
+<blockquote>货架水平排序：飞行继承货架 &gt; 飞行继承 &gt; 货架(在研转货架) &gt; 定制</blockquote>
+<h2 id="四-平台方案">四、平台方案</h2>
+<h3 id="平台选型-五因子评分">平台选型（五因子评分）</h3>
+<blockquote>轨道适配 15 + 承载贴合 30 + 供电贴合 25 + 寿命匹配 15 + 飞行成熟度 15</blockquote>
+<table>
+<thead><tr><th>排序</th><th>型号</th><th>名称</th><th>轨道</th><th>承载</th><th>供电</th><th>整星质量</th><th>寿命</th><th>评分</th></tr></thead><tbody>
+<tr><td>★首选</td><td>GEO-MID42</td><td>GEO 中型平台</td><td>GEO</td><td>650 kg</td><td>6000 W</td><td>3200 kg</td><td>15 年</td><td><strong>100.8</strong></td></tr>
+<tr><td>2</td><td>GEO-LRG65</td><td>GEO 大型平台</td><td>GEO</td><td>1200 kg</td><td>12000 W</td><td>5800 kg</td><td>15 年</td><td><strong>88.9</strong></td></tr>
+</tbody></table>
+<p><strong>首选理由：</strong></p>
+<ul>
+<li>轨道适配：平台直接支持 GEO</li>
+<li>承载 650 kg ≥ 载荷 343 kg（利用率 53%）</li>
+<li>供电 6000 W ≥ 载荷 3749 W（利用率 62%）</li>
+<li>平台寿命 15 年 ≥ 任务要求 15 年</li>
+<li>成熟度：飞行继承货架</li>
+</ul>
+<details><summary>被筛除的平台及原因</summary>
+
+| 平台 | 筛除原因 |
+|------|---------|
+| PLT-LEO-SMALL-01 | 轨道不支持(仅LEO/SSO)、承载150<343kg、供电800<3749W |
+| PLT-LEO-MID-02 | 轨道不支持(仅LEO)、供电2500<3749W |
+| PLT-MEO-NAV-01 | 轨道不支持(仅MEO)、供电1800<3749W |
+| PLT-SSO-RS-01 | 轨道不支持(仅SSO/LEO)、承载300<343kg、供电1200<3749W |
+
+</details>
+<h2 id="五-发射方案">五、发射方案</h2>
+<h3 id="运载火箭选型-四因子评分">运载火箭选型（四因子评分）</h3>
+<blockquote>入轨能力 40 + 经济性 25 + 飞行履历 20 + 整流罩包络 15</blockquote>
+<table>
+<thead><tr><th>排序</th><th>火箭</th><th>国别</th><th>GTO</th><th>LEO</th><th>SSO</th><th>整流罩</th><th>飞行次数</th><th>评分</th></tr></thead><tbody>
+<tr><td>★首选</td><td>长征三号乙</td><td>中国</td><td>5500 kg</td><td>11200 kg</td><td>6800 kg</td><td>Φ4.2 m</td><td>100</td><td><strong>89.4</strong></td></tr>
+<tr><td>2</td><td>Falcon 9</td><td>美国</td><td>8300 kg</td><td>22800 kg</td><td>13000 kg</td><td>Φ5.2 m</td><td>300</td><td><strong>84.7</strong></td></tr>
+<tr><td>3</td><td>长征七号甲</td><td>中国</td><td>7000 kg</td><td>13500 kg</td><td>8000 kg</td><td>Φ4.2 m</td><td>6</td><td><strong>66.6</strong></td></tr>
+</tbody></table>
+<p><strong>首选理由：</strong></p>
+<ul>
+<li>入轨能力 5500 kg ≥ 整星 3200 kg（利用率 58%）</li>
+<li>单位入轨成本约 12.7 k$/kg</li>
+<li>飞行 100 次（成熟）</li>
+<li>整流罩 Φ4.2 m ≥ 整星包络 Φ4.0 m</li>
+</ul>
+<h2 id="六-指标汇总与平台校核">六、指标汇总与平台校核</h2>
+<h3 id="载荷指标汇总与平台校核">载荷指标汇总与平台校核</h3>
+<table>
+<thead><tr><th>项目</th><th>数值</th><th>约束</th><th>结论</th></tr></thead><tbody>
+<tr><td>载荷质量（含 20% 裕度）</td><td>342.6 kg</td><td>≤ 650 kg（平台）</td><td>✅ 满足</td></tr>
+<tr><td>载荷功耗（含 20% 裕度）</td><td>3749 W</td><td>≤ 6000 W（平台）</td><td>✅ 满足</td></tr>
+<tr><td>其中天线</td><td>180 kg / 2200 W</td><td>—</td><td>—</td></tr>
+<tr><td>其中单机</td><td>105.5 kg / 924 W</td><td>—</td><td>—</td></tr>
+<tr><td>整星质量估算</td><td>3200 kg</td><td>—</td><td>平台 GEO-MID42</td></tr>
+</tbody></table>
+<p><strong>平台/运载可行性</strong>：✅ 通过（校核迭代 1 次）</p>
+<h2 id="七-链路预算与余量校核">七、链路预算与余量校核</h2>
+<h3 id="链路预算与余量校核">链路预算与余量校核</h3>
+<blockquote>判据：C/N 余量 ≥ 3 dB；调制体制由 C/N 自适应选定（DVBS2X 阶梯）</blockquote>
+<table>
+<thead><tr><th>链路</th><th>频段</th><th>频率</th><th>斜距</th><th>EIRP</th><th>G/T</th><th>带宽</th><th>FSPL</th><th>雨衰</th><th>C/N0</th><th>C/N</th><th>体制</th><th>余量</th><th>容量</th><th>结论</th></tr></thead><tbody>
+<tr><td>上行链路 Ka</td><td>Ka</td><td>30 GHz</td><td>39550.7 km</td><td>75.0 dBW</td><td>12.0</td><td>250 MHz</td><td>213.9 dB</td><td>2.6 dB</td><td>97.3 dBHz</td><td>13.3 dB</td><td>8PSK_DVBS2X</td><td><strong>+4.3 dB</strong></td><td>712 Mbps</td><td>✅</td></tr>
+<tr><td>下行链路 Ka</td><td>Ka</td><td>20 GHz</td><td>39550.7 km</td><td>62.0 dBW</td><td>30.0</td><td>250 MHz</td><td>210.4 dB</td><td>4.4 dB</td><td>104.1 dBHz</td><td>20.1 dB</td><td>32APSK_DVBS2X</td><td><strong>+4.6 dB</strong></td><td>1112 Mbps</td><td>✅</td></tr>
+</tbody></table>
+<p><strong>校核结论</strong>：2/2 条链路通过；下行总可用容量约 <strong>1.11 Gbps</strong></p>
+<h2 id="八-方案三重校验">八、方案三重校验</h2>
+<h3 id="方案三重校验">方案三重校验</h3>
+<table>
+<thead><tr><th>类别</th><th>校核项</th><th>结果</th><th>说明</th></tr></thead><tbody>
+<tr><td>语法</td><td>天线/载荷选型结果非空</td><td>✅ 通过</td><td>已选出首选载荷产品</td></tr>
+<tr><td>语法</td><td>平台选型结果非空</td><td>✅ 通过</td><td>首选平台 GEO-MID42</td></tr>
+<tr><td>语法</td><td>运载选型结果非空</td><td>✅ 通过</td><td>首选运载 长征三号乙</td></tr>
+<tr><td>语义</td><td>天线 EIRP 能力 ≥ 需求</td><td>✅ 通过</td><td>能力 62 dBW vs 需求 62 dBW</td></tr>
+<tr><td>语义</td><td>天线 G/T ≥ 需求</td><td>✅ 通过</td><td>能力 12.0 dB/K vs 需求 12.0 dB/K</td></tr>
+<tr><td>语义</td><td>工作模式匹配</td><td>✅ 通过</td><td>需求 在轨重构，具备 多波束/波束跳变/在轨重构</td></tr>
+<tr><td>语义</td><td>载荷质量 ≤ 平台承载</td><td>✅ 通过</td><td>343 kg vs 650 kg（利用率 53%）</td></tr>
+<tr><td>语义</td><td>载荷功耗 ≤ 平台供电</td><td>✅ 通过</td><td>3749 W vs 6000 W（利用率 62%）</td></tr>
+<tr><td>语义</td><td>平台承载裕度 ≥ 10%</td><td>✅ 通过</td><td>利用率 53%</td></tr>
+<tr><td>语义</td><td>平台寿命 ≥ 任务寿命</td><td>✅ 通过</td><td>15 年 vs 需求 15 年</td></tr>
+<tr><td>合规</td><td>业务链路单机频段与任务频段一致</td><td>✅ 通过</td><td>全部业务单机频段匹配（测控/信标按标准固定 S 波段）</td></tr>
+<tr><td>合规</td><td>上行链路 Ka C/N 余量 ≥ 3 dB</td><td>✅ 通过</td><td>余量 4.34 dB（C/N 13.34 dB，门限 9.0 dB）</td></tr>
+<tr><td>合规</td><td>下行链路 Ka C/N 余量 ≥ 3 dB</td><td>✅ 通过</td><td>余量 4.60 dB（C/N 20.10 dB，门限 15.5 dB）</td></tr>
+<tr><td>合规</td><td>单机全部为货架产品</td><td>✅ 通过</td><td>无定制缺口，符合货架优先原则</td></tr>
+<tr><td>合规</td><td>平台/运载可行性</td><td>✅ 通过</td><td>三级选型闭环可行</td></tr>
+</tbody></table>
+<p><strong>校验结论</strong>：✅ 通过</p>
+<h2 id="九-风险与异常处置">九、风险与异常处置</h2>
+<table>
+<thead><tr><th>风险项</th><th>等级</th><th>影响</th><th>处置措施</th></tr></thead><tbody>
+<tr><td>无重大风险</td><td>—</td><td>—</td><td>按流程推进</td></tr>
+</tbody></table>
+<h2 id="十-结论">十、结论</h2>
+<p><strong>方案可行，可进入详细设计阶段。</strong></p>
+<ul>
+<li>载荷：ANT-AESA-KA-HTS（Ka 频段多波束相控阵天线） + 货架单机 10 台</li>
+<li>平台：GEO-MID42（GEO 中型平台），整星约 3200 kg</li>
+<li>发射：长征三号乙（中国）</li>
+<li>校核回环迭代 1 次，可行性通过</li>
+</ul>
+</div>
+<script>
+function downloadDoc() {
+  var page = document.querySelector('.page');
+  var css = document.querySelector('#page-style').textContent;
+  var head = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+    + 'xmlns:w="urn:schemas-microsoft-com:office:word" '
+    + 'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'
+    + '<title>' + (document.title || 'scheme') + '</title>'
+    + '<style>' + css + ' body{font-family:SimSun,serif;} .toolbar{display:none;}'
+    + ' .page{border:none;box-shadow:none;margin:0;padding:0;max-width:none;}</style>'
+    + '</head><body>';
+  var src = head + page.outerHTML + '</body></html>';
+  var blob = new Blob(['\ufeff', src], {type: 'application/msword'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (document.title || 'scheme') + '.doc';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+}
+</script>
+</body>
+</html>

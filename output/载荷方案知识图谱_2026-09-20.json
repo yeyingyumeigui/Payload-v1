@@ -1,0 +1,1473 @@
+{
+  "version": 2,
+  "exportedAt": "2026-09-20T02:31:51.067251Z",
+  "name": "载荷方案知识图谱",
+  "description": "在卫星系统知识图谱基础上扩展的载荷方案领域图谱，覆盖通信天线（相控阵/反射阵/反射面/伞状/喇叭/螺旋/光学）、转发器（透明/再生/DTP柔性）、激光通信终端、智能处理单元（DPU/星载计算机/AI推理/在轨重构）、射频单机链（LNA/SSPA/TWTA/OMUX/MPA等）、通信链路（上行/下行/星间激光/星间射频）、频段/轨道/转发体制、平台/运载，以及遥感/导航/科学载荷。约束含 EIRP/G_T/FSPL/C_N0/链路余量/容量/DTP交换/质量功耗/激光ATP/货架优先等工程判据。",
+  "sourceFile": "knowledge-graph-2026-09-20.json",
+  "ontologies": [
+    {
+      "id": "sat",
+      "name": "卫星系统",
+      "description": "卫星总体，承载任务与平台顶层指标",
+      "parentId": null,
+      "order": 0
+    },
+    {
+      "id": "payload",
+      "name": "有效载荷分系统",
+      "description": "执行卫星核心任务的有效载荷集合（通信/遥感/导航/科学）",
+      "parentId": "sat",
+      "order": 0
+    },
+    {
+      "id": "control",
+      "name": "控制分系统",
+      "description": "负责卫星姿态与轨道控制",
+      "parentId": "sat",
+      "order": 1
+    },
+    {
+      "id": "power",
+      "name": "电源分系统",
+      "description": "卫星电能的产生、存储与分配",
+      "parentId": "sat",
+      "order": 2
+    },
+    {
+      "id": "ttc",
+      "name": "测控分系统",
+      "description": "卫星遥测、遥控与测距",
+      "parentId": "sat",
+      "order": 3
+    },
+    {
+      "id": "platform",
+      "name": "卫星平台",
+      "description": "提供结构/热控/姿轨控/供电等通用支撑的公用平台（货架化程度高）",
+      "parentId": "sat",
+      "order": 4
+    },
+    {
+      "id": "launch_vehicle",
+      "name": "运载火箭",
+      "description": "将卫星送入目标轨道的运输系统，按 GTO/LEO/SSO 运力与整流罩包络选型",
+      "parentId": "sat",
+      "order": 5
+    },
+    {
+      "id": "star",
+      "name": "星敏感器",
+      "description": "通过恒星观测提供高精度姿态基准",
+      "parentId": "control",
+      "order": 0
+    },
+    {
+      "id": "obc",
+      "name": "控制计算机",
+      "description": "姿态控制律解算与指令输出",
+      "parentId": "control",
+      "order": 1
+    },
+    {
+      "id": "gyro",
+      "name": "陀螺组件",
+      "description": "惯性姿态角速率测量",
+      "parentId": "control",
+      "order": 2
+    },
+    {
+      "id": "panel",
+      "name": "太阳能帆板",
+      "description": "光照期发电单元",
+      "parentId": "power",
+      "order": 0
+    },
+    {
+      "id": "battery",
+      "name": "蓄电池组",
+      "description": "阴影期供电与能量存储",
+      "parentId": "power",
+      "order": 1
+    },
+    {
+      "id": "ttc_transponder",
+      "name": "测控应答机",
+      "description": "测控信号的收发与相干转发",
+      "parentId": "ttc",
+      "order": 0
+    },
+    {
+      "id": "ttc_antenna",
+      "name": "测控天线",
+      "description": "测控链路射频信号辐射与接收",
+      "parentId": "ttc",
+      "order": 1
+    },
+    {
+      "id": "camera",
+      "name": "光学相机",
+      "description": "对地观测的高分辨率光学载荷（全色/多光谱/高光谱）",
+      "parentId": "payload",
+      "order": 0
+    },
+    {
+      "id": "ccd",
+      "name": "CCD探测器",
+      "description": "光学相机成像焦平面器件",
+      "parentId": "camera",
+      "order": 0
+    },
+    {
+      "id": "sar",
+      "name": "合成孔径雷达",
+      "description": "主动微波成像载荷，全天时全天候对地观测",
+      "parentId": "payload",
+      "order": 1
+    },
+    {
+      "id": "hyperspectral",
+      "name": "高光谱成像仪",
+      "description": "多光谱段连续成像，用于物质成分反演",
+      "parentId": "payload",
+      "order": 2
+    },
+    {
+      "id": "comm_payload",
+      "name": "通信有效载荷",
+      "description": "卫星通信业务载荷，含天线/转发器/处理/激光等，按转发体制（透明/再生/DTP柔性）组织",
+      "parentId": "payload",
+      "order": 3
+    },
+    {
+      "id": "comm_antenna",
+      "name": "通信天线",
+      "description": "业务链路射频信号辐射与接收，按体制分为相控阵/反射面/反射阵/喇叭/螺旋/光学等",
+      "parentId": "comm_payload",
+      "order": 0
+    },
+    {
+      "id": "phased_array",
+      "name": "相控阵天线",
+      "description": "由 T/R 组件构成的有源电子扫描阵列，支持多波束/波束跳变/在轨重构，是柔性载荷与手机直连的核心天线体制",
+      "parentId": "comm_antenna",
+      "order": 0
+    },
+    {
+      "id": "reflectarray",
+      "name": "反射阵天线",
+      "description": "由可展开反射阵面构成的天线，兼顾大口径与展开收纳，适用于 Ka 多波束重构",
+      "parentId": "comm_antenna",
+      "order": 1
+    },
+    {
+      "id": "reflector",
+      "name": "反射面天线",
+      "description": "固定或可展开抛物面天线，技术成熟、成本低，适用于单波束或固定多波束覆盖",
+      "parentId": "comm_antenna",
+      "order": 2
+    },
+    {
+      "id": "umbrella",
+      "name": "伞状可展开天线",
+      "description": "大口径伞状网面可展开天线，适用于 L 波段大口径多波束（如 12m 伞状）",
+      "parentId": "comm_antenna",
+      "order": 3
+    },
+    {
+      "id": "horn",
+      "name": "喇叭天线",
+      "description": "全向或准全向喇叭天线，用于低增益广覆盖（如 C 频段全向）",
+      "parentId": "comm_antenna",
+      "order": 4
+    },
+    {
+      "id": "helix",
+      "name": "螺旋天线",
+      "description": "四臂螺旋等圆极化天线，用于测控/导航/低速率链路",
+      "parentId": "comm_antenna",
+      "order": 5
+    },
+    {
+      "id": "optical_antenna",
+      "name": "光学天线",
+      "description": "激光通信终端的卡塞格林/折射式光学收发天线",
+      "parentId": "comm_antenna",
+      "order": 6
+    },
+    {
+      "id": "tr_module",
+      "name": "T/R组件",
+      "description": "相控阵的收发组件，含功放/低噪放/移相器/衰减器，是阵面功耗与热控关键",
+      "parentId": "phased_array",
+      "order": 0
+    },
+    {
+      "id": "beam_former",
+      "name": "波束赋形网络",
+      "description": "实现多波束成形与功率合成的网络（模拟 BFN 或数字 DBF）",
+      "parentId": "phased_array",
+      "order": 1
+    },
+    {
+      "id": "transponder",
+      "name": "通信转发器",
+      "description": "业务信号星上转发处理单元，按体制分为透明转发/再生处理/柔性DTP",
+      "parentId": "comm_payload",
+      "order": 1
+    },
+    {
+      "id": "transparent",
+      "name": "透明转发器",
+      "description": "仅做变频与放大（Bent-Pipe），不解调，技术成熟、时延小、成本低",
+      "parentId": "transponder",
+      "order": 0
+    },
+    {
+      "id": "regenerative",
+      "name": "再生转发器",
+      "description": "星上解调/译码/交换/再调制，噪声不累积、链路余量提升、支持星上路由",
+      "parentId": "transponder",
+      "order": 1
+    },
+    {
+      "id": "dtp",
+      "name": "DTP数字透明处理器",
+      "description": "数字信道化+星上交换矩阵，波束/带宽/功率在轨重构（FlexSat 类柔性载荷核心）",
+      "parentId": "transponder",
+      "order": 2
+    },
+    {
+      "id": "rf_chain",
+      "name": "射频单机链",
+      "description": "通信转发器的射频通道单机集合（接收/变频/放大/合成/隔离）",
+      "parentId": "comm_payload",
+      "order": 2
+    },
+    {
+      "id": "lna",
+      "name": "低噪声放大器LNA",
+      "description": "接收前端低噪声放大，决定接收系统噪声温度与 G/T",
+      "parentId": "rf_chain",
+      "order": 0
+    },
+    {
+      "id": "sspa",
+      "name": "固态功放SSPA",
+      "description": "GaN/GaAs 固态功率放大器，高可靠、长寿命，适合批产",
+      "parentId": "rf_chain",
+      "order": 1
+    },
+    {
+      "id": "twta",
+      "name": "行波管功放TWTA",
+      "description": "高效率大功率放大，适合 GEO 大 EIRP 透明转发",
+      "parentId": "rf_chain",
+      "order": 2
+    },
+    {
+      "id": "dconv",
+      "name": "下变频器DCONV",
+      "description": "将上行射频下变频至中频/零中频",
+      "parentId": "rf_chain",
+      "order": 3
+    },
+    {
+      "id": "uconv",
+      "name": "上变频器UCONV",
+      "description": "将中频上变频至下行射频",
+      "parentId": "rf_chain",
+      "order": 4
+    },
+    {
+      "id": "omux",
+      "name": "输出多工器OMUX",
+      "description": "多通道下行滤波与合成，隔离各通道并合至发射天线",
+      "parentId": "rf_chain",
+      "order": 5
+    },
+    {
+      "id": "imux",
+      "name": "输入多工器IMUX",
+      "description": "多通道上行滤波与分路",
+      "parentId": "rf_chain",
+      "order": 6
+    },
+    {
+      "id": "mpa",
+      "name": "多功放矩阵MPA",
+      "description": "N×N 功率池，单管故障可重构，提高功放利用率与可靠性",
+      "parentId": "rf_chain",
+      "order": 7
+    },
+    {
+      "id": "circulator",
+      "name": "环行器/隔离器",
+      "description": "收发隔离与单向传输保护，提升功放稳定性",
+      "parentId": "rf_chain",
+      "order": 8
+    },
+    {
+      "id": "switch_matrix",
+      "name": "微波开关矩阵",
+      "description": "SP8T 等开关矩阵，实现通道切换与重构",
+      "parentId": "rf_chain",
+      "order": 9
+    },
+    {
+      "id": "laser_com",
+      "name": "激光通信终端",
+      "description": "星间/星地激光高速链路终端（ATP 捕获跟踪瞄准 + DPSK/OOK 调制）",
+      "parentId": "comm_payload",
+      "order": 3
+    },
+    {
+      "id": "atp",
+      "name": "ATP捕获跟踪瞄准",
+      "description": "激光链路的粗跟踪+精跟踪+瞄准子系统，决定建链捕获概率与跟踪精度",
+      "parentId": "laser_com",
+      "order": 0
+    },
+    {
+      "id": "optical_trm",
+      "name": "光收发模块",
+      "description": "激光器/探测器/DPSK调制解调，决定激光链路速率与灵敏度",
+      "parentId": "laser_com",
+      "order": 1
+    },
+    {
+      "id": "intelligent_processing",
+      "name": "智能处理单元",
+      "description": "星上在轨处理与智能计算单元，含数据压缩/AI推理/在轨重构调度",
+      "parentId": "comm_payload",
+      "order": 4
+    },
+    {
+      "id": "dpu",
+      "name": "数据处理单元DPU",
+      "description": "载荷数据在轨处理、压缩、缓存与下行调度",
+      "parentId": "intelligent_processing",
+      "order": 0
+    },
+    {
+      "id": "obc_payload",
+      "name": "星载计算机",
+      "description": "载荷级控制与管理计算机，负责载荷调度/遥控遥测/故障管理",
+      "parentId": "intelligent_processing",
+      "order": 1
+    },
+    {
+      "id": "ai_unit",
+      "name": "AI推理单元",
+      "description": "星上 AI 加速单元，支持目标检测/变化检测/云检测/在轨智能筛选",
+      "parentId": "intelligent_processing",
+      "order": 2
+    },
+    {
+      "id": "reconfig_controller",
+      "name": "在轨重构控制器",
+      "description": "柔性载荷在轨重构调度（波束图样/带宽/功率/路由的动态配置）",
+      "parentId": "intelligent_processing",
+      "order": 3
+    },
+    {
+      "id": "link",
+      "name": "通信链路",
+      "description": "星地/星间射频或激光链路的抽象，承载 EIRP/G_T/带宽/余量等预算指标",
+      "parentId": "comm_payload",
+      "order": 5
+    },
+    {
+      "id": "uplink",
+      "name": "上行链路",
+      "description": "关口站→卫星上行链路（雨衰按上行频段计）",
+      "parentId": "link",
+      "order": 0
+    },
+    {
+      "id": "downlink",
+      "name": "下行链路",
+      "description": "卫星→用户/关口站下行链路（EIRP 由星上决定）",
+      "parentId": "link",
+      "order": 1
+    },
+    {
+      "id": "isl_laser",
+      "name": "星间激光链路",
+      "description": "星间激光高速链路（ISL），用于星座组网与回传",
+      "parentId": "link",
+      "order": 2
+    },
+    {
+      "id": "isl_rf",
+      "name": "星间射频链路",
+      "description": "星间射频链路（Ka/毫米波），用于星座组网",
+      "parentId": "link",
+      "order": 3
+    },
+    {
+      "id": "frequency_band",
+      "name": "频段",
+      "description": "业务频段（L/S/C/X/Ku/Ka/Q/V/激光），决定雨衰、天线口径、器件工艺与频率指配",
+      "parentId": "comm_payload",
+      "order": 6
+    },
+    {
+      "id": "orbit",
+      "name": "轨道类型",
+      "description": "LEO/MEO/GEO/SSO/HEO，决定斜距、覆盖、时延与平台/运载选型",
+      "parentId": "sat",
+      "order": 6
+    },
+    {
+      "id": "arch_template",
+      "name": "转发体制",
+      "description": "透明转发/再生处理/DTP 柔性，决定载荷架构与单机链组成",
+      "parentId": "comm_payload",
+      "order": 7
+    },
+    {
+      "id": "nav_payload",
+      "name": "导航载荷",
+      "description": "导航信号生成与放大、导航天线、原子钟（B1C/B2a/L1/L5）",
+      "parentId": "payload",
+      "order": 4
+    },
+    {
+      "id": "sci_payload",
+      "name": "科学探测载荷",
+      "description": "大气掩星/重力场/磁强计等科学探测载荷",
+      "parentId": "payload",
+      "order": 5
+    }
+  ],
+  "attributes": [
+    {
+      "id": "a-star-fov",
+      "ontologyId": "star",
+      "name": "视场角",
+      "description": "星敏感器可观测天区的角度范围，影响可用恒星数量",
+      "symbol": "FOV"
+    },
+    {
+      "id": "a-star-acc",
+      "ontologyId": "star",
+      "name": "测量精度",
+      "description": "星敏感器输出的姿态测量误差（3σ）",
+      "symbol": "σ_m"
+    },
+    {
+      "id": "a-star-update",
+      "ontologyId": "star",
+      "name": "更新速率",
+      "description": "姿态数据输出频率（Hz）",
+      "symbol": "f_hr"
+    },
+    {
+      "id": "a-obc-point",
+      "ontologyId": "obc",
+      "name": "姿态控制精度",
+      "description": "卫星稳定后的姿态偏差（3σ）",
+      "symbol": "σ_c"
+    },
+    {
+      "id": "a-obc-stab",
+      "ontologyId": "obc",
+      "name": "姿态稳定度",
+      "description": "姿态角速率波动范围（°/s）",
+      "symbol": "ω_s"
+    },
+    {
+      "id": "a-cam-res",
+      "ontologyId": "camera",
+      "name": "地面分辨率",
+      "description": "图像可分辨的最小地面距离（m）",
+      "symbol": "GSD"
+    },
+    {
+      "id": "a-cam-swath",
+      "ontologyId": "camera",
+      "name": "幅宽",
+      "description": "单景图像覆盖的地面宽度（km）",
+      "symbol": "W_sw"
+    },
+    {
+      "id": "a-panel-power",
+      "ontologyId": "panel",
+      "name": "输出功率",
+      "description": "光照期帆板输出电功率（W）",
+      "symbol": "P_pv"
+    },
+    {
+      "id": "a-bat-cap",
+      "ontologyId": "battery",
+      "name": "容量",
+      "description": "蓄电池组可用储能（Wh）",
+      "symbol": "E_b"
+    },
+    {
+      "id": "a-bat-dod",
+      "ontologyId": "battery",
+      "name": "放电深度",
+      "description": "蓄电池组单圈放电比例（%）",
+      "symbol": "DOD"
+    },
+    {
+      "id": "a-ttc-ant-gain",
+      "ontologyId": "ttc_antenna",
+      "name": "增益",
+      "description": "测控天线方向性增益（dBi）",
+      "symbol": "G_t"
+    },
+    {
+      "id": "a-control-acc",
+      "ontologyId": "control",
+      "name": "姿态测量精度",
+      "description": "分系统级姿态测量精度指标",
+      "symbol": "σ_ctl"
+    },
+    {
+      "id": "a-ccd-pixel",
+      "ontologyId": "ccd",
+      "name": "像元尺寸",
+      "description": "CCD单个像元的物理尺寸（μm）",
+      "symbol": "d_px"
+    },
+    {
+      "id": "a-comm-ant-eirp",
+      "ontologyId": "comm_antenna",
+      "name": "EIRP能力",
+      "description": "天线等效全向辐射功率能力（dBW），= P_out + G_ant − L_feed",
+      "symbol": "EIRP"
+    },
+    {
+      "id": "a-comm-ant-gt",
+      "ontologyId": "comm_antenna",
+      "name": "G/T品质因数",
+      "description": "接收增益与系统噪声温度之比（dB/K）",
+      "symbol": "G/T"
+    },
+    {
+      "id": "a-comm-ant-gain",
+      "ontologyId": "comm_antenna",
+      "name": "天线增益",
+      "description": "天线方向性增益（dBi）",
+      "symbol": "G_ant"
+    },
+    {
+      "id": "a-comm-ant-beam",
+      "ontologyId": "comm_antenna",
+      "name": "波束数",
+      "description": "可同时形成的独立波束数量",
+      "symbol": "N_beam"
+    },
+    {
+      "id": "a-comm-ant-mass",
+      "ontologyId": "comm_antenna",
+      "name": "质量",
+      "description": "天线系统质量（kg）",
+      "symbol": "m_ant"
+    },
+    {
+      "id": "a-comm-ant-power",
+      "ontologyId": "comm_antenna",
+      "name": "功耗",
+      "description": "天线系统总功耗（W）",
+      "symbol": "P_ant"
+    },
+    {
+      "id": "a-comm-ant-mode",
+      "ontologyId": "comm_antenna",
+      "name": "工作模式",
+      "description": "单波束/多波束/波束跳变/在轨重构",
+      "symbol": "Mode"
+    },
+    {
+      "id": "a-comm-ant-aperture",
+      "ontologyId": "comm_antenna",
+      "name": "口径/阵面尺寸",
+      "description": "反射面口径或阵面尺寸（m）",
+      "symbol": "D_ap"
+    },
+    {
+      "id": "a-pa-elements",
+      "ontologyId": "phased_array",
+      "name": "阵元数",
+      "description": "相控阵 T/R 组件数量",
+      "symbol": "N_el"
+    },
+    {
+      "id": "a-pa-scan",
+      "ontologyId": "phased_array",
+      "name": "扫描角",
+      "description": "电子扫描覆盖范围（±°）",
+      "symbol": "θ_scan"
+    },
+    {
+      "id": "a-pa-reconfig",
+      "ontologyId": "phased_array",
+      "name": "在轨重构能力",
+      "description": "波束图样/带宽/功率在轨重构支持度（0-1）",
+      "symbol": "R_pa"
+    },
+    {
+      "id": "a-ra-aperture",
+      "ontologyId": "reflectarray",
+      "name": "展开口径",
+      "description": "展开后反射阵口径（m）",
+      "symbol": "D_ra"
+    },
+    {
+      "id": "a-refl-surface",
+      "ontologyId": "reflector",
+      "name": "面精度",
+      "description": "反射面表面 RMS 误差（mm），需 ≤ λ/32",
+      "symbol": "δ_surf"
+    },
+    {
+      "id": "a-tr-power",
+      "ontologyId": "tr_module",
+      "name": "单组件功耗",
+      "description": "单个 T/R 组件功耗（W）",
+      "symbol": "P_tr"
+    },
+    {
+      "id": "a-tr-temp",
+      "ontologyId": "tr_module",
+      "name": "结温",
+      "description": "T/R 组件结温（℃），需 ≤ 125℃",
+      "symbol": "T_j"
+    },
+    {
+      "id": "a-trp-gain",
+      "ontologyId": "transponder",
+      "name": "转发增益",
+      "description": "转发器总增益（dB）",
+      "symbol": "G_trp"
+    },
+    {
+      "id": "a-trp-nf",
+      "ontologyId": "transponder",
+      "name": "噪声系数",
+      "description": "接收通道噪声系数（dB），影响 G/T",
+      "symbol": "NF"
+    },
+    {
+      "id": "a-trp-bw",
+      "ontologyId": "transponder",
+      "name": "转发带宽",
+      "description": "单转发器带宽（MHz）",
+      "symbol": "B_trp"
+    },
+    {
+      "id": "a-trp-mass",
+      "ontologyId": "transponder",
+      "name": "质量",
+      "description": "转发器质量（kg）",
+      "symbol": "m_trp"
+    },
+    {
+      "id": "a-trp-power",
+      "ontologyId": "transponder",
+      "name": "功耗",
+      "description": "转发器功耗（W）",
+      "symbol": "P_trp"
+    },
+    {
+      "id": "a-trans-delay",
+      "ontologyId": "transparent",
+      "name": "转发时延",
+      "description": "透明转发星上处理时延（ns），近零",
+      "symbol": "τ_trans"
+    },
+    {
+      "id": "a-regen-gain",
+      "ontologyId": "regenerative",
+      "name": "链路余量增益",
+      "description": "再生相比透明可提升链路余量（dB）",
+      "symbol": "ΔM_reg"
+    },
+    {
+      "id": "a-regen-delay",
+      "ontologyId": "regenerative",
+      "name": "处理时延",
+      "description": "星上解调译码再调制时延（ms）",
+      "symbol": "τ_reg"
+    },
+    {
+      "id": "a-dtp-sub-bw",
+      "ontologyId": "dtp",
+      "name": "子带带宽",
+      "description": "数字信道化最小子带带宽（MHz）",
+      "symbol": "B_sub"
+    },
+    {
+      "id": "a-dtp-switch",
+      "ontologyId": "dtp",
+      "name": "交换容量",
+      "description": "星上交换矩阵总容量（Gbps）",
+      "symbol": "C_sw"
+    },
+    {
+      "id": "a-dtp-channels",
+      "ontologyId": "dtp",
+      "name": "信道数",
+      "description": "数字信道化通道数",
+      "symbol": "N_ch"
+    },
+    {
+      "id": "a-dtp-mass",
+      "ontologyId": "dtp",
+      "name": "质量",
+      "description": "DTP 质量（kg）",
+      "symbol": "m_dtp"
+    },
+    {
+      "id": "a-dtp-power",
+      "ontologyId": "dtp",
+      "name": "功耗",
+      "description": "DTP 功耗（W）",
+      "symbol": "P_dtp"
+    },
+    {
+      "id": "a-lna-gain",
+      "ontologyId": "lna",
+      "name": "增益",
+      "description": "LNA 增益（dB）",
+      "symbol": "G_lna"
+    },
+    {
+      "id": "a-lna-nf",
+      "ontologyId": "lna",
+      "name": "噪声系数",
+      "description": "LNA 噪声系数（dB），决定接收系统温度",
+      "symbol": "NF_lna"
+    },
+    {
+      "id": "a-sspa-pout",
+      "ontologyId": "sspa",
+      "name": "输出功率",
+      "description": "SSPA 饱和输出功率（W）",
+      "symbol": "P_sspa"
+    },
+    {
+      "id": "a-sspa-eff",
+      "ontologyId": "sspa",
+      "name": "效率",
+      "description": "SSPA 功率附加效率（%）",
+      "symbol": "η_sspa"
+    },
+    {
+      "id": "a-twta-pout",
+      "ontologyId": "twta",
+      "name": "输出功率",
+      "description": "TWTA 饱和输出功率（W）",
+      "symbol": "P_twta"
+    },
+    {
+      "id": "a-twta-eff",
+      "ontologyId": "twta",
+      "name": "效率",
+      "description": "TWTA 效率（%）",
+      "symbol": "η_twta"
+    },
+    {
+      "id": "a-omux-channels",
+      "ontologyId": "omux",
+      "name": "通道数",
+      "description": "OMUX 通道数",
+      "symbol": "N_omux"
+    },
+    {
+      "id": "a-mpa-channels",
+      "ontologyId": "mpa",
+      "name": "矩阵规模",
+      "description": "MPA N×N 矩阵规模",
+      "symbol": "N_mpa"
+    },
+    {
+      "id": "a-laser-rate",
+      "ontologyId": "laser_com",
+      "name": "链路速率",
+      "description": "激光通信速率（Gbps）",
+      "symbol": "R_laser"
+    },
+    {
+      "id": "a-laser-eirp",
+      "ontologyId": "laser_com",
+      "name": "发射EIRP",
+      "description": "激光发射等效全向辐射功率（dBW）",
+      "symbol": "EIRP_opt"
+    },
+    {
+      "id": "a-laser-gt",
+      "ontologyId": "laser_com",
+      "name": "G/T",
+      "description": "激光接收品质因数（dB/K 等效）",
+      "symbol": "GT_opt"
+    },
+    {
+      "id": "a-atp-acq",
+      "ontologyId": "atp",
+      "name": "捕获概率",
+      "description": "ATP 建链捕获概率（%），需 ≥95%",
+      "symbol": "P_acq"
+    },
+    {
+      "id": "a-atp-track",
+      "ontologyId": "atp",
+      "name": "跟踪精度",
+      "description": "ATP 精跟踪精度（μrad），需 ≤1μrad",
+      "symbol": "σ_track"
+    },
+    {
+      "id": "a-opt-trm-sens",
+      "ontologyId": "optical_trm",
+      "name": "接收灵敏度",
+      "description": "光接收灵敏度（dBm），DPSK 优于 OOK 约6dB",
+      "symbol": "S_opt"
+    },
+    {
+      "id": "a-dpu-rate",
+      "ontologyId": "dpu",
+      "name": "处理速率",
+      "description": "DPU 在轨处理吞吐（Mbps）",
+      "symbol": "R_dpu"
+    },
+    {
+      "id": "a-dpu-compress",
+      "ontologyId": "dpu",
+      "name": "压缩比",
+      "description": "数据压缩比",
+      "symbol": "CR"
+    },
+    {
+      "id": "a-obcp-mips",
+      "ontologyId": "obc_payload",
+      "name": "处理能力",
+      "description": "星载计算机处理能力（MIPS）",
+      "symbol": "MIPS"
+    },
+    {
+      "id": "a-ai-tops",
+      "ontologyId": "ai_unit",
+      "name": "AI算力",
+      "description": "星上 AI 推理算力（TOPS）",
+      "symbol": "AI_TOPS"
+    },
+    {
+      "id": "a-reconfig-time",
+      "ontologyId": "reconfig_controller",
+      "name": "重构时间",
+      "description": "在轨重构切换时间（s）",
+      "symbol": "t_rec"
+    },
+    {
+      "id": "a-link-fspl",
+      "ontologyId": "link",
+      "name": "自由空间损耗",
+      "description": "FSPL = 20lg(d)+20lg(f)−147.55（dB）",
+      "symbol": "L_fs"
+    },
+    {
+      "id": "a-link-rain",
+      "ontologyId": "link",
+      "name": "雨衰",
+      "description": "降雨衰减（dB），按频段/仰角/可用性计",
+      "symbol": "A_rain"
+    },
+    {
+      "id": "a-link-cn0",
+      "ontologyId": "link",
+      "name": "载噪比密度",
+      "description": "C/N0 = EIRP − FSPL − ΣL + G/T − k（dBHz）",
+      "symbol": "CN0"
+    },
+    {
+      "id": "a-link-cn",
+      "ontologyId": "link",
+      "name": "载噪比",
+      "description": "C/N = C/N0 − 10lg(B)（dB）",
+      "symbol": "CN"
+    },
+    {
+      "id": "a-link-margin",
+      "ontologyId": "link",
+      "name": "链路余量",
+      "description": "M = C/N − (C/N)_req（dB），需 ≥3dB",
+      "symbol": "M"
+    },
+    {
+      "id": "a-link-cap",
+      "ontologyId": "link",
+      "name": "链路容量",
+      "description": "C = B × η（Mbps）",
+      "symbol": "C_link"
+    },
+    {
+      "id": "a-link-dist",
+      "ontologyId": "link",
+      "name": "斜距",
+      "description": "星地/星间斜距（km）",
+      "symbol": "d_slant"
+    },
+    {
+      "id": "a-link-bw",
+      "ontologyId": "link",
+      "name": "带宽",
+      "description": "链路占用带宽（MHz）",
+      "symbol": "B_link"
+    },
+    {
+      "id": "a-band-fup",
+      "ontologyId": "frequency_band",
+      "name": "上行频率",
+      "description": "上行中心频率（GHz）",
+      "symbol": "f_up"
+    },
+    {
+      "id": "a-band-fdown",
+      "ontologyId": "frequency_band",
+      "name": "下行频率",
+      "description": "下行中心频率（GHz）",
+      "symbol": "f_down"
+    },
+    {
+      "id": "a-band-rain",
+      "ontologyId": "frequency_band",
+      "name": "典型雨衰",
+      "description": "0.01%时间超越概率典型雨衰（dB）",
+      "symbol": "A_band"
+    },
+    {
+      "id": "a-orbit-alt",
+      "ontologyId": "orbit",
+      "name": "轨道高度",
+      "description": "轨道高度（km）",
+      "symbol": "H_orb"
+    },
+    {
+      "id": "a-orbit-period",
+      "ontologyId": "orbit",
+      "name": "轨道周期",
+      "description": "轨道周期（min）",
+      "symbol": "T_orb"
+    },
+    {
+      "id": "a-arch-flex",
+      "ontologyId": "arch_template",
+      "name": "体制灵活度",
+      "description": "在轨重构/灵活性等级（透明<再生<DTP）",
+      "symbol": "F_arch"
+    },
+    {
+      "id": "a-plat-mass-cap",
+      "ontologyId": "platform",
+      "name": "载荷承载质量",
+      "description": "平台可承载载荷质量（kg）",
+      "symbol": "M_plat"
+    },
+    {
+      "id": "a-plat-power-cap",
+      "ontologyId": "platform",
+      "name": "载荷供电功率",
+      "description": "平台可提供载荷功率（W）",
+      "symbol": "P_plat"
+    },
+    {
+      "id": "a-plat-sat-mass",
+      "ontologyId": "platform",
+      "name": "整星质量",
+      "description": "整星发射质量（kg）",
+      "symbol": "M_sat"
+    },
+    {
+      "id": "a-plat-envelope",
+      "ontologyId": "platform",
+      "name": "包络尺寸",
+      "description": "平台包络/整流罩适配尺寸（m）",
+      "symbol": "D_env"
+    },
+    {
+      "id": "a-plat-life",
+      "ontologyId": "platform",
+      "name": "设计寿命",
+      "description": "平台设计寿命（年）",
+      "symbol": "L_life"
+    },
+    {
+      "id": "a-lv-gto",
+      "ontologyId": "launch_vehicle",
+      "name": "GTO运力",
+      "description": "GTO 转移轨道运力（kg）",
+      "symbol": "C_gto"
+    },
+    {
+      "id": "a-lv-leo",
+      "ontologyId": "launch_vehicle",
+      "name": "LEO运力",
+      "description": "LEO 运力（kg）",
+      "symbol": "C_leo"
+    },
+    {
+      "id": "a-lv-sso",
+      "ontologyId": "launch_vehicle",
+      "name": "SSO运力",
+      "description": "SSO 运力（kg）",
+      "symbol": "C_sso"
+    },
+    {
+      "id": "a-lv-fairing",
+      "ontologyId": "launch_vehicle",
+      "name": "整流罩直径",
+      "description": "整流罩直径（m）",
+      "symbol": "D_fair"
+    },
+    {
+      "id": "a-nav-eirp",
+      "ontologyId": "nav_payload",
+      "name": "导航EIRP",
+      "description": "导航信号 EIRP（dBW）",
+      "symbol": "EIRP_nav"
+    },
+    {
+      "id": "a-nav-uere",
+      "ontologyId": "nav_payload",
+      "name": "用户等效距离误差",
+      "description": "UERE（m）",
+      "symbol": "UERE"
+    },
+    {
+      "id": "a-nav-clock",
+      "ontologyId": "nav_payload",
+      "name": "原子钟守时精度",
+      "description": "原子钟频率稳定度/守时精度",
+      "symbol": "σ_clk"
+    },
+    {
+      "id": "a-sci-sens",
+      "ontologyId": "sci_payload",
+      "name": "探测灵敏度",
+      "description": "科学探测灵敏度/精度",
+      "symbol": "S_sci"
+    },
+    {
+      "id": "a-sar-res",
+      "ontologyId": "sar",
+      "name": "空间分辨率",
+      "description": "SAR 距离/方位分辨率（m）",
+      "symbol": "GSD_sar"
+    },
+    {
+      "id": "a-sar-swath",
+      "ontologyId": "sar",
+      "name": "幅宽",
+      "description": "SAR 测绘幅宽（km）",
+      "symbol": "W_sar"
+    },
+    {
+      "id": "a-hyp-bands",
+      "ontologyId": "hyperspectral",
+      "name": "光谱通道数",
+      "description": "高光谱连续光谱通道数",
+      "symbol": "N_band"
+    },
+    {
+      "id": "a-scheme-mass",
+      "ontologyId": "comm_payload",
+      "name": "载荷总质量",
+      "description": "通信载荷总质量（kg）",
+      "symbol": "M_pay"
+    },
+    {
+      "id": "a-scheme-power",
+      "ontologyId": "comm_payload",
+      "name": "载荷总功耗",
+      "description": "通信载荷总功耗（W）",
+      "symbol": "P_pay"
+    },
+    {
+      "id": "a-scheme-gap",
+      "ontologyId": "comm_payload",
+      "name": "货架缺口数",
+      "description": "需定制（非货架）单机数量，目标为0",
+      "symbol": "N_gap"
+    },
+    {
+      "id": "a-scheme-heritage",
+      "ontologyId": "comm_payload",
+      "name": "货架水平",
+      "description": "方案整体货架继承水平（1定制~4飞行继承货架）",
+      "symbol": "H_scheme"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "c-1",
+      "formula": "σ_c ≤ σ_m / 3",
+      "description": "姿态控制精度应优于测量精度的三分之一，保证测量噪声不被放大",
+      "members": [
+        {
+          "attributeId": "a-star-acc",
+          "role": "σ_m"
+        },
+        {
+          "attributeId": "a-obc-point",
+          "role": "σ_c"
+        }
+      ]
+    },
+    {
+      "id": "c-2",
+      "formula": "P_pv ≥ E_b × DOD / T_e",
+      "description": "光照期输出功率需覆盖整星阴影期功耗（E_b 为蓄电池容量，DOD 放电深度，T_e 阴影时长）",
+      "members": [
+        {
+          "attributeId": "a-panel-power",
+          "role": "P_pv"
+        },
+        {
+          "attributeId": "a-bat-cap",
+          "role": "E_b"
+        },
+        {
+          "attributeId": "a-bat-dod",
+          "role": "DOD"
+        }
+      ]
+    },
+    {
+      "id": "c-3",
+      "formula": "σ_m + ω_s ≤ 0.05°",
+      "description": "星敏感器测量精度与姿态稳定度共同决定的姿态确定误差上限",
+      "members": [
+        {
+          "attributeId": "a-star-acc",
+          "role": "σ_m"
+        },
+        {
+          "attributeId": "a-obc-stab",
+          "role": "ω_s"
+        }
+      ]
+    },
+    {
+      "id": "c-4",
+      "formula": "GSD = d_px × H_orb / f_cam",
+      "description": "地面分辨率由像元尺寸、轨道高度与相机焦距共同约束，其中像元尺寸为耦合输入",
+      "members": [
+        {
+          "attributeId": "a-cam-res",
+          "role": "GSD"
+        },
+        {
+          "attributeId": "a-ccd-pixel",
+          "role": "d_px"
+        }
+      ]
+    },
+    {
+      "id": "c-5",
+      "formula": "EIRP = P_out + G_ant − L_feed",
+      "description": "等效全向辐射功率由功放输出功率、天线增益与馈电损耗决定（dB 域加减），是天线五要素选型第一维（权重30）",
+      "members": [
+        {
+          "attributeId": "a-comm-ant-eirp",
+          "role": "EIRP"
+        },
+        {
+          "attributeId": "a-comm-ant-gain",
+          "role": "G_ant"
+        },
+        {
+          "attributeId": "a-sspa-pout",
+          "role": "P_out"
+        },
+        {
+          "attributeId": "a-twta-pout",
+          "role": "P_out"
+        }
+      ]
+    },
+    {
+      "id": "c-6",
+      "formula": "G/T = G_ant − 10lg(T_sys)",
+      "description": "接收品质因数由接收天线增益与系统噪声温度决定；T_sys 主要由 LNA 噪声系数主导，是天线五要素第二维（权重25）",
+      "members": [
+        {
+          "attributeId": "a-comm-ant-gt",
+          "role": "G/T"
+        },
+        {
+          "attributeId": "a-comm-ant-gain",
+          "role": "G_ant"
+        },
+        {
+          "attributeId": "a-lna-nf",
+          "role": "NF_lna"
+        }
+      ]
+    },
+    {
+      "id": "c-7",
+      "formula": "G_pa = 10lg(N_el × η) + G_el",
+      "description": "相控阵增益由阵元数、阵面效率与单元增益决定（忽略扫描损耗），用于反推满足 EIRP 所需阵元数",
+      "members": [
+        {
+          "attributeId": "a-comm-ant-gain",
+          "role": "G_ant"
+        },
+        {
+          "attributeId": "a-pa-elements",
+          "role": "N_el"
+        }
+      ]
+    },
+    {
+      "id": "c-8",
+      "formula": "G_refl = 10lg(η × (πD/λ)²)",
+      "description": "反射面天线增益由口径、频率与口面效率决定，用于按 EIRP 反推所需口径",
+      "members": [
+        {
+          "attributeId": "a-comm-ant-gain",
+          "role": "G_ant"
+        },
+        {
+          "attributeId": "a-comm-ant-aperture",
+          "role": "D_ap"
+        },
+        {
+          "attributeId": "a-band-fdown",
+          "role": "f_down"
+        }
+      ]
+    },
+    {
+      "id": "c-9",
+      "formula": "L_fs = 20lg(d) + 20lg(f) − 147.55",
+      "description": "自由空间损耗由斜距与频率决定（d:m, f:Hz），是链路预算的基础项",
+      "members": [
+        {
+          "attributeId": "a-link-fspl",
+          "role": "L_fs"
+        },
+        {
+          "attributeId": "a-link-dist",
+          "role": "d_slant"
+        },
+        {
+          "attributeId": "a-band-fdown",
+          "role": "f_down"
+        }
+      ]
+    },
+    {
+      "id": "c-10",
+      "formula": "C/N0 = EIRP − L_fs − ΣL + G/T − k",
+      "description": "载噪比密度由发射 EIRP、自由空间损耗、各类损耗（雨衰/指向/极化/大气/实现）、接收 G/T 与玻尔兹曼常数决定（k=−228.6 dBW/Hz/K）",
+      "members": [
+        {
+          "attributeId": "a-link-cn0",
+          "role": "CN0"
+        },
+        {
+          "attributeId": "a-comm-ant-eirp",
+          "role": "EIRP"
+        },
+        {
+          "attributeId": "a-link-fspl",
+          "role": "L_fs"
+        },
+        {
+          "attributeId": "a-link-rain",
+          "role": "A_rain"
+        },
+        {
+          "attributeId": "a-comm-ant-gt",
+          "role": "G/T"
+        }
+      ]
+    },
+    {
+      "id": "c-11",
+      "formula": "C/N = C/N0 − 10lg(B)",
+      "description": "载噪比由载噪比密度减去带宽归一项得到（B:Hz）",
+      "members": [
+        {
+          "attributeId": "a-link-cn",
+          "role": "CN"
+        },
+        {
+          "attributeId": "a-link-cn0",
+          "role": "CN0"
+        },
+        {
+          "attributeId": "a-link-bw",
+          "role": "B_link"
+        }
+      ]
+    },
+    {
+      "id": "c-12",
+      "formula": "M = C/N − (C/N)_req ≥ 3 dB",
+      "description": "链路余量判据：实际 C/N 减去所选调制编码体制的门限，须 ≥3dB 方可闭合，否则触发回环（降阶/增 EIRP/减带宽/放宽可用性）",
+      "members": [
+        {
+          "attributeId": "a-link-margin",
+          "role": "M"
+        },
+        {
+          "attributeId": "a-link-cn",
+          "role": "CN"
+        }
+      ]
+    },
+    {
+      "id": "c-13",
+      "formula": "C_link = B × η",
+      "description": "链路容量由带宽与频谱效率决定（η 由 C/N 自适应选定的 MODCOD 给出，DVBS2X 阶梯：QPSK 1.79~32APSK 4.45 bps/Hz）",
+      "members": [
+        {
+          "attributeId": "a-link-cap",
+          "role": "C_link"
+        },
+        {
+          "attributeId": "a-link-bw",
+          "role": "B_link"
+        }
+      ]
+    },
+    {
+      "id": "c-14",
+      "formula": "C_sw ≥ N_beam × B_beam × η_reuse",
+      "description": "DTP 交换容量须不小于波束数×单波束带宽×频率复用增益，否则星上交换成为容量瓶颈",
+      "members": [
+        {
+          "attributeId": "a-dtp-switch",
+          "role": "C_sw"
+        },
+        {
+          "attributeId": "a-comm-ant-beam",
+          "role": "N_beam"
+        }
+      ]
+    },
+    {
+      "id": "c-15",
+      "formula": "M_pay ≤ M_plat 且 P_pay ≤ P_plat",
+      "description": "载荷总质量与总功耗须在平台承载与供电能力内（平台可行性硬约束，超限则换大平台或减配载荷）",
+      "members": [
+        {
+          "attributeId": "a-scheme-mass",
+          "role": "M_pay"
+        },
+        {
+          "attributeId": "a-plat-mass-cap",
+          "role": "M_plat"
+        },
+        {
+          "attributeId": "a-scheme-power",
+          "role": "P_pay"
+        },
+        {
+          "attributeId": "a-plat-power-cap",
+          "role": "P_plat"
+        }
+      ]
+    },
+    {
+      "id": "c-16",
+      "formula": "M_sat ≤ C_orbit(launch_vehicle)",
+      "description": "整星发射质量须不大于所选运载对应轨道（GTO/LEO/SSO）的运力，且包络须适配整流罩直径",
+      "members": [
+        {
+          "attributeId": "a-plat-sat-mass",
+          "role": "M_sat"
+        },
+        {
+          "attributeId": "a-lv-gto",
+          "role": "C_gto"
+        },
+        {
+          "attributeId": "a-lv-leo",
+          "role": "C_leo"
+        },
+        {
+          "attributeId": "a-lv-sso",
+          "role": "C_sso"
+        },
+        {
+          "attributeId": "a-plat-envelope",
+          "role": "D_env"
+        },
+        {
+          "attributeId": "a-lv-fairing",
+          "role": "D_fair"
+        }
+      ]
+    },
+    {
+      "id": "c-17",
+      "formula": "P_acq ≥ 95% 且 σ_track ≤ 1 μrad",
+      "description": "激光通信 ATP 捕获概率须 ≥95%、精跟踪精度须 ≤1μrad，方可维持稳定激光链路",
+      "members": [
+        {
+          "attributeId": "a-atp-acq",
+          "role": "P_acq"
+        },
+        {
+          "attributeId": "a-atp-track",
+          "role": "σ_track"
+        }
+      ]
+    },
+    {
+      "id": "c-18",
+      "formula": "R_laser ≤ C_isl(G/T_opt, EIRP_opt, L_fs_opt)",
+      "description": "激光链路速率受发射 EIRP、接收 G/T 与光学自由空间损耗约束（DPSK 体制门限约8dB，灵敏度优于 OOK 约6dB）",
+      "members": [
+        {
+          "attributeId": "a-laser-rate",
+          "role": "R_laser"
+        },
+        {
+          "attributeId": "a-laser-eirp",
+          "role": "EIRP_opt"
+        },
+        {
+          "attributeId": "a-laser-gt",
+          "role": "GT_opt"
+        }
+      ]
+    },
+    {
+      "id": "c-19",
+      "formula": "δ_surf ≤ λ/32",
+      "description": "反射面/反射阵天线表面 RMS 精度须优于工作波长的 1/32（Ka 约0.27mm），否则增益下降、旁瓣抬升",
+      "members": [
+        {
+          "attributeId": "a-refl-surface",
+          "role": "δ_surf"
+        },
+        {
+          "attributeId": "a-band-fdown",
+          "role": "f_down"
+        }
+      ]
+    },
+    {
+      "id": "c-20",
+      "formula": "N_gap → 0 且 H_scheme → 4",
+      "description": "货架优先原则：定制缺口数 N_gap 目标为0，方案整体货架水平 H_scheme 优先取飞行继承货架(4)>飞行继承(3)>货架(2)>定制(1)",
+      "members": [
+        {
+          "attributeId": "a-scheme-gap",
+          "role": "N_gap"
+        },
+        {
+          "attributeId": "a-scheme-heritage",
+          "role": "H_scheme"
+        }
+      ]
+    }
+  ]
+}

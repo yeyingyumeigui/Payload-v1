@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文生有效载荷业务流程梳理与智能体架构设计</title>
+<style id="page-style">
+:root { --ink:#1a2233; --muted:#5a6a85; --line:#dde5f0; --accent:#1f5eff;
+        --bg:#f5f7fb; --card:#ffffff; --ok:#1a7f4b; --bad:#c2372c; --warn:#b07a1f; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+       font-family:"Source Han Serif SC","Noto Serif CJK SC","SimSun","宋体",serif;
+       font-size:15px; line-height:1.85; }
+.toolbar { position:sticky; top:0; z-index:50; display:flex; gap:10px; align-items:center;
+           padding:10px 24px; background:#0f1c3f; color:#fff; }
+.toolbar .title { font-weight:700; margin-right:auto; font-size:15px;
+                  font-family:"Source Han Sans SC","Microsoft YaHei",sans-serif; }
+.toolbar button { border:1px solid rgba(255,255,255,.45); background:transparent;
+           color:#fff; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:13px;
+           font-family:"Source Han Sans SC","Microsoft YaHei",sans-serif; }
+.toolbar button:hover { background:rgba(255,255,255,.15); }
+.page { max-width:920px; margin:24px auto 64px; background:var(--card);
+        padding:56px 64px; border:1px solid var(--line); border-radius:8px;
+        box-shadow:0 2px 14px rgba(15,28,63,.06); }
+h1 { text-align:center; font-size:26px; line-height:1.5; margin:.2em 0 .8em;
+     font-family:"Source Han Serif SC","SimSun",serif; }
+h2 { font-size:19px; margin:1.8em 0 .6em; padding-left:10px;
+     border-left:4px solid var(--accent); }
+h3 { font-size:16px; margin:1.4em 0 .5em; }
+p { margin:.5em 0; text-align:justify; }
+blockquote { margin:.8em 0; padding:8px 14px; background:#f0f4fb;
+             border-left:3px solid var(--accent); color:var(--muted); font-size:14px; }
+table { border-collapse:collapse; width:100%; margin:.8em 0; font-size:13.5px; }
+th,td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+th { background:#eef2f9; font-weight:700; white-space:nowrap; }
+tr:nth-child(even) td { background:#fafbfe; }
+pre { background:#0f1c3f; color:#dfe7f5; padding:14px 16px; border-radius:6px;
+      overflow-x:auto; font-size:12.5px; line-height:1.6; }
+code { font-family:"Cascadia Code",Consolas,monospace; }
+p code, li code, td code { background:#eef2f9; color:#27408b; padding:1px 5px;
+      border-radius:4px; font-size:13px; }
+ul { margin:.4em 0 .8em; padding-left:1.6em; }
+li { margin:.25em 0; }
+details { margin:.6em 0; border:1px solid var(--line); border-radius:6px; padding:8px 12px; }
+summary { cursor:pointer; color:var(--accent); font-weight:600; }
+svg { max-width:100%; height:auto; display:block; margin:12px auto; }
+.toc { background:#f7f9fd; border:1px solid var(--line); border-radius:8px;
+       padding:16px 28px; margin:0 0 28px; }
+.toc-title { text-align:center; font-weight:700; font-size:17px; margin-bottom:8px;
+       letter-spacing:.5em; text-indent:.5em; }
+.toc ul { list-style:none; padding:0; margin:0; }
+.toc li { margin:3px 0; }
+.toc-3 { padding-left:1.6em; }
+.toc a { color:var(--ink); text-decoration:none; }
+.toc a:hover { color:var(--accent); }
+.meta { text-align:center; color:var(--muted); font-size:13px; margin-bottom:28px; }
+
+/* 公文风格变体：标题三号小标宋居中，正文小四仿宋/宋体，首行缩进两字符 */
+body.gongwen { font-size:12pt; }
+body.gongwen .page { max-width:800px; padding:64px 72px; }
+body.gongwen h1 { font-family:"STZhongsong","华文中宋","SimSun",serif;
+       font-size:16pt; /* 三号 */ font-weight:700; text-align:center; }
+body.gongwen h2 { font-family:"SimHei","黑体",sans-serif; font-size:14pt;
+       border-left:none; padding-left:0; }
+body.gongwen h3 { font-family:"KaiTi","楷体",serif; font-size:12pt; font-weight:700; }
+body.gongwen p { font-family:"FangSong","仿宋","SimSun",serif; font-size:12pt; /* 小四 */
+       text-indent:2em; line-height:1.9; }
+body.gongwen p.num { text-indent:0; }
+body.gongwen blockquote p, body.gongwen td p, body.gongwen th p { text-indent:0; }
+body.gongwen table { font-size:10.5pt; }
+body.gongwen .toc p { text-indent:0; }
+
+@media print {
+  .toolbar { display:none; }
+  body { background:#fff; }
+  .page { box-shadow:none; border:none; margin:0; max-width:none; padding:10mm 6mm; }
+  h2 { break-after:avoid; }
+  table, pre, blockquote, svg { break-inside:avoid; }
+}
+</style>
+
+</head>
+<body>
+<div class="toolbar">
+  <span class="title">文生有效载荷业务流程梳理与智能体架构设计</span>
+  <button onclick="downloadDoc()">下载 DOC</button>
+  <button onclick="window.print()">打印 / 存 PDF</button>
+</div>
+<div class="page">
+<nav class="toc"><div class="toc-title">目 录</div><ul>
+<li class="toc-2"><a href="#一-概述">一、概述</a></li>
+<li class="toc-3"><a href="#1-1-业务背景">1.1 业务背景</a></li>
+<li class="toc-3"><a href="#1-2-设计目标">1.2 设计目标</a></li>
+<li class="toc-2"><a href="#二-端到端主流程">二、端到端主流程</a></li>
+<li class="toc-3"><a href="#2-1-主流程图">2.1 主流程图</a></li>
+<li class="toc-3"><a href="#2-2-流程节点与-Skill-对照">2.2 流程节点与 Skill 对照</a></li>
+<li class="toc-3"><a href="#2-3-六阶段泳道">2.3 六阶段泳道</a></li>
+<li class="toc-2"><a href="#三-关键流程节点详解">三、关键流程节点详解</a></li>
+<li class="toc-3"><a href="#3-1-SK-INTENT-意图解析">3.1 SK-INTENT 意图解析</a></li>
+<li class="toc-3"><a href="#3-2-SK-CLARIFY-澄清闸口-禁止擅自假设">3.2 SK-CLARIFY 澄清闸口（禁止擅自假设）</a></li>
+<li class="toc-3"><a href="#3-3-三级选型闭环">3.3 三级选型闭环</a></li>
+<li class="toc-3"><a href="#3-4-双回环校核机制">3.4 双回环校核机制</a></li>
+<li class="toc-3"><a href="#3-5-SK-BUDGET-链路预算">3.5 SK-BUDGET 链路预算</a></li>
+<li class="toc-3"><a href="#3-6-SK-VALID-三重校验">3.6 SK-VALID 三重校验</a></li>
+<li class="toc-3"><a href="#3-7-SK-DOC-方案生成-十章结构">3.7 SK-DOC 方案生成（十章结构）</a></li>
+<li class="toc-2"><a href="#四-异常分级体系-30-条规则">四、异常分级体系（30 条规则）</a></li>
+<li class="toc-2"><a href="#五-知识底座-货架产品库现状">五、知识底座：货架产品库现状</a></li>
+<li class="toc-2"><a href="#六-数据流与交付物">六、数据流与交付物</a></li>
+<li class="toc-2"><a href="#七-KPI-指标体系">七、KPI 指标体系</a></li>
+<li class="toc-2"><a href="#八-演进路线图">八、演进路线图</a></li>
+<li class="toc-2"><a href="#九-附录">九、附录</a></li>
+<li class="toc-3"><a href="#9-1-代码结构">9.1 代码结构</a></li>
+<li class="toc-3"><a href="#9-2-运行方式">9.2 运行方式</a></li>
+<li class="toc-3"><a href="#9-3-与既有工作-Traework-的承接关系">9.3 与既有工作（Traework）的承接关系</a></li>
+</ul></nav>
+<blockquote>文生载荷智能体项目组 | 2026-09-20 | 版本 V0.2（骨架已落地可运行）</blockquote>
+<blockquote></blockquote>
+<blockquote>配套代码：<code>D:\ZWL\文生载荷Workbuddy\payload_agent\</code>（零依赖，102 项测试全通过，8/8 端到端用例走通）</blockquote>
+<h2 id="一-概述">一、概述</h2>
+<p><strong>一句话概括</strong>：文生有效载荷智能体把"一句自然语言需求"变成"一份可审计的卫星有效载荷方案"——通过 11 个 Skill 组成的确定性流水线（意图解析 → 澄清闸口 → 知识检索 → 三级选型 → 链路预算 → 三重校验 → 方案生成 → 文档导出），以货架产品库为知识底座，以双回环校核为质量闸门，以 L1/L2/L3 异常分级为处置机制。</p>
+<h3 id="1-1-业务背景">1.1 业务背景</h3>
+<p>商业航天批产模式下，有效载荷方案设计存在三个痛点：</p>
+<table>
+<thead><tr><th>痛点</th><th>传统模式表现</th><th>智能体解法</th></tr></thead><tbody>
+<tr><td>设计周期长</td><td>方案论证以周计，人工查手册、算链路、写文档</td><td>全链路秒级生成，确定性公式可复现</td></tr>
+<tr><td>知识分散</td><td>货架产品信息散落在个人经验与纸质目录</td><td>结构化货架库统一沉淀（天线/单机/平台/运载）</td></tr>
+<tr><td>质量不一致</td><td>校核项靠人工自觉，频段错配、余量不足时有发生</td><td>三重校验闸门 + 30 条异常规则强制兜底</td></tr>
+</tbody></table>
+<h3 id="1-2-设计目标">1.2 设计目标</h3>
+<p class="num">1. <strong>禁止擅自假设</strong>：需求缺项必须澄清，不得虚构用户约束（blocking 级缺项直接中断）。</p>
+<p class="num">2. <strong>货架优先</strong>：飞行继承货架 &gt; 飞行继承 &gt; 货架(在研转货架) &gt; 定制，缺口显式记录不回退。</p>
+<p class="num">3. <strong>校核闭环</strong>：任何方案必须过"平台可行性 + 链路余量 + 三重校验"三道闸门，不通过即回环或转人工。</p>
+<p class="num">4. <strong>确定性可审计</strong>：无 LLM 也能跑通全链路；每一步评分理由、计算过程全部留痕。</p>
+<p class="num">5. <strong>异常分级处置</strong>：L1 自动降级不扰民、L2 告警放行等决策、L3 保护中止转人工。</p>
+<h2 id="二-端到端主流程">二、端到端主流程</h2>
+<h3 id="2-1-主流程图">2.1 主流程图</h3>
+<svg viewBox="0 0 680 1240" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6a85"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2372c"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f4b"/>
+    </marker>
+  </defs>
+
+  <!-- 用户需求 -->
+  <rect x="220" y="16" width="240" height="44" rx="22" fill="#e8f0ff" stroke="#1f5eff" stroke-width="1.6"/>
+  <text x="340" y="43" text-anchor="middle" font-size="14" fill="#1a2233" font-weight="bold">用户需求（自然语言）</text>
+  <line x1="340" y1="60" x2="340" y2="86" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- SK-INTENT -->
+  <rect x="205" y="88" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="108" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-INTENT 意图解析</text>
+  <text x="340" y="126" text-anchor="middle" font-size="11" fill="#5a6a85">载荷类型/轨道/频段/体制/数值指标</text>
+  <line x1="340" y1="136" x2="340" y2="160" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- 澄清闸口（菱形） -->
+  <polygon points="340,162 480,208 340,254 200,208" fill="#fff7e6" stroke="#b07a1f" stroke-width="1.5"/>
+  <text x="340" y="203" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-CLARIFY 澄清闸口</text>
+  <text x="340" y="222" text-anchor="middle" font-size="11" fill="#5a6a85">有 blocking 级缺项？</text>
+
+  <!-- 澄清分支：右侧返回用户 -->
+  <line x1="480" y1="208" x2="560" y2="208" stroke="#c2372c" stroke-width="1.4" marker-end="url(#arrRed)"/>
+  <rect x="560" y="184" width="106" height="48" rx="8" fill="#fdecea" stroke="#c2372c" stroke-width="1.3"/>
+  <text x="613" y="204" text-anchor="middle" font-size="11" fill="#c2372c" font-weight="bold">need_clarify</text>
+  <text x="613" y="220" text-anchor="middle" font-size="10" fill="#5a6a85">中断等用户补充</text>
+  <path d="M 613 184 L 613 38 L 460 38" fill="none" stroke="#c2372c" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrRed)"/>
+  <text x="345" y="243" text-anchor="end" font-size="10" fill="#c2372c">是（L3）</text>
+  <line x1="340" y1="254" x2="340" y2="280" stroke="#1a7f4b" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+  <text x="352" y="272" font-size="10" fill="#1a7f4b">否（warning 级默认放行并标注）</text>
+
+  <!-- SK-RETRIEVE -->
+  <rect x="205" y="282" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="302" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-RETRIEVE 知识检索</text>
+  <text x="340" y="320" text-anchor="middle" font-size="11" fill="#5a6a85">货架目录/选型判据/行业标准/体制模板</text>
+  <line x1="340" y1="330" x2="340" y2="356" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- 三级选型闭环组 -->
+  <rect x="120" y="358" width="440" height="240" rx="10" fill="#f7f9fd" stroke="#8fa3c8" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="140" y="382" font-size="12" fill="#27408b" font-weight="bold">三级选型闭环（内环 ≤3 次迭代）</text>
+
+  <rect x="205" y="394" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="414" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-ANTSEL / SK-EQUIP 载荷选型</text>
+  <text x="340" y="432" text-anchor="middle" font-size="11" fill="#5a6a85">天线五要素评分 · 单机货架组链 · 缺口记录</text>
+  <line x1="340" y1="442" x2="340" y2="466" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="205" y="468" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="488" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-PLAT / SK-LAUNCH 平台运载</text>
+  <text x="340" y="506" text-anchor="middle" font-size="11" fill="#5a6a85">可行性预筛 · 五因子/四因子评分</text>
+
+  <!-- 内环回环箭头 -->
+  <path d="M 205 492 L 158 492 L 158 418 L 205 418" fill="none" stroke="#b07a1f" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="150" y="458" font-size="10" fill="#b07a1f" text-anchor="middle" transform="rotate(-90 150 458)">平台不可行→换下一候选天线</text>
+
+  <!-- L3 中止分支 -->
+  <line x1="475" y1="492" x2="560" y2="492" stroke="#c2372c" stroke-width="1.4" marker-end="url(#arrRed)"/>
+  <rect x="560" y="468" width="106" height="48" rx="8" fill="#fdecea" stroke="#c2372c" stroke-width="1.3"/>
+  <text x="613" y="488" text-anchor="middle" font-size="11" fill="#c2372c" font-weight="bold">L3 转人工</text>
+  <text x="613" y="504" text-anchor="middle" font-size="10" fill="#5a6a85">拆分/换轨/定制</text>
+  <text x="516" y="484" text-anchor="middle" font-size="10" fill="#c2372c">候选耗尽</text>
+
+  <line x1="340" y1="516" x2="340" y2="560" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="352" y="545" font-size="10" fill="#1a7f4b">可行</text>
+
+  <!-- SK-BUDGET -->
+  <rect x="205" y="562" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="582" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-BUDGET 链路预算</text>
+  <text x="340" y="600" text-anchor="middle" font-size="11" fill="#5a6a85">FSPL/C-N0/C-N/余量 · MODCOD 由 C/N 自适应</text>
+  <line x1="340" y1="610" x2="340" y2="636" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- SK-VALID（菱形） -->
+  <polygon points="340,638 490,688 340,738 190,688" fill="#fff7e6" stroke="#b07a1f" stroke-width="1.5"/>
+  <text x="340" y="682" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-VALID 三重校验</text>
+  <text x="340" y="700" text-anchor="middle" font-size="11" fill="#5a6a85">语法 / 语义 / 合规 通过？</text>
+
+  <!-- 外环回环：链路余量不足 -->
+  <path d="M 190 688 L 88 688 L 88 418 L 205 418" fill="none" stroke="#b07a1f" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="80" y="556" font-size="10" fill="#b07a1f" text-anchor="middle" transform="rotate(-90 80 556)">链路余量不足→否决天线重选型（外环 ≤2 次）</text>
+
+  <!-- 校验不通过且无候选：带告警放行 -->
+  <line x1="490" y1="688" x2="560" y2="688" stroke="#b07a1f" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="560" y="664" width="106" height="48" rx="8" fill="#fff7e6" stroke="#b07a1f" stroke-width="1.3"/>
+  <text x="613" y="684" text-anchor="middle" font-size="11" fill="#b07a1f" font-weight="bold">带告警放行</text>
+  <text x="613" y="700" text-anchor="middle" font-size="10" fill="#5a6a85">不通过项写入方案</text>
+  <path d="M 613 712 L 613 792 L 475 792" fill="none" stroke="#b07a1f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+
+  <line x1="340" y1="738" x2="340" y2="768" stroke="#1a7f4b" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+  <text x="352" y="758" font-size="10" fill="#1a7f4b">通过</text>
+
+  <!-- SK-DOC -->
+  <rect x="205" y="770" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="790" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-DOC 方案生成</text>
+  <text x="340" y="808" text-anchor="middle" font-size="11" fill="#5a6a85">十章 Markdown 方案（确定性模板装配）</text>
+  <line x1="340" y1="818" x2="340" y2="844" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- 人工确认（可选） -->
+  <rect x="205" y="846" width="270" height="44" rx="8" fill="#f3ecff" stroke="#7b4fd0" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="340" y="865" text-anchor="middle" font-size="12" fill="#1a2233" font-weight="bold">人工确认（confirm_mode，可选）</text>
+  <text x="340" y="881" text-anchor="middle" font-size="10" fill="#5a6a85">选型后暂停 · 可改选平台/运载候选</text>
+  <line x1="340" y1="890" x2="340" y2="916" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- SK-WORD -->
+  <rect x="205" y="918" width="270" height="48" rx="8" fill="#eef2f9" stroke="#1f5eff" stroke-width="1.4"/>
+  <text x="340" y="938" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">SK-WORD 文档导出</text>
+  <text x="340" y="956" text-anchor="middle" font-size="11" fill="#5a6a85">HTML（目录+DOC下载+打印PDF）</text>
+  <line x1="340" y1="966" x2="340" y2="992" stroke="#5a6a85" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- 交付 -->
+  <rect x="180" y="994" width="320" height="52" rx="26" fill="#e8f5ee" stroke="#1a7f4b" stroke-width="1.6"/>
+  <text x="340" y="1016" text-anchor="middle" font-size="13" fill="#1a2233" font-weight="bold">交付：载荷方案（MD / HTML / DOC）</text>
+  <text x="340" y="1034" text-anchor="middle" font-size="10" fill="#5a6a85">含评分理由 · 计算过程 · 校验结论 · 风险处置</text>
+
+  <!-- 事件流旁注 -->
+  <rect x="150" y="1078" width="380" height="120" rx="8" fill="#f7f9fd" stroke="#8fa3c8" stroke-width="1"/>
+  <text x="340" y="1100" text-anchor="middle" font-size="11" fill="#27408b" font-weight="bold">全程事件流（每步 checkpoint 留痕）</text>
+  <text x="170" y="1122" font-size="10" fill="#5a6a85">· 每个 Skill 执行前后记录事件（seq/stage/message/level）</text>
+  <text x="170" y="1140" font-size="10" fill="#5a6a85">· 前端可增量拉取展示进度；支持人工中止（interrupt）</text>
+  <text x="170" y="1158" font-size="10" fill="#5a6a85">· L1 降级自动处理；L2 告警写入方案；L3 中止转人工</text>
+  <text x="170" y="1176" font-size="10" fill="#5a6a85">· 状态码：completed / need_clarify / infeasible / interrupted /</text>
+  <text x="170" y="1192" font-size="10" fill="#5a6a85">  awaiting_confirmation / error</text>
+</svg>
+<h3 id="2-2-流程节点与-Skill-对照">2.2 流程节点与 Skill 对照</h3>
+<table>
+<thead><tr><th>#</th><th>流程节点</th><th>Skill</th><th>业务阶段</th><th>输入</th><th>输出</th><th>闸门性质</th></tr></thead><tbody>
+<tr><td>1</td><td>意图解析</td><td>SK-INTENT</td><td>需求理解</td><td>需求原文</td><td>IntentResult 结构化意图</td><td>—</td></tr>
+<tr><td>2</td><td>澄清闸口</td><td>SK-CLARIFY</td><td>需求理解</td><td>IntentResult</td><td>澄清问题清单</td><td><strong>阻断闸</strong>（blocking 缺项中断）</td></tr>
+<tr><td>3</td><td>知识检索</td><td>SK-RETRIEVE</td><td>知识支撑</td><td>IntentResult</td><td>压缩知识上下文</td><td>—</td></tr>
+<tr><td>4</td><td>天线选型</td><td>SK-ANTSEL</td><td>载荷方案</td><td>SelectionRequirement</td><td>评分排序候选</td><td>—</td></tr>
+<tr><td>5</td><td>单机选型</td><td>SK-EQUIP</td><td>载荷方案</td><td>Intent + Requirement</td><td>单机清单 + 定制缺口</td><td>—</td></tr>
+<tr><td>6</td><td>平台选型</td><td>SK-PLAT</td><td>平台运载</td><td>载荷包络/轨道/寿命</td><td>可行平台排序 + 筛除记录</td><td><strong>可行性闸</strong>（内环回环点）</td></tr>
+<tr><td>7</td><td>运载选型</td><td>SK-LAUNCH</td><td>平台运载</td><td>整星质量/轨道/包络</td><td>运载候选排序</td><td>—</td></tr>
+<tr><td>8</td><td>链路预算</td><td>SK-BUDGET</td><td>指标校核</td><td>SelectionPlan</td><td>LinkBudget 列表</td><td>—</td></tr>
+<tr><td>9</td><td>三重校验</td><td>SK-VALID</td><td>指标校核</td><td>Plan + Budgets + Intent</td><td>ValidationResult</td><td><strong>质量闸</strong>（外环回环点）</td></tr>
+<tr><td>10</td><td>方案生成</td><td>SK-DOC</td><td>成果输出</td><td>全部上游产物</td><td>十章 Markdown 方案</td><td>—</td></tr>
+<tr><td>11</td><td>文档导出</td><td>SK-WORD</td><td>成果输出</td><td>Markdown</td><td>HTML / DOC</td><td>—</td></tr>
+</tbody></table>
+<h3 id="2-3-六阶段泳道">2.3 六阶段泳道</h3>
+<svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6a85"/>
+    </marker>
+  </defs>
+  <!-- 泳道标签列 -->
+  <rect x="8" y="30" width="86" height="250" fill="#f0f4fb" stroke="#dde5f0"/>
+  <text x="51" y="150" text-anchor="middle" font-size="12" fill="#27408b" font-weight="bold" transform="rotate(-90 51 150)">业务阶段泳道</text>
+
+  <!-- 六个阶段 -->
+  <g font-size="11">
+    <rect x="104" y="40" width="86" height="230" rx="6" fill="#e8f0ff" stroke="#1f5eff"/>
+    <text x="147" y="62" text-anchor="middle" font-weight="bold" fill="#27408b">需求理解</text>
+    <rect x="112" y="76" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="147" y="95" text-anchor="middle" fill="#1a2233">SK-INTENT</text>
+    <rect x="112" y="114" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="147" y="133" text-anchor="middle" fill="#1a2233">SK-CLARIFY</text>
+    <text x="147" y="170" text-anchor="middle" fill="#c2372c" font-size="10">阻断闸</text>
+    <text x="147" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">缺项必澄清</text>
+    <text x="147" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">禁止假设</text>
+
+    <rect x="200" y="40" width="66" height="230" rx="6" fill="#eef7f0" stroke="#1a7f4b"/>
+    <text x="233" y="62" text-anchor="middle" font-weight="bold" fill="#1a7f4b">知识支撑</text>
+    <rect x="206" y="76" width="54" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="233" y="95" text-anchor="middle" fill="#1a2233" font-size="9.5">SK-RETRIEVE</text>
+    <text x="233" y="170" text-anchor="middle" fill="#5a6a85" font-size="9">货架目录</text>
+    <text x="233" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">选型判据</text>
+    <text x="233" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">行业标准</text>
+
+    <rect x="276" y="40" width="86" height="230" rx="6" fill="#fff7e6" stroke="#b07a1f"/>
+    <text x="319" y="62" text-anchor="middle" font-weight="bold" fill="#b07a1f">载荷方案</text>
+    <rect x="284" y="76" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="319" y="95" text-anchor="middle" fill="#1a2233">SK-ANTSEL</text>
+    <rect x="284" y="114" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="319" y="133" text-anchor="middle" fill="#1a2233">SK-EQUIP</text>
+    <text x="319" y="170" text-anchor="middle" fill="#5a6a85" font-size="9">通信:天线五要素</text>
+    <text x="319" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">非通信:分辨率等</text>
+    <text x="319" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">货架优先组链</text>
+
+    <rect x="372" y="40" width="86" height="230" rx="6" fill="#f3ecff" stroke="#7b4fd0"/>
+    <text x="415" y="62" text-anchor="middle" font-weight="bold" fill="#7b4fd0">平台运载</text>
+    <rect x="380" y="76" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="415" y="95" text-anchor="middle" fill="#1a2233">SK-PLAT</text>
+    <rect x="380" y="114" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="415" y="133" text-anchor="middle" fill="#1a2233">SK-LAUNCH</text>
+    <text x="415" y="170" text-anchor="middle" fill="#5a6a85" font-size="9">可行性预筛</text>
+    <text x="415" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">五因子/四因子</text>
+    <text x="415" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">内环回环点</text>
+
+    <rect x="468" y="40" width="86" height="230" rx="6" fill="#fdecea" stroke="#c2372c"/>
+    <text x="511" y="62" text-anchor="middle" font-weight="bold" fill="#c2372c">指标校核</text>
+    <rect x="476" y="76" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="511" y="95" text-anchor="middle" fill="#1a2233">SK-BUDGET</text>
+    <rect x="476" y="114" width="70" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="511" y="133" text-anchor="middle" fill="#1a2233">SK-VALID</text>
+    <text x="511" y="170" text-anchor="middle" fill="#5a6a85" font-size="9">C/N余量≥3dB</text>
+    <text x="511" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">语法/语义/合规</text>
+    <text x="511" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">外环回环点</text>
+
+    <rect x="564" y="40" width="106" height="230" rx="6" fill="#e8f5ee" stroke="#1a7f4b"/>
+    <text x="617" y="62" text-anchor="middle" font-weight="bold" fill="#1a7f4b">成果输出</text>
+    <rect x="576" y="76" width="82" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="617" y="95" text-anchor="middle" fill="#1a2233">SK-DOC</text>
+    <rect x="576" y="114" width="82" height="30" rx="4" fill="#fff" stroke="#8fa3c8"/>
+    <text x="617" y="133" text-anchor="middle" fill="#1a2233">SK-WORD</text>
+    <text x="617" y="170" text-anchor="middle" fill="#5a6a85" font-size="9">十章方案文档</text>
+    <text x="617" y="186" text-anchor="middle" fill="#5a6a85" font-size="9">HTML+DOC</text>
+    <text x="617" y="200" text-anchor="middle" fill="#5a6a85" font-size="9">打印/PDF</text>
+  </g>
+  <!-- 阶段间箭头 -->
+  <g stroke="#5a6a85" stroke-width="1.2">
+    <line x1="190" y1="155" x2="200" y2="155" marker-end="url(#arr2)"/>
+    <line x1="266" y1="155" x2="276" y2="155" marker-end="url(#arr2)"/>
+    <line x1="362" y1="155" x2="372" y2="155" marker-end="url(#arr2)"/>
+    <line x1="458" y1="155" x2="468" y2="155" marker-end="url(#arr2)"/>
+    <line x1="554" y1="155" x2="564" y2="155" marker-end="url(#arr2)"/>
+  </g>
+  <text x="340" y="292" text-anchor="middle" font-size="10" fill="#5a6a85">用户交互点：澄清闸口（前）· 人工确认（后）· 中止指令（全程）</text>
+</svg>
+<h2 id="三-关键流程节点详解">三、关键流程节点详解</h2>
+<h3 id="3-1-SK-INTENT-意图解析">3.1 SK-INTENT 意图解析</h3>
+<p>从自然语言提取结构化设计要素，关键词后端为主、LLM 后端可选增强（失败自动降级）。</p>
+<table>
+<thead><tr><th>提取要素</th><th>说明</th><th>陷阱规避</th></tr></thead><tbody>
+<tr><td>载荷类型</td><td>通信/遥感/导航/科学，按关键词命中数取最优</td><td>"遥感"与"通信数传"共现时按命中数裁决</td></tr>
+<tr><td>轨道类型</td><td>GEO/LEO/MEO/SSO/HEO</td><td>未识别不默认，交澄清闸口</td></tr>
+<tr><td>工作频段</td><td>字母频段（Ka/Ku/L…）+ 数值频段</td><td><strong>数值必须带 GHz 上下文</strong>："12米伞天线""300kg""30万人"不得误判为频段；L 波段按特征频点（1525/1559/1626/1660 MHz）识别</td></tr>
+<tr><td>关键技术</td><td>相控阵/伞天线/DTP/激光通信/星上处理…</td><td>—</td></tr>
+<tr><td>转发体制</td><td>transparent / regenerative / dtp</td><td>透明转发与 DTP 共现 → 标记歧义</td></tr>
+<tr><td>数值指标</td><td>EIRP/G-T/质量/功耗/寿命/容量/波束数/带宽/分辨率/幅宽</td><td>比较符全覆盖：≥ ≤ &gt;= &lt;= 不低于 不超过 优于 好于</td></tr>
+<tr><td>歧义检测</td><td>GEO+手机直连、透明+DTP、射频+激光混用</td><td>写入 ambiguity 交澄清闸口</td></tr>
+</tbody></table>
+<h3 id="3-2-SK-CLARIFY-澄清闸口-禁止擅自假设">3.2 SK-CLARIFY 澄清闸口（禁止擅自假设）</h3>
+<table>
+<thead><tr><th>触发条件</th><th>级别</th><th>处置</th></tr></thead><tbody>
+<tr><td>载荷类型未识别</td><td>blocking (L3)</td><td>中断，返回 need_clarify 问题清单</td></tr>
+<tr><td>轨道类型未识别</td><td>blocking (L3)</td><td>中断，返回 need_clarify 问题清单</td></tr>
+<tr><td>通信载荷未指定频段</td><td>blocking (L3)</td><td>中断（频段决定整条选型链）</td></tr>
+<tr><td>意图歧义（如透明+DTP 冲突）</td><td>blocking (L3)</td><td>中断，请用户二选一</td></tr>
+<tr><td>未指定转发体制</td><td>warning (L2)</td><td>按业务场景推荐，方案中标注来源</td></tr>
+<tr><td>未给出 EIRP 指标</td><td>warning (L2)</td><td>按轨道/频段/体制推算，选型需求表标注"推算"</td></tr>
+</tbody></table>
+<p><strong>每个选型需求项都带"来源"标注</strong>（用户指定 / 工程默认 / 按轨道推算 / 未指定），保证方案可追溯、不夹带私货。</p>
+<h3 id="3-3-三级选型闭环">3.3 三级选型闭环</h3>
+<p><strong>第一级：载荷方案（通信 = 天线 + 单机；非通信 = 载荷单机）</strong></p>
+<p>天线五要素评分（满分 100）：</p>
+<table>
+<thead><tr><th>要素</th><th>权重</th><th>判据</th><th>不满足时</th></tr></thead><tbody>
+<tr><td>EIRP</td><td>30</td><td>能力 ≥ 需求</td><td>按差距线性降分（每差 10 dB 扣光）</td></tr>
+<tr><td>G/T</td><td>25</td><td>能力 ≥ 需求</td><td>按差距线性降分（每差 8 dB 扣光）</td></tr>
+<tr><td>重量</td><td>20</td><td>≤ 轨道参考包络</td><td>按比例降分</td></tr>
+<tr><td>功耗</td><td>15</td><td>≤ 轨道参考包络</td><td>按比例降分</td></tr>
+<tr><td>工作模式</td><td>10</td><td>单波束/多波束/波束跳变/在轨重构匹配</td><td>不给分并记录冲突</td></tr>
+<tr><td>货架水平</td><td>+2</td><td>heritage×0.5 加权</td><td>同等条件优先飞行继承</td></tr>
+</tbody></table>
+<p>频段<strong>硬过滤</strong>：有匹配频段产品时只返回匹配产品；全不匹配时降权 0.6 并标记。</p>
+<p>单机货架组链（透明/DTP/再生三体制）：LNA → DCONV → OMUX → (DTP+MPA | SSPA/TWTA) → UCONV → CIRC，公用 SWITCH/BCN/TTC 恒配。<strong>频段硬约束</strong>：请求频段无货架品时记为定制缺口，绝不回退到错误频段产品（L 波段载荷配 Ka 变频器是工程错误）。</p>
+<p>非通信载荷判据完全不同：遥感按分辨率 30/幅宽 20/数据率 15/质量 15/功耗 10/指向 10；导航按信号体制/EIRP·UERE/原子钟；科学按灵敏度/观测几何/数据率。</p>
+<p><strong>第二级：平台选型（五因子）</strong></p>
+<p>先做可行性预筛（轨道兼容 + 承载 ≥ 载荷质量 + 供电 ≥ 载荷功耗），再评分：轨道适配 15 + 承载贴合 30 + 供电贴合 25 + 寿命匹配 15 + 飞行成熟度 15。轨道包含关系：SSO 任务可由 LEO 平台承接（评分 12/15）。</p>
+<p><strong>第三级：运载选型（四因子）</strong></p>
+<p>入轨能力 40 + 经济性 25 + 飞行履历 20 + 整流罩包络 15；按轨道取对应能力列（GEO→GTO、SSO→SSO、LEO/MEO→LEO）；能力余量 &gt;50% 提示搭载/拼单降本。</p>
+<h3 id="3-4-双回环校核机制">3.4 双回环校核机制</h3>
+<table>
+<thead><tr><th>回环</th><th>位置</th><th>触发条件</th><th>动作</th><th>上限</th></tr></thead><tbody>
+<tr><td>内环（平台可行性）</td><td>SelectionEngine.run</td><td>载荷包络超所有同轨道平台能力</td><td>换评分次序的下一候选天线重估</td><td>3 次迭代</td></tr>
+<tr><td>外环（链路余量）</td><td>PayloadDesignChain</td><td>三重校验不通过且失败项为链路余量</td><td>否决当前天线型号（exclude），重跑选型</td><td>2 次回环</td></tr>
+</tbody></table>
+<p>回环耗尽仍不可行 → <code>feasible=False</code>（L3），方案文档给出"拆分多星 / 改换轨道 / 定制平台"人工决策建议。</p>
+<h3 id="3-5-SK-BUDGET-链路预算">3.5 SK-BUDGET 链路预算</h3>
+<p>计算链条（全部确定性公式，逐项留痕）：</p>
+<pre><code>
+FSPL = 20lg(d) + 20lg(f) − 147.55
+C/N0 = EIRP − FSPL − (雨衰+指向+极化+大气+实现) + G/T − k(−228.6)
+C/N  = C/N0 − 10lg(B)
+余量 = C/N − 体制门限 ≥ 3 dB → 通过
+</code></pre>
+<p><strong>关键设计：MODCOD 由 C/N 自适应反推</strong>（32APSK→16APSK→8PSK→QPSK DVBS2X 阶梯），即"先有链路质量，再定体制与容量"，而不是先锁高阶体制再看链路是否闭合。雨衰按频段基准值（0.01% 超越概率）做仰角修正（1/sin(el)）与可用性修正（p^-0.6）。星间激光链路固定 DPSK 体制不走自适应阶梯。测控/信标（S 波段）豁免业务频段校验。</p>
+<h3 id="3-6-SK-VALID-三重校验">3.6 SK-VALID 三重校验</h3>
+<table>
+<thead><tr><th>类别</th><th>校核项</th><th>级别</th></tr></thead><tbody>
+<tr><td>语法</td><td>载荷选型非空 / 平台非空 / 运载非空</td><td>error</td></tr>
+<tr><td>语义</td><td>天线 EIRP ≥ 需求 / G/T ≥ 需求 / 工作模式匹配</td><td>error</td></tr>
+<tr><td>语义</td><td>载荷质量 ≤ 平台承载 / 功耗 ≤ 平台供电</td><td>error</td></tr>
+<tr><td>语义</td><td>平台承载裕度 ≥10%（利用率 &gt;90% 告警）</td><td>warning</td></tr>
+<tr><td>语义</td><td>平台寿命 ≥ 任务寿命</td><td>warning</td></tr>
+<tr><td>语义</td><td>用户显式质量/功耗约束二次校核</td><td>error</td></tr>
+<tr><td>合规</td><td>业务单机频段与任务频段一致（TTC/BCN 豁免）</td><td>error</td></tr>
+<tr><td>合规</td><td>每条链路 C/N 余量 ≥ 3 dB</td><td>error</td></tr>
+<tr><td>合规</td><td>单机全部货架（有缺口记 warning）</td><td>warning</td></tr>
+<tr><td>合规</td><td>平台/运载可行性</td><td>error</td></tr>
+</tbody></table>
+<h3 id="3-7-SK-DOC-方案生成-十章结构">3.7 SK-DOC 方案生成（十章结构）</h3>
+<p>一、需求分析 → 二、选型需求与判据（五要素表 + 来源标注）→ 三、载荷方案（体制/天线/单机/缺口 或 非通信载荷）→ 四、平台方案（含被筛除平台折叠表）→ 五、发射方案 → 六、指标汇总与平台校核 → 七、链路预算与余量校核 → 八、方案三重校验 → 九、风险与异常处置 → 十、结论。</p>
+<h2 id="四-异常分级体系-30-条规则">四、异常分级体系（30 条规则）</h2>
+<table>
+<thead><tr><th>Skill</th><th>异常码</th><th>触发条件</th><th>级别</th><th>自动处置</th><th>人工处置</th></tr></thead><tbody>
+<tr><td>SK-INTENT</td><td>INT-01</td><td>关键词命中为空</td><td>L1</td><td>回退 LLM 意图解析</td><td>无需干预</td></tr>
+<tr><td>SK-INTENT</td><td>INT-02</td><td>LLM 解析失败/超时</td><td>L1</td><td>降级关键词后端，标记 fallback</td><td>无需干预</td></tr>
+<tr><td>SK-INTENT</td><td>INT-03</td><td>频段/轨道识别冲突</td><td>L2</td><td>写入 ambiguity，保留多候选</td><td>人工澄清</td></tr>
+<tr><td>SK-INTENT</td><td>INT-04</td><td>数值指标提取失败</td><td>L1</td><td>留空，由下游按轨道/频段推算</td><td>无需干预</td></tr>
+<tr><td>SK-CLARIFY</td><td>CLA-01</td><td>存在 blocking 级缺项</td><td>L3</td><td>中断流程，返回 need_clarify</td><td>用户补充需求后重跑</td></tr>
+<tr><td>SK-CLARIFY</td><td>CLA-02</td><td>仅 warning 级缺项</td><td>L2</td><td>按工程默认值继续，标注假设来源</td><td>确认默认值是否可接受</td></tr>
+<tr><td>SK-RETRIEVE</td><td>RET-01</td><td>检索结果为空</td><td>L1</td><td>回退全量目录摘要注入</td><td>无需干预</td></tr>
+<tr><td>SK-RETRIEVE</td><td>RET-02</td><td>上下文超长</td><td>L1</td><td>按相关度截断至预算内</td><td>无需干预</td></tr>
+<tr><td>SK-ANTSEL</td><td>ANT-01</td><td>无频段匹配天线</td><td>L2</td><td>返回降权候选并标记需定制</td><td>确认放宽频段或立项定制</td></tr>
+<tr><td>SK-ANTSEL</td><td>ANT-02</td><td>工作模式完全不匹配</td><td>L2</td><td>标记冲突，不给模式分</td><td>确认工作模式需求</td></tr>
+<tr><td>SK-ANTSEL</td><td>ANT-03</td><td>EIRP/G-T 能力均不足</td><td>L3</td><td>中止本分支，回环换候选</td><td>重估指标可达性</td></tr>
+<tr><td>SK-EQUIP</td><td>EQU-01</td><td>该频段无货架单机</td><td>L2</td><td>记定制缺口，不回退错误频段</td><td>确认定制或放宽频段</td></tr>
+<tr><td>SK-EQUIP</td><td>EQU-02</td><td>功放体制冲突（SSPA/TWTA）</td><td>L2</td><td>保留首选，备选记入候选</td><td>确认功放体制</td></tr>
+<tr><td>SK-EQUIP</td><td>EQU-03</td><td>单机汇总超平台包络</td><td>L3</td><td>触发校核回环换候选</td><td>评估降配方案</td></tr>
+<tr><td>SK-BUDGET</td><td>BUD-01</td><td>链路余量 &lt; 3 dB</td><td>L2</td><td>标记不通过并给调整建议</td><td>调整天线口径或功放功率</td></tr>
+<tr><td>SK-BUDGET</td><td>BUD-02</td><td>体制最低阶仍不闭合</td><td>L3</td><td>回环换更大口径天线候选</td><td>重估链路可达性</td></tr>
+<tr><td>SK-BUDGET</td><td>BUD-03</td><td>链路参数缺失</td><td>L1</td><td>按轨道典型值填充并标注</td><td>无需干预</td></tr>
+<tr><td>SK-PLAT</td><td>PLA-01</td><td>该轨道无匹配平台</td><td>L2</td><td>返回空可行集，触发回环</td><td>评估定制平台</td></tr>
+<tr><td>SK-PLAT</td><td>PLA-02</td><td>所有平台承载/供电不足</td><td>L3</td><td>feasible=False，中止并给建议</td><td>重新评估载荷包络</td></tr>
+<tr><td>SK-PLAT</td><td>PLA-03</td><td>平台利用率 &gt; 90%</td><td>L2</td><td>标注裕度风险告警</td><td>评估升级平台或减重</td></tr>
+<tr><td>SK-LAUNCH</td><td>LAU-01</td><td>无入轨能力匹配火箭</td><td>L2</td><td>返回最接近候选并标记</td><td>评估减重或拆分发射</td></tr>
+<tr><td>SK-LAUNCH</td><td>LAU-02</td><td>整流罩包络超限</td><td>L2</td><td>候选降分并标记超限</td><td>评估折叠/拆分/改大罩</td></tr>
+<tr><td>SK-LAUNCH</td><td>LAU-03</td><td>能力余量 &gt; 50%</td><td>L1</td><td>提示搭载/拼单机会</td><td>评估搭载发射降本</td></tr>
+<tr><td>SK-VALID</td><td>VAL-01</td><td>语义校验不达标</td><td>L2</td><td>标记不达标项，进入回环</td><td>确认是否接受偏差</td></tr>
+<tr><td>SK-VALID</td><td>VAL-02</td><td>合规校验失败</td><td>L2</td><td>标记违规项，触发回环</td><td>调整方案</td></tr>
+<tr><td>SK-VALID</td><td>VAL-03</td><td>平台可行性判负</td><td>L3</td><td>中止，标记方案不可行</td><td>人工重新设计</td></tr>
+<tr><td>SK-DOC</td><td>DOC-01</td><td>选型结果为空</td><td>L2</td><td>生成模板骨架标注缺失</td><td>人工补充</td></tr>
+<tr><td>SK-DOC</td><td>DOC-02</td><td>LLM 润色失败</td><td>L1</td><td>回退确定性模板装配</td><td>无需干预</td></tr>
+<tr><td>SK-WORD</td><td>WOR-01</td><td>导出目录不可写</td><td>L2</td><td>改写入临时目录返回实际路径</td><td>指定输出目录</td></tr>
+<tr><td>SK-WORD</td><td>WOR-02</td><td>转换失败</td><td>L2</td><td>返回原始 Markdown</td><td>排查格式</td></tr>
+</tbody></table>
+<p>分级统计：<strong>L1 × 8</strong>（自动降级不扰民）/ <strong>L2 × 16</strong>（告警放行等决策）/ <strong>L3 × 6</strong>（保护中止转人工）。</p>
+<h2 id="五-知识底座-货架产品库现状">五、知识底座：货架产品库现状</h2>
+<table>
+<thead><tr><th>目录</th><th>规模</th><th>说明</th></tr></thead><tbody>
+<tr><td>天线货架</td><td>10 型</td><td>Ka/Ku/L/C/S/激光，相控阵/反射面/伞状/反射阵/喇叭/螺旋/光学</td></tr>
+<tr><td>单机货架</td><td>20 型</td><td>LNA/SSPA/TWTA/DCONV/UCONV/OMUX/MPA/DTP/CIRC/SWITCH/BCN/TTC/OPT</td></tr>
+<tr><td>遥感载荷</td><td>6 型</td><td>全色 0.5m/2m、多光谱 8m、SAR X/C、高光谱 30m</td></tr>
+<tr><td>导航载荷</td><td>3 型</td><td>B1C 信号单元、L 天线阵、导航行波管</td></tr>
+<tr><td>科学载荷</td><td>3 型</td><td>掩星探测、重力加速度计、磁强计</td></tr>
+<tr><td>卫星平台</td><td>6 型</td><td>LEO 小/中型、GEO 中/大型、MEO 导航、SSO 遥感</td></tr>
+<tr><td>运载火箭</td><td>12 型</td><td>长征系列 5 型 + 商业火箭 3 型 + 国外 4 型</td></tr>
+<tr><td>转发体制</td><td>3 类</td><td>透明 / 再生 / DTP 柔性</td></tr>
+<tr><td>频段定义</td><td>9 个</td><td>L/S/C/X/Ku/Ka/Q/V/激光（含雨衰基准）</td></tr>
+<tr><td>行业标准</td><td>12 条</td><td>ITU/ESA/CCSDS/MIL/GJB + 天线/链路/激光/热控/EMC/可靠性/抗辐射</td></tr>
+</tbody></table>
+<p>货架水平四级：<strong>4 飞行继承货架 &gt; 3 飞行继承 &gt; 2 货架(在研转货架) &gt; 1 定制</strong>。扩产品直接往 catalog 追加 dict 即可，选型引擎自动覆盖。</p>
+<h2 id="六-数据流与交付物">六、数据流与交付物</h2>
+<pre><code>
+用户文本 ─→ IntentResult ─→ SelectionRequirement ─→ SelectionPlan
+                                                      │
+              clarification 清单（阻断时）              ├─→ LinkBudget[]（逐链路明细）
+                                                      ├─→ ValidationResult（三重校验）
+                                                      └─→ 十章 Markdown 方案
+                                                             │
+                                             ┌───────────────┼────────────────┐
+                                          .md 源文件      .html 交付版      .doc 下载
+                                       （审计/版本管理）（目录+打印PDF）（Word 编辑）
+</code></pre>
+<p>交付物三性要求：<strong>可追溯</strong>（每项取值带来源标注、每次评分带理由）、<strong>可复现</strong>（确定性公式，同输入同输出）、<strong>可审计</strong>（事件流全程留痕，校验结论逐项列表）。</p>
+<h2 id="七-KPI-指标体系">七、KPI 指标体系</h2>
+<table>
+<thead><tr><th>维度</th><th>指标</th><th>目标</th><th>当前实测（骨架 V0.2）</th></tr></thead><tbody>
+<tr><td>效率</td><td>全链路生成时长</td><td>&lt; 5 s</td><td>≈0.4 s（keyword 后端，纯 CPU）</td></tr>
+<tr><td>效率</td><td>单方案文档规模</td><td>≥ 10 章</td><td>10 章 / 4000–6100 字符</td></tr>
+<tr><td>质量</td><td>测试用例通过率</td><td>100%</td><td>102/102（14 个测试类）</td></tr>
+<tr><td>质量</td><td>端到端用例走通率</td><td>100%</td><td>8/8（4 类载荷 + 澄清 + 确认流）</td></tr>
+<tr><td>质量</td><td>三重校验覆盖项</td><td>≥ 10 项</td><td>10 类校核项</td></tr>
+<tr><td>知识</td><td>货架命中率（通信单机）</td><td>≥ 80%</td><td>CASE1 10/10 全货架；L 波段 4 项缺口显式检出</td></tr>
+<tr><td>稳健</td><td>异常规则覆盖</td><td>每 Skill ≥ 2 条</td><td>30 条 / 11 Skill 全覆盖</td></tr>
+<tr><td>稳健</td><td>回环收敛</td><td>内环 ≤3、外环 ≤2</td><td>按上限强制收敛，耗尽转 L3</td></tr>
+<tr><td>交互</td><td>阻断级缺项检出</td><td>100% 拦截</td><td>CASE7"帮我看看遥感载荷"正确中断</td></tr>
+</tbody></table>
+<h2 id="八-演进路线图">八、演进路线图</h2>
+<table>
+<thead><tr><th>阶段</th><th>版本</th><th>内容</th><th>状态</th></tr></thead><tbody>
+<tr><td>骨架落地</td><td>V0.2</td><td>11 Skill + 双回环 + 三重校验 + 30 异常规则 + 102 测试 + HTML/DOC 导出</td><td>✅ 本期完成</td></tr>
+<tr><td>LLM 增强</td><td>V0.3</td><td>意图解析 LLM 后端（接口已预留，key 即插即用）、方案章节 LLM 润色（确定性数据不被改写）</td><td>规划</td></tr>
+<tr><td>知识扩充</td><td>V0.4</td><td>向量检索替换规则命中（契约不变）、货架库扩容（真实产品数据接入）、协议生成 SK-PROTO 落地</td><td>规划</td></tr>
+<tr><td>服务化</td><td>V0.5</td><td>FastAPI 封装 20 个端点（对齐 Traework 后端）、SSE 事件流推送、会话持久化</td><td>规划</td></tr>
+<tr><td>产品化</td><td>V1.0</td><td>前端交互（澄清问答/候选确认/事件时间线）、Word 正式排版导出、多轮方案迭代对话</td><td>规划</td></tr>
+</tbody></table>
+<h2 id="九-附录">九、附录</h2>
+<h3 id="9-1-代码结构">9.1 代码结构</h3>
+<pre><code>
+D:\ZWL\文生载荷Workbuddy\
+├── payload_agent\           # 智能体核心包（零依赖）
+│   ├── __init__.py          # 公共 API 导出
+│   ├── catalog.py           # 货架产品库（知识底座）
+│   ├── intent.py            # SK-INTENT / SK-CLARIFY 意图解析与澄清
+│   ├── knowledge.py         # SK-RETRIEVE 确定性知识检索
+│   ├── selection.py         # SK-ANTSEL/EQUIP/PLAT/LAUNCH 三级选型引擎
+│   ├── link_budget.py       # SK-BUDGET / SK-VALID 链路预算与三重校验
+│   ├── skill_registry.py    # Skill 注册表 + 异常分级
+│   ├── chain.py             # 主链路编排（双回环/确认流/中止/事件流）
+│   └── docgen.py            # SK-DOC / SK-WORD 文档生成与导出
+├── demo.py                  # 端到端演示（8 用例）
+├── test_agent.py            # 测试集（102 用例，unittest）
+└── output\                  # 方案产物（MD + HTML）
+</code></pre>
+<h3 id="9-2-运行方式">9.2 运行方式</h3>
+<pre><code>
+# 端到端演示（生成 output\方案_*.md / .html）
+python demo.py
+
+# 测试集
+python -m unittest test_agent -v
+
+# 作为库调用
+from payload_agent import PayloadDesignChain
+chain = PayloadDesignChain()
+r = chain.invoke({&quot;user_input&quot;: &quot;设计GEO Ka频段高通量通信载荷…&quot;})
+print(r.status); print(r.design_scheme)
+</code></pre>
+<h3 id="9-3-与既有工作-Traework-的承接关系">9.3 与既有工作（Traework）的承接关系</h3>
+<p>本骨架承接 Traework 项目 2026-08-17~08-21 周的智能体设计成果：11 Skill 体系、异常分级规则表、三级选型闭环、五要素/五因子/四因子评分模型均对齐 <code>skill_registry.py</code> / <code>selection_engine.py</code> / <code>payload_chain.py</code> 的既有定义，并做了三项工程强化：① 频段硬约束（缺口显式化，不回退错误频段）；② MODCOD 由 C/N 自适应反推（修正预设体制导致余量为负的方向性错误）；③ 用户约束与工程参考包络分离（不虚构硬约束，可行性以平台实际能力为准）。</p>
+</div>
+<script>
+function downloadDoc() {
+  var page = document.querySelector('.page');
+  var css = document.querySelector('#page-style').textContent;
+  var head = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+    + 'xmlns:w="urn:schemas-microsoft-com:office:word" '
+    + 'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'
+    + '<title>' + (document.title || 'scheme') + '</title>'
+    + '<style>' + css + ' body{font-family:SimSun,serif;} .toolbar{display:none;}'
+    + ' .page{border:none;box-shadow:none;margin:0;padding:0;max-width:none;}</style>'
+    + '</head><body>';
+  var src = head + page.outerHTML + '</body></html>';
+  var blob = new Blob(['\ufeff', src], {type: 'application/msword'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (document.title || 'scheme') + '.doc';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="payload-design">
+<title>导出验证方案</title>
+
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom>
+<w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>@page WordSection1{size:595.3pt 841.9pt;margin:72pt 72pt 72pt 72pt;mso-header-margin:42.55pt;
+mso-footer-margin:49.6pt;mso-paper-source:0;}div.WordSection1{page:WordSection1;}</style>
+<style>
+body{font-family:"仿宋","FangSong","宋体",serif;font-size:12pt;line-height:1.7;color:#000}
+.doc-title{font-family:"方正小标宋简体","黑体","SimHei",sans-serif;font-size:22pt;text-align:center;margin:18pt 0 6pt}
+.doc-sub{text-align:center;font-size:10.5pt;color:#444;margin:0 0 4pt}
+.doc-kpi{text-align:center;font-size:10.5pt;color:#1a3;margin:0 0 8pt}
+.doc-h2{font-family:"黑体","SimHei",sans-serif;font-size:15pt;margin:16pt 0 6pt;border-bottom:1.5pt solid #0b5cad;padding-bottom:3pt}
+.doc-sec{font-size:11pt}
+.doc-sec table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:6pt 0}
+.doc-sec th,.doc-sec td{border:0.75pt solid #888;padding:3pt 5pt;text-align:left;vertical-align:top}
+.doc-sec th{background:#e8eef7;font-weight:bold}
+.doc-sec .note,.doc-sec .warnbox,.doc-sec .badbox,.doc-sec .okbox{border:0.75pt solid #aaa;padding:5pt 8pt;margin:6pt 0;font-size:9.5pt}
+.doc-sec .kpi,.doc-sec .kpis{font-size:9.5pt}
+.doc-sec svg{max-width:100%;height:auto}
+.doc-foot{font-size:9pt;color:#555;text-align:center;margin-top:12pt}
+.tag{border:0.5pt solid #999;padding:0 4pt;font-size:9pt}
+</style>
+</head>
+<body><div class="WordSection1">
+<h1 class="doc-title">导出验证方案</h1>
+<p class="doc-sub">通信卫星有效载荷方案设计器 · payload-design 五步闭环自动生成 · 2026-09-21 12:37</p>
+<p class="doc-kpi">EIRP 50.9 dBW</p>
+<hr/>
+<h2 class="doc-h2">1. 方案总览</h2>
+<div class="doc-sec"><table><tr><th>项</th><th>值</th></tr><tr><td>EIRP</td><td>50.9 dBW</td></tr></table></div>
+<br style="page-break-before:auto"/>
+<h2 class="doc-h2">2. 信息流图</h2>
+<div class="doc-sec"><svg width="1160" height="400" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="100" height="40" fill="#eaf1fa"/><circle r="4" fill="#0b5cad"><animateMotion dur="2s" repeatCount="indefinite" path="M0,0 L100,0"/></circle></svg></div>
+<br style="page-break-before:auto"/>
+<h2 class="doc-h2">3. 链路预算</h2>
+<div class="doc-sec"><p>余量 3.70 dB</p></div>
+<br style="page-break-before:auto"/>
+<hr/><p class="doc-foot">本方案由设计引擎按 25 条工程约束自动校核生成；单机默认值为工程典型值，仅用于方案级论证，正式设计以详细链路预算为准。</p>
+</div></body>
+</html>

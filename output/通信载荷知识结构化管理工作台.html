@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>通信载荷知识结构化管理工作台</title>
+<style>
+:root{
+ --bg:#0B1220; --panel:#101A2C; --panel2:#0D1626; --line:#1E2A3F; --line2:#2A3A55;
+ --txt:#D7E3F4; --dim:#7C8DA6; --dim2:#54637A;
+ --cyan:#38BDF8; --cyan2:#7DD3FC; --green:#34D399; --amber:#FBBF24; --red:#F87171; --violet:#A78BFA; --orange:#FB923C; --blue:#60A5FA;
+ --cat0:#38BDF8; --cat1:#60A5FA; --cat2:#94A3B8; --cat3:#FBBF24; --cat4:#34D399; --cat5:#A78BFA; --cat6:#FB923C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font:13px/1.55 "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:5px 8px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#243449;border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+#app{display:flex;flex-direction:column;height:100%}
+/* ---------- toolbar ---------- */
+#toolbar{display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:linear-gradient(180deg,#12203A,#0E1930);border-bottom:1px solid var(--line);flex-shrink:0}
+#toolbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:.4px;white-space:nowrap}
+#toolbar .logo .cube{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--cyan),#2563EB);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#04121F;font-weight:900}
+.tabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px}
+.tabs button{padding:4px 12px;border-radius:6px;font-size:12px;color:var(--dim);white-space:nowrap}
+.tabs button.on{background:#17304F;color:var(--cyan2);box-shadow:inset 0 0 0 1px #2B4A73}
+.tabs button:hover:not(.on){color:var(--txt)}
+#search{width:190px}
+.spacer{flex:1}
+.tbtn{padding:5px 11px;border:1px solid var(--line2);border-radius:7px;font-size:12px;color:var(--dim);background:var(--panel2);white-space:nowrap}
+.tbtn:hover{color:var(--txt);border-color:var(--cyan)}
+.tbtn.pri{color:var(--cyan2);border-color:#2B4A73}
+/* ---------- topbar（元信息 + 本地/远程操作） ---------- */
+#topbar{display:flex;align-items:center;gap:9px;height:34px;padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--line);flex-shrink:0;font-size:11px;overflow:hidden}
+#topbar .mgrp{display:flex;align-items:center;gap:9px;flex-shrink:0}
+#topbar .mgrp label{display:flex;align-items:center;gap:4px;color:var(--dim2);font-family:Consolas,monospace;font-size:10px;white-space:nowrap}
+#topbar .mgrp input{width:104px;padding:2px 6px;font-size:11px}
+#ctxWarn{color:var(--amber);font-size:10px;font-family:Consolas,monospace;white-space:nowrap}
+.btngrp{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.btngrp>i{font-style:normal;font-size:9px;font-family:Consolas,monospace;color:var(--dim2);margin-right:2px;white-space:nowrap}
+.vsep{width:1px;height:17px;background:var(--line);flex-shrink:0}
+.obtn{padding:3px 9px;border:1px solid var(--line2);border-radius:5px;font-size:11px;color:var(--dim);background:var(--panel2);white-space:nowrap}
+.obtn:hover:not(:disabled){color:var(--cyan2);border-color:var(--cyan)}
+.obtn.on{color:var(--green);border-color:#1F6B4A;background:#123024}
+.obtn:disabled{opacity:.42;cursor:not-allowed}
+#mBase{width:122px;padding:2px 6px;font-size:10.5px;font-family:Consolas,monospace}
+#syncSt{font-family:Consolas,monospace;font-size:10px;color:var(--dim2);white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+#syncSt.ok{color:var(--green)}
+#syncSt.busy{color:var(--amber)}
+#syncSt.off{color:var(--dim2)}
+@keyframes sp{to{transform:rotate(360deg)}}
+#syncSt .spi{display:inline-block;animation:sp .9s linear infinite}
+/* ---------- PATH 面包屑 ---------- */
+#pathBox{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;font-size:11px;color:var(--dim)}
+#pathBox>i{font-style:normal;font-family:Consolas,monospace;font-size:9px;letter-spacing:.7px;color:var(--dim2)}
+#pathTxt{display:flex;align-items:center;min-width:0;overflow:hidden;white-space:nowrap}
+#pathTxt em{font-style:normal;color:var(--dim2);padding:0 4px}
+#pathTxt .cur{color:var(--cyan2);font-weight:600}
+/* ---------- 视图浮层：图例 / 缩放 / 联动指示 / pill ---------- */
+.pill{padding:3px 10px;border:1px solid var(--line2);border-radius:20px;font-size:11px;color:var(--dim);background:#0E1930;white-space:nowrap}
+.pill:hover{color:var(--txt);border-color:var(--cyan)}
+.pill.on{color:var(--cyan2);border-color:#2B4A73;background:#153049}
+.pill.on.a{color:var(--amber);border-color:#7A5B18;background:#2A2312}
+.pill.on.c{color:#67E8F9;border-color:#155E6B;background:#0E2C33}
+#legend{position:absolute;left:12px;bottom:44px;display:none;gap:10px;align-items:center;flex-wrap:wrap;max-width:64%;background:#0B1220CC;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:10.5px;color:var(--dim);pointer-events:none;z-index:12}
+#legend .lg-i{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+#legend .lg-i i{width:9px;height:9px;border-radius:50%;display:inline-block}
+#legend .lg-i i.sq{border-radius:2px;border:1px solid #F59E0B}
+#legend .lg-i i.ln{width:16px;height:2px;border-radius:1px}
+#zoomBox{position:absolute;right:12px;bottom:12px;display:none;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0E1930E8;z-index:12}
+#zoomBox button{width:28px;height:26px;color:var(--dim);font-size:13px;line-height:1;border-bottom:1px solid var(--line)}
+#zoomBox button:last-child{border-bottom:none}
+#zoomBox button:hover{color:var(--cyan2);background:#17304F}
+#linkInd{position:absolute;left:12px;top:10px;font-size:10.5px;font-family:Consolas,monospace;color:var(--dim2);background:#0B1220B8;border:1px solid var(--line);border-radius:6px;padding:3px 9px;pointer-events:none;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:12}
+#linkInd b{color:var(--cyan2)}
+/* ---------- layout ---------- */
+#main{display:flex;flex:1;min-height:0}
+#left{width:288px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+#center{flex:1;min-width:0;position:relative;background:
+ radial-gradient(1200px 600px at 70% -10%,#12233C 0%,transparent 60%),var(--bg)}
+#right{width:392px;flex-shrink:0;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.pane-h{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);flex-shrink:0}
+.pane-h b{color:var(--txt);font-size:12.5px}
+.pane-h .cnt{margin-left:auto;font-family:Consolas,monospace;font-size:11px;color:var(--dim2)}
+.scroll{overflow:auto;flex:1;min-height:0}
+/* ---------- tree ---------- */
+.tnode{user-select:none}
+.trow{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 0;cursor:pointer;border-left:2px solid transparent}
+.trow:hover{background:#152238}
+.trow.sel{background:#14283F;border-left-color:var(--cyan)}
+.trow .car{width:14px;height:14px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:var(--dim2);font-size:9px;transition:transform .12s}
+.trow .car.open{transform:rotate(90deg)}
+.trow .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.trow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.trow .bdg{font-size:10px;color:var(--dim2);border:1px solid var(--line2);border-radius:4px;padding:0 4px;font-family:Consolas,monospace}
+.trow .ops{display:none;gap:2px}
+.trow:hover .ops{display:flex}
+.ops button{width:19px;height:19px;border-radius:4px;color:var(--dim);font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.ops button:hover{background:#1D3049;color:var(--cyan2)}
+.trow.hit .nm{color:var(--amber)}
+/* ---------- center views ---------- */
+#viewWrap{position:absolute;inset:0}
+canvas.view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+canvas.view:active{cursor:grabbing}
+#viewHint{position:absolute;left:12px;bottom:10px;font-size:11px;color:var(--dim2);pointer-events:none;background:#0B1220B8;padding:3px 9px;border-radius:6px;border:1px solid var(--line)}
+#viewTools{position:absolute;right:12px;top:10px;display:flex;gap:6px;align-items:center}
+#viewTools select,#viewTools button{font-size:11px;padding:3px 9px}
+#tooltip{position:absolute;pointer-events:none;background:#0E1B2EF2;border:1px solid var(--line2);border-radius:8px;padding:8px 11px;font-size:11.5px;max-width:330px;display:none;z-index:30;box-shadow:0 8px 24px #0008}
+#tooltip .tt{font-weight:700;font-size:12.5px;margin-bottom:3px}
+#tooltip .td{color:var(--dim);margin-bottom:3px}
+#tooltip .tm{font-family:Consolas,monospace;color:var(--cyan2);font-size:10.5px}
+/* chain view */
+#chainView{position:absolute;inset:0;overflow:auto;padding:16px 18px 46px}
+.cvgrp{margin-bottom:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.cvgrp>h4{padding:8px 13px;font-size:12.5px;background:var(--panel2);border-bottom:1px solid var(--line);color:var(--cyan2)}
+.cvitem{padding:10px 13px;border-bottom:1px solid var(--line)}
+.cvitem:last-child{border-bottom:none}
+.cvitem .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.cvitem .h b{font-size:13px}
+.cvitem .h .cat{font-size:10px;border-radius:4px;padding:0 6px;background:#17304F;color:var(--cyan2)}
+.cvitem .h .cid{margin-left:auto;font-family:Consolas,monospace;font-size:10.5px;color:var(--dim2)}
+.cvitem .d{font-size:11.5px;color:var(--dim);margin-bottom:7px}
+.crow2{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin:4px 0}
+.uchip{border:1px solid var(--line2);border-left:3px solid var(--c,#94A3B8);border-radius:6px;background:var(--panel2);padding:3px 9px;font-size:11.5px;cursor:pointer}
+.uchip:hover{border-color:var(--cyan)}
+.uchip i{display:block;font-style:normal;font-family:Consolas,monospace;font-size:9px;color:var(--dim2)}
+.carr{color:var(--dim2);font-size:12px;padding:0 2px}
+/* dsm */
+#dsmView{position:absolute;inset:0;overflow:auto;padding:14px 14px 46px}
+#dsmView table{border-collapse:collapse;font-size:10px}
+#dsmView th{position:sticky;top:0;background:var(--panel);z-index:2}
+#dsmView th.rl{position:sticky;left:0;background:var(--panel);z-index:3;text-align:right;padding:1px 7px 1px 0;font-weight:400;color:var(--dim);white-space:nowrap;font-size:10.5px}
+#dsmView th.cl{height:88px;vertical-align:bottom;padding:0}
+#dsmView th.cl>div{transform:rotate(-58deg);transform-origin:left bottom;white-space:nowrap;color:var(--dim);font-weight:400;font-size:10.5px;width:16px}
+#dsmView td{width:17px;height:17px;border:1px solid #101A2C;text-align:center;font-size:9px;cursor:default}
+#dsmView td.mk{cursor:pointer}
+/* ---------- right panel ---------- */
+#detail{padding:12px 13px;display:flex;flex-direction:column;gap:11px}
+.dtitle{display:flex;align-items:flex-start;gap:8px}
+.dtitle h3{font-size:15px;line-height:1.3;flex:1}
+.catbadge{font-size:10.5px;border-radius:5px;padding:1px 8px;white-space:nowrap;margin-top:2px}
+.dpath{font-size:10.5px;color:var(--dim2);font-family:Consolas,monospace;word-break:break-all}
+.ddesc{font-size:12px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.sect{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.sect>h5{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
+.sect>h5 .n{margin-left:auto;font-family:Consolas,monospace;color:var(--dim2);font-size:10.5px}
+.sect>h5 button{margin-left:6px;font-size:11px;color:var(--cyan2);border:1px solid #2B4A73;border-radius:5px;padding:0 7px}
+.sect .body{padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+.arow{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:#0E1728;cursor:pointer}
+.arow:hover{border-color:var(--line2)}
+.arow .l1{display:flex;align-items:center;gap:7px}
+.arow .l1 b{font-size:12.5px;flex:1}
+.arow .sym{font-family:Consolas,monospace;font-size:11px;color:var(--cyan2);background:#12283F;border-radius:4px;padding:0 6px}
+.arow .l2{font-size:11px;color:var(--dim);margin-top:2px}
+.arow .ops2{display:flex;gap:4px}
+.ops2 button{font-size:10.5px;color:var(--dim);border:1px solid var(--line2);border-radius:4px;padding:0 6px}
+.ops2 button:hover{color:var(--cyan2);border-color:var(--cyan)}
+.ccard{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:7px;padding:7px 9px;background:#151321}
+.ccard .f{font-family:Consolas,monospace;font-size:11.5px;color:var(--amber);word-break:break-all}
+.ccard .d{font-size:11px;color:var(--dim);margin:3px 0 5px}
+.mchips{display:flex;flex-wrap:wrap;gap:4px}
+.mchip{font-size:10.5px;border-radius:5px;padding:1px 7px;background:#1D2A41;border:1px solid var(--line2);cursor:pointer}
+.mchip:hover{border-color:var(--cyan)}
+.mchip .r{color:var(--cyan2);font-family:Consolas,monospace}
+.kv{display:flex;gap:8px;font-size:11.5px}
+.kv .k{color:var(--dim2);flex-shrink:0;width:64px}
+.empty{color:var(--dim2);font-size:11.5px;padding:6px 2px}
+/* ---------- footer ---------- */
+#status{display:flex;align-items:center;gap:12px;height:26px;padding:0 12px;border-top:1px solid var(--line);background:var(--panel);font-size:10.5px;color:var(--dim);font-family:Consolas,monospace;flex-shrink:0}
+#status .g{color:var(--green)}
+#status b{color:var(--cyan2)}
+#status .path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---------- modal ---------- */
+#mask{position:fixed;inset:0;background:#04070CB0;display:none;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:6vh 16px}
+#mask.on{display:flex}
+.modal{width:640px;max-width:96vw;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 24px 70px #000C;overflow:hidden}
+.modal h4{padding:11px 15px;border-bottom:1px solid var(--line);font-size:14px;display:flex;align-items:center;gap:9px}
+.modal h4 .x{margin-left:auto;color:var(--dim);font-size:16px;line-height:1}
+.modal .mb{padding:14px 15px;display:flex;flex-direction:column;gap:11px}
+.modal .mf{padding:10px 15px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--panel2)}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:11px;color:var(--dim)}
+.fld .r2{display:flex;gap:8px}
+.fld .r2>*{flex:1}
+.btn{padding:6px 15px;border-radius:7px;font-size:12.5px;border:1px solid var(--line2);color:var(--dim)}
+.btn:hover{color:var(--txt)}
+.btn.pri{background:#155E93;border-color:#2B7FBF;color:#EAF6FF}
+.btn.danger{color:var(--red);border-color:#7F1D1D}
+.mrow{display:flex;gap:7px;align-items:center}
+.mrow select{flex:1}
+.mrow input{width:110px}
+.mrow button{color:var(--red);font-size:14px;width:24px}
+.toast{position:fixed;right:18px;bottom:18px;background:#12304A;border:1px solid #2B4A73;color:var(--cyan2);border-radius:8px;padding:8px 15px;font-size:12.5px;z-index:99;display:none;box-shadow:0 10px 30px #0009;max-width:58vw}
+.toast.ok{background:#12291F;border-color:#1F6B4A;color:var(--green)}
+.toast.err{background:#2A1B12;border-color:#7A4A18;color:var(--amber)}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="topbar">
+  <span class="mgrp">
+   <label>用户名<input id="mUser" placeholder="请输入用户名"></label>
+   <label>项目名<input id="mProj" placeholder="请输入项目名"></label>
+   <label>文件名<input id="mFile" placeholder="请输入文件名"></label>
+  </span>
+  <span id="ctxWarn"></span>
+  <div class="spacer"></div>
+  <span class="btngrp"><i>本地操作</i>
+   <button class="obtn" id="btnImport" title="从 JSON 导入（覆盖当前数据）">导入</button>
+   <button class="obtn" id="btnExport" title="导出为 JSON 文件">导出</button>
+  </span>
+  <span class="vsep"></span>
+  <span class="btngrp"><i>远程操作</i>
+   <input id="mBase" placeholder="同步服务器地址" title="REST 同步服务地址，默认 http://119.80.252.20:5173">
+   <button class="obtn" id="btnSave" title="保存当前知识图谱到服务器">保存</button>
+   <button class="obtn" id="btnSync" title="从服务器拉取数据">同步</button>
+   <button class="obtn" id="btnAuto" title="开启自动同步（每 25 秒拉取一次）">自动同步</button>
+   <span id="syncSt" class="off">⚠ 离线模式</span>
+  </span>
+  <span class="vsep"></span>
+  <button class="obtn" id="btnReset" title="重置为内置知识库">重置</button>
+  <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+ </div>
+ <div id="toolbar">
+  <span class="logo"><span class="cube">KG</span>通信载荷知识结构化管理工作台</span>
+  <div class="tabs" id="tabs">
+   <button data-v="comp" class="on">组成网络</button>
+   <button data-v="unit">单机连接</button>
+   <button data-v="coup">属性耦合</button>
+   <button data-v="g3d">3D 视图</button>
+   <button data-v="dsm">DSM 矩阵</button>
+   <button data-v="chain">链路流程</button>
+  </div>
+  <span id="pathBox"><i>PATH</i><span id="pathTxt">—</span></span>
+  <div class="spacer"></div>
+  <input id="search" type="search" placeholder="搜索本体 / 属性 / 符号…">
+ </div>
+ <div id="main">
+  <div id="left">
+   <div class="pane-h"><b>本体树</b><span class="cnt" id="treeCnt"></span></div>
+   <div class="scroll" id="tree"></div>
+  </div>
+  <div id="center">
+   <div id="viewWrap">
+    <canvas class="view" id="cv"></canvas>
+    <div id="chainView" style="display:none"></div>
+    <div id="dsmView" style="display:none"></div>
+     <div id="viewTools"></div>
+    <div id="linkInd">点击节点联动左右面板</div>
+    <div id="legend"></div>
+    <div id="zoomBox"><button id="zIn" title="放大">＋</button><button id="zOut" title="缩小">－</button><button id="zFit" title="重置视图与自动布局">⤢</button></div>
+    <div id="viewHint"></div>
+    <div id="tooltip"></div>
+   </div>
+  </div>
+  <div id="right">
+   <div class="pane-h"><b>详情 / 属性 / 约束</b><span class="cnt" id="rightCnt"></span></div>
+   <div class="scroll" id="detail"></div>
+  </div>
+ </div>
+ <div id="status">
+  <span class="g">● 知识库已就绪</span><span>|</span>
+  <span>本体 <b id="stOnt">0</b></span>
+  <span>属性 <b id="stAttr">0</b></span>
+  <span>约束 <b id="stCst">0</b></span>
+  <span>关系 <b id="stRel">0</b></span><span>|</span>
+  <span class="path" id="stPath">—</span>
+  <span style="margin-left:auto" id="stVer"></span>
+ </div>
+</div>
+<div id="mask"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const SEED = {"version": 6, "exportedAt": "2026-09-21T10:28:49", "name": "通信有效载荷知识图谱（v6 整合版）", "scope": "Ka 通信有效载荷：反射面+馈源阵天线、透明/DTP 转发器、激光通信、载荷控制器四分系统及其单机、软件、接口、控制环路与链路组成", "description": "在 knowledge-graph-2026-09-21 导出稿基础上修订：天线改为反射面+馈源阵（拼块阵）并纳入波控机、展开控制器；转发器保留透明转发与 DTP；载荷控制器分系统对齐载荷控制器知识图谱，控制环直接指向各分系统受控单机", "sourceFile": "knowledge-graph-2026-09-21.json", "schema": {"ontologies": "id / name / description / parentId / order / category / chain?", "attributes": "id / ontologyId / name / description / symbol", "constraints": "id / formula / description / members[{attributeId, role}]", "relations": "id / from / to / type / description", "category枚举": ["载荷总体", "分系统", "分组", "体制", "单机", "链路", "指标", "软件", "接口"], "chain说明": "有序节点 id 列表，表示体制/链路/控制环经过的单机或软件"}, "ontologies": [{"id": "comm_payload", "name": "通信有效载荷", "description": "Ka 通信有效载荷知识图谱：天线分系统采用反射面+馈源阵（拼块阵）体制，转发器分系统支持透明转发与 DTP，激光通信分系统提供星间/星地激光链路，载荷控制器分系统对波束、路由、展开、指向与激光实施统一管控；覆盖分系统、单机、软件、接口、控制环路与链路组成关系", "parentId": null, "order": 0, "category": "载荷总体"}, {"id": "ant_subsys", "name": "天线分系统", "description": "反射面+馈源阵（拼块阵）天线分系统：波控机驱动拼块馈源阵、经反射面形成收发多波束，展开控制器管理反射面在轨展开与锁定", "parentId": "comm_payload", "order": 0, "category": "分系统"}, {"id": "ant_arch", "name": "天线体制", "description": "", "parentId": "ant_subsys", "order": 0, "category": "分组"}, {"id": "refl_feed", "name": "反射面+馈源阵（拼块阵）", "description": "波控机计算并加载幅相权值→拼块馈源阵激励→反射面形成收发多波束", "parentId": "ant_arch", "order": 0, "category": "体制", "chain": ["beam_ctrl", "feed_array", "reflector"]}, {"id": "ant_units", "name": "反射面与控制单机", "description": "", "parentId": "ant_subsys", "order": 1, "category": "分组"}, {"id": "beam_ctrl", "name": "波控机", "description": "波束控制计算机：计算波束幅相权值、控制馈源阵通道幅相、执行波束调度与校准补偿", "parentId": "ant_units", "order": 0, "category": "单机"}, {"id": "feed_array", "name": "馈源阵（拼块馈源阵）", "description": "拼块式馈源阵与馈电网络：由多块拼块馈源单元组成，接受波控机幅相控制形成馈电波前", "parentId": "ant_units", "order": 1, "category": "单机"}, {"id": "reflector", "name": "拼块式反射面", "description": "拼块可展开反射面：将馈源阵球面波反射为口径面波束，提供天线增益", "parentId": "ant_units", "order": 2, "category": "单机"}, {"id": "deploy_mech", "name": "反射面展开机构", "description": "反射面展开机构：驱动反射面面板展开、到位与锁定", "parentId": "ant_units", "order": 3, "category": "单机"}, {"id": "deploy_ctrl", "name": "展开控制器", "description": "展开控制器：执行展开时序、到位闭锁与互锁保护，回传展开状态", "parentId": "ant_units", "order": 4, "category": "单机"}, {"id": "ant_links", "name": "天线射频链路", "description": "", "parentId": "ant_subsys", "order": 2, "category": "分组"}, {"id": "ant_tx_path", "name": "天线发射通道", "description": "发射信号经波控机加权、馈源阵激励、反射面辐射", "parentId": "ant_links", "order": 0, "category": "链路", "chain": ["beam_ctrl", "feed_array", "reflector"]}, {"id": "ant_rx_path", "name": "天线接收通道", "description": "接收信号经反射面汇聚、馈源阵收集、波控机合成", "parentId": "ant_links", "order": 1, "category": "链路", "chain": ["reflector", "feed_array", "beam_ctrl"]}, {"id": "trp_subsys", "name": "转发器分系统", "description": "Ka 转发器分系统：支持透明转发与 DTP 数字透明处理两种体制", "parentId": "comm_payload", "order": 1, "category": "分系统"}, {"id": "trp_arch", "name": "转发体制", "description": "星上信号处理方式，决定链路余量、灵活度、功耗与研制风险；三种体制各有明确适用场景", "parentId": "trp_subsys", "order": 0, "category": "分组"}, {"id": "transparent", "name": "透明转发器", "description": "接收-变频-放大-输出的弯管式转发链路", "parentId": "trp_arch", "order": 0, "category": "体制", "chain": ["lna", "imux", "dconv", "uconv", "sspa", "omux"]}, {"id": "dtp", "name": "DTP数字透明处理器", "description": "中频数字化后星上交换路由再恢复模拟的柔性转发链路", "parentId": "trp_arch", "order": 1, "category": "体制", "chain": ["lna", "imux", "dconv", "adc", "dswitch", "dac", "uconv", "sspa", "omux"]}, {"id": "trp_rx", "name": "接收通道单机", "description": "上行接收前端单机，噪声系数直接决定系统噪声温度与 G/T", "parentId": "trp_subsys", "order": 1, "category": "分组"}, {"id": "lna", "name": "低噪声放大器LNA", "description": "接收前端低噪声放大，噪声系数 Ka 典型 1.6dB / Ku 1.2dB / L 0.8dB，通常 A/B 冷备", "parentId": "trp_rx", "order": 0, "category": "单机"}, {"id": "imux", "name": "输入多工器IMUX", "description": "上行多通道滤波与分路，将宽带接收信号按转发器通道分割", "parentId": "trp_rx", "order": 1, "category": "单机"}, {"id": "dconv", "name": "下变频器DCONV", "description": "将上行射频（Ka 30GHz / Ku 14GHz）下变频至中频或零中频，便于滤波与数字化", "parentId": "trp_rx", "order": 2, "category": "单机"}, {"id": "trp_amp", "name": "功率放大单机", "description": "下行功率放大单机，决定星上 EIRP 与直流功耗（P_dc = P_out/η）", "parentId": "trp_subsys", "order": 2, "category": "分组"}, {"id": "sspa", "name": "固态功放SSPA", "description": "GaN/GaAs 固态功率放大器，效率高、寿命长、可批产，适合中低功率与相控阵阵元级放大", "parentId": "trp_amp", "order": 0, "category": "单机"}, {"id": "epc", "name": "电子功率调节器EPC", "description": "行波管高压电源调节与开关机控制，含过流/过压保护与遥测", "parentId": "trp_amp", "order": 1, "category": "单机"}, {"id": "trp_freq", "name": "变频与频率单机", "description": "上变频与本振频率源，相位噪声影响 EVM 与解调门限", "parentId": "trp_subsys", "order": 3, "category": "分组"}, {"id": "uconv", "name": "上变频器UCONV", "description": "将中频上变频至下行射频（Ka 20GHz / Ku 12GHz）", "parentId": "trp_freq", "order": 0, "category": "单机"}, {"id": "lo_source", "name": "频率源/本振", "description": "变频与采样所需的高稳定频率源，相位噪声（dBc/Hz@offset）影响 EVM 与解调门限", "parentId": "trp_freq", "order": 1, "category": "单机"}, {"id": "trp_filter", "name": "滤波与多工单机", "description": "通道选择、杂散抑制与通带平坦度控制单机", "parentId": "trp_subsys", "order": 4, "category": "分组"}, {"id": "omux", "name": "输出多工器OMUX", "description": "下行多通道滤波与合成，隔离各通道并合成至发射天线，是透明转发载荷的关键无源单机", "parentId": "trp_filter", "order": 0, "category": "单机"}, {"id": "trp_switch", "name": "交换与数字化单机", "description": "DTP 柔性体制的核心单机：数字信道化、子带交换与数模转换", "parentId": "trp_subsys", "order": 5, "category": "分组"}, {"id": "adc", "name": "数字信道化ADC", "description": "宽带模数转换与数字信道化，把射频/中频信号切分为可交换的子带（最小子带带宽 B_sub）", "parentId": "trp_switch", "order": 0, "category": "单机"}, {"id": "dswitch", "name": "星上交换矩阵", "description": "子带级非阻塞交换矩阵，实现「任意输入波束→任意输出波束」的在轨重构连接，容量 C_sw", "parentId": "trp_switch", "order": 1, "category": "单机"}, {"id": "dac", "name": "数模转换DAC", "description": "交换后子带的数模转换，输出至上变频与功放链", "parentId": "trp_switch", "order": 2, "category": "单机"}, {"id": "trp_links", "name": "通信链路", "description": "转发器分系统承载的星地/星上通信链路，含上行馈电、下行用户、星上波束交换与再生转发通道", "parentId": "trp_subsys", "order": 6, "category": "分组"}, {"id": "uplink", "name": "上行馈电链路", "description": "关口站上行经天线进入接收通道", "parentId": "trp_links", "order": 0, "category": "链路", "chain": ["reflector", "feed_array", "beam_ctrl", "lna", "imux", "dconv"]}, {"id": "downlink", "name": "下行用户链路", "description": "转发器下行经馈源阵与反射面辐射用户", "parentId": "trp_links", "order": 1, "category": "链路", "chain": ["uconv", "sspa", "omux", "feed_array", "reflector"]}, {"id": "interbeam_link", "name": "星上波束交换链路", "description": "DTP 数字化后星上波束间交换", "parentId": "trp_links", "order": 2, "category": "链路", "chain": ["adc", "dswitch", "dac"]}, {"id": "laser_subsys", "name": "激光通信分系统", "description": "星间/星地激光高速链路终端，由光学天线单元、ATP 捕获跟踪单元、光收发单元、控制单元与激光链路组成，提供 Gbps 级星间组网与低时延回传能力；判据为捕获概率 ≥95%、精跟踪 ≤1μrad", "parentId": "comm_payload", "order": 2, "category": "分系统"}, {"id": "laser_opt", "name": "光学天线单元", "description": "激光发射/接收光学口径，增益极高、发散角微弧度级", "parentId": "laser_subsys", "order": 0, "category": "分组"}, {"id": "optical_antenna", "name": "光学天线", "description": "卡塞格林/折射式光学收发天线（如 Φ135mm），等效增益 ≈118dB，发散角 μrad 级", "parentId": "laser_opt", "order": 0, "category": "单机"}, {"id": "laser_atp", "name": "ATP捕获跟踪单元", "description": "捕获（Acquisition）—跟踪（Tracking）—瞄准（Pointing）单元，决定建链成功率与跟踪精度", "parentId": "laser_subsys", "order": 1, "category": "分组"}, {"id": "atp_coarse", "name": "ATP粗跟踪机构", "description": "万向架/转台式粗跟踪，完成大范围捕获与粗对准，是建链捕获概率的关键", "parentId": "laser_atp", "order": 0, "category": "单机"}, {"id": "fsm", "name": "精跟踪快速反射镜FSM", "description": "压电/音圈快速反射镜，补偿平台微振动与指向抖动，实现 ≤1μrad 精跟踪", "parentId": "laser_atp", "order": 1, "category": "单机"}, {"id": "acq_sensor", "name": "捕获跟踪传感器", "description": "四象限/CCD 探测器，提取信标光误差信号驱动 ATP 闭环", "parentId": "laser_atp", "order": 2, "category": "单机"}, {"id": "beacon_laser", "name": "信标激光器", "description": "宽发散角信标光发射，用于远距离初始捕获与跟踪引导", "parentId": "laser_atp", "order": 3, "category": "单机"}, {"id": "laser_trm", "name": "光收发单元", "description": "激光发射、接收与调制解调单机，决定链路速率与接收灵敏度", "parentId": "laser_subsys", "order": 2, "category": "分组"}, {"id": "tx_laser", "name": "通信激光器", "description": "窄线宽通信激光发射（1550nm），输出功率与线宽决定链路 EIRP 与相位噪声", "parentId": "laser_trm", "order": 0, "category": "单机"}, {"id": "photodetector", "name": "光探测器", "description": "APD/平衡探测器，接收灵敏度决定链路接收门限（DPSK 优于 OOK 约 6dB）", "parentId": "laser_trm", "order": 1, "category": "单机"}, {"id": "dpsk_modem", "name": "DPSK调制解调模块", "description": "差分相移键空调制解调，门限约 8dB，是高速激光链路主流体制", "parentId": "laser_trm", "order": 2, "category": "单机"}, {"id": "edfa", "name": "光放大器EDFA", "description": "掺铒光纤放大器，提升发射功率或补偿接收前端损耗", "parentId": "laser_trm", "order": 3, "category": "单机"}, {"id": "opt_switch", "name": "光开关", "description": "多链路光路切换与主备倒换，支持多目标星间组网", "parentId": "laser_trm", "order": 4, "category": "单机"}, {"id": "laser_ctrl_grp", "name": "激光控制单元", "description": "激光终端状态机控制与链路管理", "parentId": "laser_subsys", "order": 3, "category": "分组"}, {"id": "laser_ctrl", "name": "激光通信控制器", "description": "ATP 状态机控制、建链/断链管理、链路遥测与故障处置，接受在轨重构控制器调度", "parentId": "laser_ctrl_grp", "order": 0, "category": "单机"}, {"id": "laser_links", "name": "激光链路", "description": "星间与星地激光链路，星间无雨衰但受指向抖动影响，星地需计入云遮蔽与大气湍流代价", "parentId": "laser_subsys", "order": 4, "category": "分组"}, {"id": "isl_laser", "name": "星间激光链路ISL", "description": "DPSK 调制经光放大与通信激光器由光学天线发出", "parentId": "laser_links", "order": 0, "category": "链路", "chain": ["dpsk_modem", "edfa", "tx_laser", "optical_antenna"]}, {"id": "sgl_laser", "name": "星地激光链路", "description": "星地间激光收发链路（含大气影响）", "parentId": "laser_links", "order": 1, "category": "链路", "chain": ["dpsk_modem", "edfa", "tx_laser", "optical_antenna"]}, {"id": "pcu_subsys", "name": "载荷控制器", "description": "载荷管控分系统：硬件平台+管控软件+外部接口+控制环路，对天线、转发器、激光各单机实施统一控制、遥测采集与在轨重构", "parentId": "comm_payload", "order": 3, "category": "分系统"}, {"id": "hw", "name": "硬件平台", "description": "星载抗辐照硬件：主处理、存储、二次电源与三类总线接口", "parentId": "pcu_subsys", "order": 0, "category": "分组"}, {"id": "cpu", "name": "主处理单元", "description": "抗辐照星载 SoC：运行全部管控软件，完成控制律计算与任务调度", "parentId": "hw", "order": 0, "category": "单机"}, {"id": "mem", "name": "存储单元", "description": "程序、波束权值表、路由表与遥测固态记录存储", "parentId": "hw", "order": 1, "category": "单机"}, {"id": "pwr", "name": "二次电源模块", "description": "平台一次电源转控制器内部二次电源，含滤波与保护", "parentId": "hw", "order": 2, "category": "单机"}, {"id": "bi1553", "name": "1553B总线接口", "description": "控制总线接口：波束权值、指向指令、遥测采集的主通道", "parentId": "hw", "order": 3, "category": "单机"}, {"id": "bi422", "name": "RS422串行接口", "description": "专用指令线：展开机构时序、激光器开关等互锁指令", "parentId": "hw", "order": 4, "category": "单机"}, {"id": "bisw", "name": "SpaceWire接口", "description": "高速数据通道：DTP 路由表装载与激光用户数据中转", "parentId": "hw", "order": 5, "category": "单机"}, {"id": "tm_tc", "name": "平台遥测遥控接口", "description": "与卫星平台间的遥测下传与遥控上行接口", "parentId": "hw", "order": 6, "category": "单机"}, {"id": "sw", "name": "管控软件", "description": "载荷管控应用软件功能集，部署于主处理单元", "parentId": "pcu_subsys", "order": 1, "category": "分组"}, {"id": "f_beam", "name": "波束管理", "description": "波束调度与幅相权值计算、加载与回读校验", "parentId": "sw", "order": 0, "category": "软件"}, {"id": "f_route", "name": "信道交换配置", "description": "DTP 交换矩阵路由表生成、装载与在轨重构", "parentId": "sw", "order": 1, "category": "软件"}, {"id": "f_deploy", "name": "展开时序控制", "description": "拼块反射面展开指令序列、互锁判断与锁定确认", "parentId": "sw", "order": 2, "category": "软件"}, {"id": "f_atp", "name": "指向控制", "description": "ATP 粗/精指向指令生成与跟踪遥测闭环", "parentId": "sw", "order": 3, "category": "软件"}, {"id": "f_laser", "name": "激光功率管理", "description": "激光器开关序列、光功率调节与老化补偿", "parentId": "sw", "order": 4, "category": "软件"}, {"id": "f_tm", "name": "遥测采集处理", "description": "各单机遥测轮询采集、限幅检查、打包与固态记录", "parentId": "sw", "order": 5, "category": "软件"}, {"id": "f_fdir", "name": "状态监测与重构", "description": "故障检测、隔离与降级重构（FDIR），驱动路由/波束降级策略", "parentId": "sw", "order": 6, "category": "软件"}, {"id": "ifc", "name": "外部接口", "description": "控制器对外电气/协议接口集合", "parentId": "pcu_subsys", "order": 2, "category": "分组"}, {"id": "i_bus1553", "name": "1553B控制总线", "description": "控制器至波束赋形网络、ATP、功放的控制总线", "parentId": "ifc", "order": 0, "category": "接口"}, {"id": "i_422", "name": "RS422指令线", "description": "控制器至展开机构、激光器的专用指令与互锁线", "parentId": "ifc", "order": 1, "category": "接口"}, {"id": "i_sw", "name": "SpaceWire数据通道", "description": "控制器至交换矩阵、激光调制解调的高速数据通道", "parentId": "ifc", "order": 2, "category": "接口"}, {"id": "i_plat", "name": "平台接口", "description": "与平台间的遥测遥控、一次电源与时统接口", "parentId": "ifc", "order": 3, "category": "接口"}, {"id": "loops", "name": "控制环路", "description": "闭环控制与管控流程，chain 给出环路经过的功能/硬件/对象", "parentId": "pcu_subsys", "order": 3, "category": "分组"}, {"id": "loop_beam", "name": "波束控制环", "description": "权值计算→1553B 下发→波控机加载生效→遥测回读闭环", "parentId": "loops", "order": 0, "category": "链路", "chain": ["f_beam", "bi1553", "beam_ctrl"]}, {"id": "loop_route", "name": "路由配置环", "description": "路由表生成→SpaceWire 装载→交换矩阵生效", "parentId": "loops", "order": 1, "category": "链路", "chain": ["f_route", "bisw", "dswitch"]}, {"id": "loop_deploy", "name": "展开控制环", "description": "时序指令→RS422 专用线→展开控制器动作与互锁回传", "parentId": "loops", "order": 2, "category": "链路", "chain": ["f_deploy", "bi422", "deploy_ctrl"]}, {"id": "loop_atp", "name": "指向控制环", "description": "指向指令→1553B→ATP 执行→跟踪误差遥测回读", "parentId": "loops", "order": 3, "category": "链路", "chain": ["f_atp", "bi1553", "atp_coarse"]}, {"id": "loop_laser", "name": "激光管理环", "description": "功率指令→RS422→激光通信控制器调节→光功率遥测回读", "parentId": "loops", "order": 4, "category": "链路", "chain": ["f_laser", "bi422", "laser_ctrl"]}, {"id": "loop_tm", "name": "遥测环", "description": "总线轮询采集→打包处理→平台接口下传", "parentId": "loops", "order": 5, "category": "链路", "chain": ["f_tm", "bi1553", "tm_tc"]}, {"id": "loop_fdir", "name": "重构环", "description": "遥测诊断→故障定位→路由/波束降级重构", "parentId": "loops", "order": 6, "category": "链路", "chain": ["f_tm", "f_fdir", "f_route"]}], "attributes": [{"id": "a-pay-eirp", "ontologyId": "comm_payload", "name": "载荷EIRP能力", "description": "载荷对外等效全向辐射功率能力（dBW）", "symbol": "EIRP_pay"}, {"id": "a-pay-gt", "ontologyId": "comm_payload", "name": "载荷G/T", "description": "载荷接收品质因数（dB/K）", "symbol": "GT_pay"}, {"id": "a-pay-cap", "ontologyId": "comm_payload", "name": "系统容量", "description": "载荷可提供业务总容量（Gbps）", "symbol": "C_sys"}, {"id": "a-pay-mass", "ontologyId": "comm_payload", "name": "载荷总质量", "description": "载荷总质量（kg），为各分系统质量之和加裕度", "symbol": "M_pay"}, {"id": "a-pay-power", "ontologyId": "comm_payload", "name": "载荷总功耗", "description": "载荷总功耗（W）", "symbol": "P_pay"}, {"id": "a-pay-life", "ontologyId": "comm_payload", "name": "设计寿命", "description": "载荷在轨设计寿命（年），GEO 通常 ≥15 年", "symbol": "L_life"}, {"id": "a-pay-band", "ontologyId": "comm_payload", "name": "Ka工作频率", "description": "载荷 Ka 频段工作频率（GHz）", "symbol": "f_Ka"}, {"id": "a-ant-gain", "ontologyId": "ant_subsys", "name": "天线增益", "description": "天线方向性增益（dBi）", "symbol": "G_ant"}, {"id": "a-ant-eirp", "ontologyId": "ant_subsys", "name": "天线EIRP", "description": "EIRP = P_out + G_ant − L_feed − L_tx（dBW）", "symbol": "EIRP_ant"}, {"id": "a-ant-gt", "ontologyId": "ant_subsys", "name": "天线G/T", "description": "G/T = G_ant − 10lg(T_sys)（dB/K）", "symbol": "GT_ant"}, {"id": "a-ant-beam", "ontologyId": "ant_subsys", "name": "波束数", "description": "可同时形成的独立波束数量", "symbol": "N_beam"}, {"id": "a-ant-bw-beam", "ontologyId": "ant_subsys", "name": "单波束带宽", "description": "单个波束占用带宽（MHz）", "symbol": "B_beam"}, {"id": "a-ant-hpbw", "ontologyId": "ant_subsys", "name": "半功率波束宽度", "description": "波束半功率宽度（°），θ_3dB ≈ 70λ/D", "symbol": "θ_3dB"}, {"id": "a-ant-feed-loss", "ontologyId": "ant_subsys", "name": "馈电损耗", "description": "馈电网络插损（dB），计入 EIRP 扣减", "symbol": "L_feed"}, {"id": "a-ant-mass", "ontologyId": "ant_subsys", "name": "分系统质量", "description": "天线分系统质量（kg）", "symbol": "m_ant"}, {"id": "a-ant-power", "ontologyId": "ant_subsys", "name": "分系统功耗", "description": "天线分系统功耗（W），相控阵 ≈ N_el × P_tr + 控制功耗", "symbol": "P_ant"}, {"id": "a-ant-point", "ontologyId": "ant_subsys", "name": "波束指向精度", "description": "波束指向误差（°），引起指向损耗 L_pnt=12(θ_e/θ_3dB)²", "symbol": "θ_e"}, {"id": "a-bc-ch", "ontologyId": "beam_ctrl", "name": "波控通道数", "description": "波控机可独立控制的幅相通道数", "symbol": "N_chbf"}, {"id": "a-bc-cyc", "ontologyId": "beam_ctrl", "name": "权值更新周期", "description": "波控机完成一轮波束权值更新的时间", "symbol": "T_wctl"}, {"id": "a-bfn-set", "ontologyId": "beam_ctrl", "name": "权值加载时间", "description": "赋形网络单轮权值加载耗时（ms）", "symbol": "T_set"}, {"id": "a-fa-el", "ontologyId": "feed_array", "name": "阵元数", "description": "拼块馈源阵辐射单元总数", "symbol": "N_el"}, {"id": "a-fa-db", "ontologyId": "feed_array", "name": "幅相一致性", "description": "馈源阵通道间幅度/相位一致性", "symbol": "Δ_amp/Δ_phs"}, {"id": "a-feed-eff", "ontologyId": "feed_array", "name": "照射效率", "description": "馈源照射效率（%），影响天线总效率 η", "symbol": "η_ill"}, {"id": "a-ant-aperture", "ontologyId": "reflector", "name": "口径/阵面尺寸", "description": "反射面口径或阵面尺寸（m）", "symbol": "D_ap"}, {"id": "a-ant-surface", "ontologyId": "reflector", "name": "面精度", "description": "反射面/阵面表面 RMS 误差（mm），需 ≤ λ/32", "symbol": "δ_surf"}, {"id": "a-ant-sidelobe", "ontologyId": "reflector", "name": "旁瓣电平", "description": "天线方向图旁瓣电平（dB），需 ≤ −20dB", "symbol": "SLL"}, {"id": "a-deploy-acc", "ontologyId": "deploy_mech", "name": "展开到位精度", "description": "展开后型面到位精度（mm RMS），须满足 ≤λ/32", "symbol": "δ_dep"}, {"id": "a-dep-time", "ontologyId": "deploy_mech", "name": "展开动作时间", "description": "展开机构从收拢到锁定的动作时间", "symbol": "t_dep_m"}, {"id": "a-dep-win", "ontologyId": "deploy_ctrl", "name": "展开允许窗口", "description": "平台允许的展开时间窗（s）", "symbol": "T_win"}, {"id": "a-ilk-n", "ontologyId": "deploy_ctrl", "name": "互锁信号数", "description": "展开控制器监测的互锁/到位信号数量", "symbol": "N_ilk"}, {"id": "a-tx-loss", "ontologyId": "ant_tx_path", "name": "通道插损", "description": "发射通道总插损（dB），计入 EIRP 扣减", "symbol": "L_tx"}, {"id": "a-rx-noise", "ontologyId": "ant_rx_path", "name": "接收噪声温度", "description": "接收通道贡献的系统噪声温度（K）", "symbol": "T_sys"}, {"id": "a-trp-gain", "ontologyId": "trp_subsys", "name": "转发增益", "description": "转发器总增益（dB）", "symbol": "G_trp"}, {"id": "a-trp-nf", "ontologyId": "trp_subsys", "name": "噪声系数", "description": "接收通道总噪声系数（dB），决定系统噪声温度", "symbol": "NF"}, {"id": "a-trp-bw", "ontologyId": "trp_subsys", "name": "转发带宽", "description": "转发器总带宽（MHz）", "symbol": "B_trp"}, {"id": "a-trp-flat", "ontologyId": "trp_subsys", "name": "通带平坦度", "description": "通带幅频平坦度（dB）与群时延（ns）", "symbol": "Δ_flat"}, {"id": "a-trp-mass", "ontologyId": "trp_subsys", "name": "分系统质量", "description": "转发器分系统质量（kg）", "symbol": "m_trp"}, {"id": "a-trp-power", "ontologyId": "trp_subsys", "name": "分系统功耗", "description": "转发器分系统功耗（W），功放直流功耗 P_dc=P_out/η 为主", "symbol": "P_trp"}, {"id": "a-trp-isolation", "ontologyId": "trp_subsys", "name": "收发隔离度", "description": "收发通道隔离度（dB），舱内隔离 ≥80dB、收发 ≥100dB", "symbol": "I_trp"}, {"id": "a-trans-delay", "ontologyId": "transparent", "name": "转发时延", "description": "透明转发星上时延（ns），近似为零", "symbol": "τ_trans"}, {"id": "a-dtp-subbw", "ontologyId": "dtp", "name": "子带带宽", "description": "数字信道化最小子带带宽（MHz），越细越灵活但功耗越大", "symbol": "B_sub"}, {"id": "a-dtp-switch", "ontologyId": "dtp", "name": "交换容量", "description": "星上交换矩阵总容量（Gbps）", "symbol": "C_sw"}, {"id": "a-dtp-channels", "ontologyId": "dtp", "name": "信道数", "description": "数字信道化通道数，须满足 N_ch × B_sub ≥ B_trp", "symbol": "N_ch"}, {"id": "a-dtp-reconfig", "ontologyId": "dtp", "name": "重构时间", "description": "波束/带宽/功率在轨重构切换时间（s）", "symbol": "t_reconf"}, {"id": "a-lna-gain", "ontologyId": "lna", "name": "增益", "description": "LNA 增益（dB）", "symbol": "G_lna"}, {"id": "a-lna-nf", "ontologyId": "lna", "name": "噪声系数", "description": "LNA 噪声系数（dB），Ka 典型 1.6dB、Ku 1.2dB、L 0.8dB", "symbol": "NF_lna"}, {"id": "a-imux-ch", "ontologyId": "imux", "name": "通道数", "description": "IMUX 通道数与通道间隔（MHz）", "symbol": "N_imux"}, {"id": "a-conv-gain", "ontologyId": "dconv", "name": "变频增益", "description": "变频器转换增益（dB）与镜像抑制（dBc）", "symbol": "G_conv"}, {"id": "a-sspa-pout", "ontologyId": "sspa", "name": "输出功率", "description": "SSPA 饱和输出功率（W）", "symbol": "P_sspa"}, {"id": "a-sspa-eff", "ontologyId": "sspa", "name": "效率", "description": "SSPA 功率附加效率（%）", "symbol": "η_sspa"}, {"id": "a-sspa-lin", "ontologyId": "sspa", "name": "线性度", "description": "输出回退量与三阶交调（dBc），影响高阶调制 EVM", "symbol": "IMD3"}, {"id": "a-epc-hv", "ontologyId": "epc", "name": "高压输出", "description": "EPC 高压输出（kV）与保护响应时间", "symbol": "V_hv"}, {"id": "a-lo-phase", "ontologyId": "lo_source", "name": "相位噪声", "description": "本振相位噪声（dBc/Hz@offset），影响 EVM 与解调门限", "symbol": "L_φ"}, {"id": "a-omux-ch", "ontologyId": "omux", "name": "通道数", "description": "OMUX 通道数与通道间隔（MHz）", "symbol": "N_omux"}, {"id": "a-adc-bw", "ontologyId": "adc", "name": "采样带宽", "description": "ADC 采样带宽（MHz）与有效位数（ENOB）", "symbol": "B_adc"}, {"id": "a-dsw-cap", "ontologyId": "dswitch", "name": "交换容量", "description": "交换矩阵容量（Gbps）与交换粒度", "symbol": "C_dsw"}, {"id": "a-dac-bw", "ontologyId": "dac", "name": "输出带宽", "description": "DAC 输出带宽（MHz）与无杂散动态范围（dBc）", "symbol": "SFDR"}, {"id": "a-link-freq", "ontologyId": "uplink", "name": "工作频率", "description": "上行中心频率（GHz）", "symbol": "f_up"}, {"id": "a-link-dist", "ontologyId": "uplink", "name": "斜距", "description": "星地斜距（km），GEO 约 36000~41000km、LEO 约 600~2000km", "symbol": "d_slant"}, {"id": "a-link-fspl", "ontologyId": "uplink", "name": "自由空间损耗", "description": "L_fs = 20lg(d)+20lg(f)−147.55（dB）", "symbol": "L_fs"}, {"id": "a-link-rain", "ontologyId": "uplink", "name": "雨衰", "description": "降雨衰减（dB），A(p) ∝ p^−0.6，并按 1/sin(el) 归一到 30°", "symbol": "A_rain"}, {"id": "a-link-atm", "ontologyId": "uplink", "name": "大气损耗", "description": "大气吸收与云雾损耗（dB）", "symbol": "A_atm"}, {"id": "a-link-point", "ontologyId": "uplink", "name": "指向损耗", "description": "L_pnt = 12(θ_e/θ_3dB)²（dB）", "symbol": "L_pnt"}, {"id": "a-link-cn0", "ontologyId": "uplink", "name": "载噪比密度", "description": "C/N0 = EIRP − L_fs − ΣL + G/T − k（dBHz），k=−228.6dBW/Hz/K", "symbol": "CN0"}, {"id": "a-link-eirp-gs", "ontologyId": "uplink", "name": "关口站EIRP", "description": "上行关口站 EIRP（dBW），GEO 典型 75dBW", "symbol": "EIRP_gs"}, {"id": "a-dl-freq", "ontologyId": "downlink", "name": "工作频率", "description": "下行中心频率（GHz）", "symbol": "f_down"}, {"id": "a-dl-eirp", "ontologyId": "downlink", "name": "星上EIRP", "description": "下行星上 EIRP（dBW），由天线能力决定", "symbol": "EIRP_dl"}, {"id": "a-dl-dist", "ontologyId": "downlink", "name": "斜距", "description": "下行斜距（km）", "symbol": "d_dl"}, {"id": "a-dl-fspl", "ontologyId": "downlink", "name": "自由空间损耗", "description": "下行 FSPL（dB）", "symbol": "L_fs_dl"}, {"id": "a-dl-rain", "ontologyId": "downlink", "name": "雨衰", "description": "下行雨衰（dB），Ka 典型 6~12dB（0.01%时间超越概率）", "symbol": "A_rain_dl"}, {"id": "a-dl-gt", "ontologyId": "downlink", "name": "地面站G/T", "description": "接收地面站/用户终端品质因数（dB/K），GEO 关口站典型 30dB/K", "symbol": "GT_gs"}, {"id": "a-dl-cn0", "ontologyId": "downlink", "name": "载噪比密度", "description": "下行 C/N0（dBHz）", "symbol": "CN0_dl"}, {"id": "a-dl-cn", "ontologyId": "downlink", "name": "载噪比", "description": "C/N = C/N0 − 10lg(B)（dB）", "symbol": "CN"}, {"id": "a-dl-cnreq", "ontologyId": "downlink", "name": "解调门限", "description": "所选 MODCOD 的 C/N 门限（dB）", "symbol": "CN_req"}, {"id": "a-dl-margin", "ontologyId": "downlink", "name": "链路余量", "description": "M = C/N − (C/N)_req（dB），判据 ≥ 3dB", "symbol": "M"}, {"id": "a-dl-cap", "ontologyId": "downlink", "name": "链路容量", "description": "C = B × η（Mbps），η 为体制频谱效率", "symbol": "C_link"}, {"id": "a-dl-bw", "ontologyId": "downlink", "name": "占用带宽", "description": "下行链路占用带宽（MHz）", "symbol": "B_dl"}, {"id": "a-dl-avail", "ontologyId": "downlink", "name": "链路可用性", "description": "链路可用性要求（%），如 99.9%/99.99%，直接影响雨衰余量", "symbol": "A_avail"}, {"id": "a-ib-cap", "ontologyId": "interbeam_link", "name": "交换容量", "description": "波束间星上交换容量（Gbps）", "symbol": "C_ib"}, {"id": "a-ib-delay", "ontologyId": "interbeam_link", "name": "交换时延", "description": "星上交换时延（μs~ms），远低于星地往返", "symbol": "τ_ib"}, {"id": "a-ib-flex", "ontologyId": "interbeam_link", "name": "重构粒度", "description": "波束连接关系重构粒度（子带/波束/整通道）", "symbol": "G_ib"}, {"id": "a-laser-rate", "ontologyId": "laser_subsys", "name": "链路速率", "description": "激光通信速率（Gbps），典型 5/10Gbps", "symbol": "R_laser"}, {"id": "a-laser-eirp", "ontologyId": "laser_subsys", "name": "发射EIRP", "description": "激光发射等效全向辐射功率（dBW），典型 105dBW", "symbol": "EIRP_opt"}, {"id": "a-laser-gt", "ontologyId": "laser_subsys", "name": "接收G/T", "description": "激光接收品质因数（dB/K 等效），典型 118", "symbol": "GT_opt"}, {"id": "a-laser-wl", "ontologyId": "laser_subsys", "name": "工作波长", "description": "激光工作波长（nm），1550nm 为主流", "symbol": "λ_opt"}, {"id": "a-laser-div", "ontologyId": "laser_subsys", "name": "发散角", "description": "发射光束发散角（μrad）", "symbol": "θ_div"}, {"id": "a-laser-mass", "ontologyId": "laser_subsys", "name": "分系统质量", "description": "激光通信分系统质量（kg）", "symbol": "m_laser"}, {"id": "a-laser-power", "ontologyId": "laser_subsys", "name": "分系统功耗", "description": "激光通信分系统功耗（W）", "symbol": "P_laser"}, {"id": "a-opt-aperture", "ontologyId": "optical_antenna", "name": "光学口径", "description": "光学天线口径（mm），典型 Φ135mm 卡塞格林", "symbol": "D_opt"}, {"id": "a-atp-acq", "ontologyId": "atp_coarse", "name": "捕获概率", "description": "ATP 建链捕获概率（%），需 ≥ 95%", "symbol": "P_acq"}, {"id": "a-atp-time", "ontologyId": "atp_coarse", "name": "捕获时间", "description": "初始捕获建链时间（s），影响星座组网可用度", "symbol": "t_acq"}, {"id": "a-atp-res", "ontologyId": "atp_coarse", "name": "ATP机构响应时间", "description": "ATP 机构指令响应时间（ms）", "symbol": "T_res"}, {"id": "a-fsm-track", "ontologyId": "fsm", "name": "跟踪精度", "description": "精跟踪精度（μrad），需 ≤ 1μrad", "symbol": "σ_track"}, {"id": "a-fsm-range", "ontologyId": "fsm", "name": "偏转范围", "description": "FSM 快反镜偏转范围（±mrad）与带宽（Hz）", "symbol": "θ_fsm"}, {"id": "a-acq-sens", "ontologyId": "acq_sensor", "name": "探测灵敏度", "description": "捕获跟踪传感器探测灵敏度与视场（°）", "symbol": "S_acq"}, {"id": "a-beacon-pow", "ontologyId": "beacon_laser", "name": "信标功率", "description": "信标激光输出功率（W）与发散角（mrad）", "symbol": "P_bcn"}, {"id": "a-tx-pout", "ontologyId": "tx_laser", "name": "发射光功率", "description": "通信激光发射功率（W）与线宽（kHz）", "symbol": "P_opt"}, {"id": "a-opt-sens", "ontologyId": "photodetector", "name": "接收灵敏度", "description": "光接收灵敏度（dBm），DPSK 优于 OOK 约 6dB", "symbol": "S_opt"}, {"id": "a-dpsk-thr", "ontologyId": "dpsk_modem", "name": "解调门限", "description": "DPSK 体制解调门限（dB），约 8dB", "symbol": "CN_dpsk"}, {"id": "a-edfa-gain", "ontologyId": "edfa", "name": "放大增益", "description": "EDFA 增益（dB）与噪声指数（dB）", "symbol": "G_edfa"}, {"id": "a-isl-dist", "ontologyId": "isl_laser", "name": "星间距离", "description": "星间链路距离（km），LEO 星座典型 5000km", "symbol": "d_isl"}, {"id": "a-isl-fspl", "ontologyId": "isl_laser", "name": "光学路径损耗", "description": "激光自由空间损耗（dB），由发散角、口径与距离决定", "symbol": "L_fs_opt"}, {"id": "a-isl-cn", "ontologyId": "isl_laser", "name": "载噪比", "description": "激光链路 C/N（dB），DPSK 门限约 8dB", "symbol": "CN_isl"}, {"id": "a-isl-margin", "ontologyId": "isl_laser", "name": "链路余量", "description": "激光链路余量（dB），含湍流与指向抖动代价", "symbol": "M_isl"}, {"id": "a-isl-rate", "ontologyId": "isl_laser", "name": "链路速率", "description": "星间激光链路速率（Gbps）", "symbol": "R_isl"}, {"id": "a-isl-jitter", "ontologyId": "isl_laser", "name": "指向抖动", "description": "链路指向抖动（μrad），影响瞬时耦合损耗", "symbol": "σ_jit"}, {"id": "a-sgl-cloud", "ontologyId": "sgl_laser", "name": "云遮蔽概率", "description": "站址云遮蔽不可用概率（%），需站址分集规避", "symbol": "P_cloud"}, {"id": "a-sgl-turb", "ontologyId": "sgl_laser", "name": "大气湍流代价", "description": "大气湍流引起的闪烁/相位噪声代价（dB）", "symbol": "L_turb"}, {"id": "a-sgl-rate", "ontologyId": "sgl_laser", "name": "链路速率", "description": "星地激光链路速率（Gbps）", "symbol": "R_sgl"}, {"id": "a-c-mass", "ontologyId": "pcu_subsys", "name": "控制器质量", "description": "控制器整机质量（kg）", "symbol": "M_ctrl"}, {"id": "a-c-mbud", "ontologyId": "pcu_subsys", "name": "平台分配质量", "description": "平台分配给控制器的质量上限（kg）", "symbol": "M_bud"}, {"id": "a-c-power", "ontologyId": "pcu_subsys", "name": "控制器功耗", "description": "控制器整机功耗（W）", "symbol": "P_ctrl"}, {"id": "a-c-mtbf", "ontologyId": "pcu_subsys", "name": "任务可靠性", "description": "控制器任务期 MTBF（h）", "symbol": "MTBF"}, {"id": "a-c-soft", "ontologyId": "pcu_subsys", "name": "软件规模", "description": "管控软件规模（kLOC）", "symbol": "S_loc"}, {"id": "a-cpu-mips", "ontologyId": "cpu", "name": "处理算力", "description": "主处理单元可用算力（MIPS）", "symbol": "C_mips"}, {"id": "a-cpu-req", "ontologyId": "cpu", "name": "需求算力", "description": "各控制环算力需求之和（MIPS）", "symbol": "C_req"}, {"id": "a-mem-cap", "ontologyId": "mem", "name": "存储容量", "description": "存储单元总容量（GB）", "symbol": "Cap_mem"}, {"id": "a-pwr-out", "ontologyId": "pwr", "name": "供电能力", "description": "二次电源模块供电能力（W）", "symbol": "P_pwr"}, {"id": "a-1553-rate", "ontologyId": "bi1553", "name": "1553B速率", "description": "1553B 总线速率（Mbps）", "symbol": "R_1553"}, {"id": "a-422-rate", "ontologyId": "bi422", "name": "串行指令速率", "description": "RS422 指令线速率（kbps）", "symbol": "R_422"}, {"id": "a-sw-rate", "ontologyId": "bisw", "name": "SpaceWire速率", "description": "SpaceWire 通道速率（Mbps）", "symbol": "R_sw"}, {"id": "a-tm-down", "ontologyId": "tm_tc", "name": "遥测下传速率", "description": "平台遥测下传速率（kbps）", "symbol": "R_tm"}, {"id": "a-beam-cyc", "ontologyId": "f_beam", "name": "波束调度周期", "description": "波束权值刷新周期（ms）", "symbol": "T_beam"}, {"id": "a-beam-n", "ontologyId": "f_beam", "name": "管理波束数", "description": "在管 Ka 波束数", "symbol": "N_beamw"}, {"id": "a-route-t", "ontologyId": "f_route", "name": "路由重构时间", "description": "路由表重构与装载耗时（s）", "symbol": "T_route"}, {"id": "a-dep-t", "ontologyId": "f_deploy", "name": "展开时序时长", "description": "反射面展开指令序列时长（s）", "symbol": "T_dep"}, {"id": "a-atp-cyc", "ontologyId": "f_atp", "name": "指向控制周期", "description": "ATP 指向指令更新周期（ms）", "symbol": "T_atp"}, {"id": "a-tm-cyc", "ontologyId": "f_tm", "name": "遥测采集周期", "description": "全单机遥测轮询周期（s）", "symbol": "T_tm"}, {"id": "a-fdir-t", "ontologyId": "f_fdir", "name": "故障检测时间", "description": "故障检测与确认时间（s）", "symbol": "T_det"}, {"id": "a-loop-t", "ontologyId": "loop_beam", "name": "波束环闭环周期", "description": "波束控制环闭环周期（ms）", "symbol": "T_loop"}], "constraints": [{"id": "c-1", "formula": "EIRP = P_out + G_ant − L_feed − L_tx", "description": "下行 EIRP 由功放输出、天线增益与馈电/通道损耗决定", "members": [{"attributeId": "a-ant-eirp", "role": "EIRP"}, {"attributeId": "a-ant-gain", "role": "G_ant"}, {"attributeId": "a-ant-feed-loss", "role": "L_feed"}, {"attributeId": "a-tx-loss", "role": "L_tx"}, {"attributeId": "a-sspa-pout", "role": "P_out"}]}, {"id": "c-2", "formula": "G/T = G_ant − 10lg(T_ant + T_rx)", "description": "接收 G/T 由天线增益与系统噪声温度决定", "members": [{"attributeId": "a-ant-gt", "role": "G/T"}, {"attributeId": "a-ant-gain", "role": "G_ant"}, {"attributeId": "a-rx-noise", "role": "T_sys"}, {"attributeId": "a-lna-nf", "role": "NF_lna"}, {"attributeId": "a-trp-nf", "role": "NF"}]}, {"id": "c-3", "formula": "G_ant = eta_ant (pi * D_ap * f_Ka / c)^2", "description": "Ka 频段反射面口径增益公式", "members": [{"attributeId": "a-ant-gain", "role": "G_ant"}, {"attributeId": "a-ant-aperture", "role": "D_ap"}, {"attributeId": "a-pay-band", "role": "f_Ka"}]}, {"id": "c-4", "formula": "th_3dB ≈ 70 * lambda_Ka / D_ap", "description": "半功率波束宽度与口径反比约束", "members": [{"attributeId": "a-ant-hpbw", "role": "θ_3dB"}, {"attributeId": "a-ant-aperture", "role": "D_ap"}, {"attributeId": "a-pay-band", "role": "f_Ka"}]}, {"id": "c-5", "formula": "L_pnt = 12 * (th_e / th_3dB)^2", "description": "指向误差引起的天线损耗", "members": [{"attributeId": "a-link-point", "role": "L_pnt"}, {"attributeId": "a-ant-point", "role": "θ_e"}, {"attributeId": "a-ant-hpbw", "role": "θ_3dB"}]}, {"id": "c-6", "formula": "C/N0 = EIRP − L_fs − ΣL + G/T − k", "description": "上行链路载噪比密度预算", "members": [{"attributeId": "a-link-cn0", "role": "CN0"}, {"attributeId": "a-link-fspl", "role": "L_fs"}, {"attributeId": "a-link-rain", "role": "A_rain"}, {"attributeId": "a-link-atm", "role": "A_atm"}, {"attributeId": "a-link-point", "role": "L_pnt"}, {"attributeId": "a-ant-gt", "role": "G/T"}]}, {"id": "c-7", "formula": "C/N = C/N0 − 10lg(B)", "description": "下行载噪比由载噪比密度与占用带宽决定", "members": [{"attributeId": "a-dl-cn", "role": "CN"}, {"attributeId": "a-dl-cn0", "role": "CN0_dl"}, {"attributeId": "a-dl-bw", "role": "B_dl"}]}, {"id": "c-8", "formula": "M = C/N − (C/N)_req >= 3 dB", "description": "下行链路余量约束", "members": [{"attributeId": "a-dl-margin", "role": "M"}, {"attributeId": "a-dl-cn", "role": "CN"}, {"attributeId": "a-dl-cnreq", "role": "CN_req"}, {"attributeId": "a-dl-avail", "role": "A_avail"}]}, {"id": "c-9", "formula": "C_link = B * eta(C/N)", "description": "链路容量由带宽与频谱效率决定", "members": [{"attributeId": "a-dl-cap", "role": "C_link"}, {"attributeId": "a-dl-bw", "role": "B_dl"}, {"attributeId": "a-dl-cn", "role": "CN"}]}, {"id": "c-10", "formula": "C_sw >= N_beam * B_beam 且 N_ch * B_sub >= B_trp", "description": "DTP 交换容量与子带资源约束", "members": [{"attributeId": "a-dtp-switch", "role": "C_sw"}, {"attributeId": "a-dtp-channels", "role": "N_ch"}, {"attributeId": "a-dtp-subbw", "role": "B_sub"}, {"attributeId": "a-trp-bw", "role": "B_trp"}, {"attributeId": "a-ib-cap", "role": "C_ib"}, {"attributeId": "a-dsw-cap", "role": "C_dsw"}]}, {"id": "c-11", "formula": "I_trp >= 80 dB", "description": "转发器收发隔离度约束", "members": [{"attributeId": "a-trp-isolation", "role": "I_trp"}]}, {"id": "c-12", "formula": "P_dc = P_out / eta <= P_trp", "description": "功放直流功耗不超过分系统功耗预算", "members": [{"attributeId": "a-sspa-pout", "role": "P_out"}, {"attributeId": "a-sspa-eff", "role": "η"}, {"attributeId": "a-trp-power", "role": "P_trp"}]}, {"id": "c-13", "formula": "P_acq >= 95% 且 sigma_track <= 1 urad", "description": "ATP 捕获概率与精跟踪精度约束", "members": [{"attributeId": "a-atp-acq", "role": "P_acq"}, {"attributeId": "a-fsm-track", "role": "σ_track"}, {"attributeId": "a-isl-jitter", "role": "σ_jit"}]}, {"id": "c-14", "formula": "R_laser <= f(EIRP_opt, GT_opt, L_fs_opt, L_turb)", "description": "激光链路速率受光功率预算与大气影响限制", "members": [{"attributeId": "a-laser-rate", "role": "R_laser"}, {"attributeId": "a-laser-eirp", "role": "EIRP_opt"}, {"attributeId": "a-laser-gt", "role": "GT_opt"}, {"attributeId": "a-isl-fspl", "role": "L_fs_opt"}, {"attributeId": "a-isl-margin", "role": "M_isl"}, {"attributeId": "a-opt-sens", "role": "S_opt"}, {"attributeId": "a-sgl-turb", "role": "L_turb"}, {"attributeId": "a-sgl-cloud", "role": "P_cloud"}]}, {"id": "c-15", "formula": "Δ_amp <= 0.5 dB 且 Δ_phs <= 5° 且 SLL <= −20 dB", "description": "拼块馈源阵幅相一致性与旁瓣约束", "members": [{"attributeId": "a-fa-db", "role": "Δ_amp/Δ_phs"}, {"attributeId": "a-ant-sidelobe", "role": "SLL"}, {"attributeId": "a-feed-eff", "role": "η_ill"}]}, {"id": "c-16", "formula": "N_chbf >= N_beam", "description": "波控机通道数不少于同时工作波束数", "members": [{"attributeId": "a-bc-ch", "role": "N_chbf"}, {"attributeId": "a-ant-beam", "role": "N_beam"}]}, {"id": "c-17", "formula": "M_pay = m_ant + m_trp + m_laser + M_ctrl", "description": "载荷总质量为各分系统质量之和", "members": [{"attributeId": "a-pay-mass", "role": "M_pay"}, {"attributeId": "a-ant-mass", "role": "m_ant"}, {"attributeId": "a-trp-mass", "role": "m_trp"}, {"attributeId": "a-laser-mass", "role": "m_laser"}, {"attributeId": "a-c-mass", "role": "M_ctrl"}]}, {"id": "c-18", "formula": "P_pay = P_ant + P_trp + P_laser + P_ctrl", "description": "载荷总功耗为各分系统功耗之和", "members": [{"attributeId": "a-pay-power", "role": "P_pay"}, {"attributeId": "a-ant-power", "role": "P_ant"}, {"attributeId": "a-trp-power", "role": "P_trp"}, {"attributeId": "a-laser-power", "role": "P_laser"}, {"attributeId": "a-c-power", "role": "P_ctrl"}]}, {"id": "k-1", "formula": "(N_beamw*L_w/T_beam + L_tm/T_tm + L_atp/T_atp) / R_1553 <= 0.7", "description": "1553B 总线负载率约束：各周期消息流之和不超过总线速率的 70%", "members": [{"attributeId": "a-1553-rate", "role": "R_1553"}, {"attributeId": "a-beam-cyc", "role": "T_beam"}, {"attributeId": "a-beam-n", "role": "N_beamw"}, {"attributeId": "a-tm-cyc", "role": "T_tm"}, {"attributeId": "a-atp-cyc", "role": "T_atp"}]}, {"id": "k-2", "formula": "C_req = Σ k_i/T_i <= C_mips", "description": "算力预算：各控制环计算需求之和不超过主处理单元可用算力", "members": [{"attributeId": "a-cpu-req", "role": "C_req"}, {"attributeId": "a-cpu-mips", "role": "C_mips"}, {"attributeId": "a-beam-cyc", "role": "T_beam"}, {"attributeId": "a-atp-cyc", "role": "T_atp"}]}, {"id": "k-3", "formula": "S_loc*u + P_tab + R_rec <= Cap_mem", "description": "存储预算：程序、权值/路由表与遥测记录之和不超过存储容量", "members": [{"attributeId": "a-c-soft", "role": "S_loc"}, {"attributeId": "a-mem-cap", "role": "Cap_mem"}]}, {"id": "k-4", "formula": "P_ctrl <= P_pwr", "description": "功耗预算：整机功耗不超过二次电源供电能力", "members": [{"attributeId": "a-c-power", "role": "P_ctrl"}, {"attributeId": "a-pwr-out", "role": "P_pwr"}]}, {"id": "k-5", "formula": "T_loop = max(T_beam, T_tm) + T_set", "description": "波束环闭环周期由调度周期、遥测周期与权值加载时间决定", "members": [{"attributeId": "a-loop-t", "role": "T_loop"}, {"attributeId": "a-beam-cyc", "role": "T_beam"}, {"attributeId": "a-bfn-set", "role": "T_set"}]}, {"id": "k-6", "formula": "T_det + T_route <= T_safe", "description": "重构时效：故障检测加重构时间需小于系统允许的安全中断时间", "members": [{"attributeId": "a-fdir-t", "role": "T_det"}, {"attributeId": "a-route-t", "role": "T_route"}]}, {"id": "k-7", "formula": "T_dep <= T_win", "description": "展开时序时长需在平台允许窗口内完成", "members": [{"attributeId": "a-dep-t", "role": "T_dep"}, {"attributeId": "a-dep-win", "role": "T_win"}]}, {"id": "k-8", "formula": "T_atp <= T_res / 10", "description": "指向控制周期需远小于 ATP 机构响应时间，保证闭环稳定", "members": [{"attributeId": "a-atp-cyc", "role": "T_atp"}, {"attributeId": "a-atp-res", "role": "T_res"}]}, {"id": "k-9", "formula": "M_ctrl <= M_bud", "description": "控制器质量不得超平台分配上限", "members": [{"attributeId": "a-c-mass", "role": "M_ctrl"}, {"attributeId": "a-c-mbud", "role": "M_bud"}]}], "relations": [{"id": "rel-1", "from": "refl_feed", "to": "beam_ctrl", "type": "体制组成单机", "description": "反射面+馈源阵（拼块阵） 的组成节点（1/3）"}, {"id": "rel-2", "from": "refl_feed", "to": "feed_array", "type": "体制组成单机", "description": "反射面+馈源阵（拼块阵） 的组成节点（2/3）"}, {"id": "rel-3", "from": "refl_feed", "to": "reflector", "type": "体制组成单机", "description": "反射面+馈源阵（拼块阵） 的组成节点（3/3）"}, {"id": "rel-4", "from": "transparent", "to": "lna", "type": "体制组成单机", "description": "透明转发器 的组成节点（1/6）"}, {"id": "rel-5", "from": "transparent", "to": "imux", "type": "体制组成单机", "description": "透明转发器 的组成节点（2/6）"}, {"id": "rel-6", "from": "transparent", "to": "dconv", "type": "体制组成单机", "description": "透明转发器 的组成节点（3/6）"}, {"id": "rel-7", "from": "transparent", "to": "uconv", "type": "体制组成单机", "description": "透明转发器 的组成节点（4/6）"}, {"id": "rel-8", "from": "transparent", "to": "sspa", "type": "体制组成单机", "description": "透明转发器 的组成节点（5/6）"}, {"id": "rel-9", "from": "transparent", "to": "omux", "type": "体制组成单机", "description": "透明转发器 的组成节点（6/6）"}, {"id": "rel-10", "from": "dtp", "to": "lna", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（1/9）"}, {"id": "rel-11", "from": "dtp", "to": "imux", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（2/9）"}, {"id": "rel-12", "from": "dtp", "to": "dconv", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（3/9）"}, {"id": "rel-13", "from": "dtp", "to": "adc", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（4/9）"}, {"id": "rel-14", "from": "dtp", "to": "dswitch", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（5/9）"}, {"id": "rel-15", "from": "dtp", "to": "dac", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（6/9）"}, {"id": "rel-16", "from": "dtp", "to": "uconv", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（7/9）"}, {"id": "rel-17", "from": "dtp", "to": "sspa", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（8/9）"}, {"id": "rel-18", "from": "dtp", "to": "omux", "type": "体制组成单机", "description": "DTP数字透明处理器 的组成节点（9/9）"}, {"id": "rel-19", "from": "ant_tx_path", "to": "beam_ctrl", "type": "链路组成单机", "description": "天线发射通道 的经过节点（1/3）"}, {"id": "rel-20", "from": "ant_tx_path", "to": "feed_array", "type": "链路组成单机", "description": "天线发射通道 的经过节点（2/3）"}, {"id": "rel-21", "from": "ant_tx_path", "to": "reflector", "type": "链路组成单机", "description": "天线发射通道 的经过节点（3/3）"}, {"id": "rel-22", "from": "ant_rx_path", "to": "reflector", "type": "链路组成单机", "description": "天线接收通道 的经过节点（1/3）"}, {"id": "rel-23", "from": "ant_rx_path", "to": "feed_array", "type": "链路组成单机", "description": "天线接收通道 的经过节点（2/3）"}, {"id": "rel-24", "from": "ant_rx_path", "to": "beam_ctrl", "type": "链路组成单机", "description": "天线接收通道 的经过节点（3/3）"}, {"id": "rel-25", "from": "uplink", "to": "reflector", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（1/6）"}, {"id": "rel-26", "from": "uplink", "to": "feed_array", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（2/6）"}, {"id": "rel-27", "from": "uplink", "to": "beam_ctrl", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（3/6）"}, {"id": "rel-28", "from": "uplink", "to": "lna", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（4/6）"}, {"id": "rel-29", "from": "uplink", "to": "imux", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（5/6）"}, {"id": "rel-30", "from": "uplink", "to": "dconv", "type": "链路组成单机", "description": "上行馈电链路 的经过节点（6/6）"}, {"id": "rel-31", "from": "downlink", "to": "uconv", "type": "链路组成单机", "description": "下行用户链路 的经过节点（1/5）"}, {"id": "rel-32", "from": "downlink", "to": "sspa", "type": "链路组成单机", "description": "下行用户链路 的经过节点（2/5）"}, {"id": "rel-33", "from": "downlink", "to": "omux", "type": "链路组成单机", "description": "下行用户链路 的经过节点（3/5）"}, {"id": "rel-34", "from": "downlink", "to": "feed_array", "type": "链路组成单机", "description": "下行用户链路 的经过节点（4/5）"}, {"id": "rel-35", "from": "downlink", "to": "reflector", "type": "链路组成单机", "description": "下行用户链路 的经过节点（5/5）"}, {"id": "rel-36", "from": "interbeam_link", "to": "adc", "type": "链路组成单机", "description": "星上波束交换链路 的经过节点（1/3）"}, {"id": "rel-37", "from": "interbeam_link", "to": "dswitch", "type": "链路组成单机", "description": "星上波束交换链路 的经过节点（2/3）"}, {"id": "rel-38", "from": "interbeam_link", "to": "dac", "type": "链路组成单机", "description": "星上波束交换链路 的经过节点（3/3）"}, {"id": "rel-39", "from": "isl_laser", "to": "dpsk_modem", "type": "链路组成单机", "description": "星间激光链路ISL 的经过节点（1/4）"}, {"id": "rel-40", "from": "isl_laser", "to": "edfa", "type": "链路组成单机", "description": "星间激光链路ISL 的经过节点（2/4）"}, {"id": "rel-41", "from": "isl_laser", "to": "tx_laser", "type": "链路组成单机", "description": "星间激光链路ISL 的经过节点（3/4）"}, {"id": "rel-42", "from": "isl_laser", "to": "optical_antenna", "type": "链路组成单机", "description": "星间激光链路ISL 的经过节点（4/4）"}, {"id": "rel-43", "from": "sgl_laser", "to": "dpsk_modem", "type": "链路组成单机", "description": "星地激光链路 的经过节点（1/4）"}, {"id": "rel-44", "from": "sgl_laser", "to": "edfa", "type": "链路组成单机", "description": "星地激光链路 的经过节点（2/4）"}, {"id": "rel-45", "from": "sgl_laser", "to": "tx_laser", "type": "链路组成单机", "description": "星地激光链路 的经过节点（3/4）"}, {"id": "rel-46", "from": "sgl_laser", "to": "optical_antenna", "type": "链路组成单机", "description": "星地激光链路 的经过节点（4/4）"}, {"id": "rel-47", "from": "loop_beam", "to": "f_beam", "type": "链路组成单机", "description": "波束控制环 的经过节点（1/3）"}, {"id": "rel-48", "from": "loop_beam", "to": "bi1553", "type": "链路组成单机", "description": "波束控制环 的经过节点（2/3）"}, {"id": "rel-49", "from": "loop_beam", "to": "beam_ctrl", "type": "链路组成单机", "description": "波束控制环 的经过节点（3/3）"}, {"id": "rel-50", "from": "loop_route", "to": "f_route", "type": "链路组成单机", "description": "路由配置环 的经过节点（1/3）"}, {"id": "rel-51", "from": "loop_route", "to": "bisw", "type": "链路组成单机", "description": "路由配置环 的经过节点（2/3）"}, {"id": "rel-52", "from": "loop_route", "to": "dswitch", "type": "链路组成单机", "description": "路由配置环 的经过节点（3/3）"}, {"id": "rel-53", "from": "loop_deploy", "to": "f_deploy", "type": "链路组成单机", "description": "展开控制环 的经过节点（1/3）"}, {"id": "rel-54", "from": "loop_deploy", "to": "bi422", "type": "链路组成单机", "description": "展开控制环 的经过节点（2/3）"}, {"id": "rel-55", "from": "loop_deploy", "to": "deploy_ctrl", "type": "链路组成单机", "description": "展开控制环 的经过节点（3/3）"}, {"id": "rel-56", "from": "loop_atp", "to": "f_atp", "type": "链路组成单机", "description": "指向控制环 的经过节点（1/3）"}, {"id": "rel-57", "from": "loop_atp", "to": "bi1553", "type": "链路组成单机", "description": "指向控制环 的经过节点（2/3）"}, {"id": "rel-58", "from": "loop_atp", "to": "atp_coarse", "type": "链路组成单机", "description": "指向控制环 的经过节点（3/3）"}, {"id": "rel-59", "from": "loop_laser", "to": "f_laser", "type": "链路组成单机", "description": "激光管理环 的经过节点（1/3）"}, {"id": "rel-60", "from": "loop_laser", "to": "bi422", "type": "链路组成单机", "description": "激光管理环 的经过节点（2/3）"}, {"id": "rel-61", "from": "loop_laser", "to": "laser_ctrl", "type": "链路组成单机", "description": "激光管理环 的经过节点（3/3）"}, {"id": "rel-62", "from": "loop_tm", "to": "f_tm", "type": "链路组成单机", "description": "遥测环 的经过节点（1/3）"}, {"id": "rel-63", "from": "loop_tm", "to": "bi1553", "type": "链路组成单机", "description": "遥测环 的经过节点（2/3）"}, {"id": "rel-64", "from": "loop_tm", "to": "tm_tc", "type": "链路组成单机", "description": "遥测环 的经过节点（3/3）"}, {"id": "rel-65", "from": "loop_fdir", "to": "f_tm", "type": "链路组成单机", "description": "重构环 的经过节点（1/3）"}, {"id": "rel-66", "from": "loop_fdir", "to": "f_fdir", "type": "链路组成单机", "description": "重构环 的经过节点（2/3）"}, {"id": "rel-67", "from": "loop_fdir", "to": "f_route", "type": "链路组成单机", "description": "重构环 的经过节点（3/3）"}, {"id": "rel-68", "from": "f_beam", "to": "cpu", "type": "软件部署", "description": "波束管理 部署运行于主处理单元"}, {"id": "rel-69", "from": "f_route", "to": "cpu", "type": "软件部署", "description": "信道交换配置 部署运行于主处理单元"}, {"id": "rel-70", "from": "f_deploy", "to": "cpu", "type": "软件部署", "description": "展开时序控制 部署运行于主处理单元"}, {"id": "rel-71", "from": "f_atp", "to": "cpu", "type": "软件部署", "description": "指向控制 部署运行于主处理单元"}, {"id": "rel-72", "from": "f_laser", "to": "cpu", "type": "软件部署", "description": "激光功率管理 部署运行于主处理单元"}, {"id": "rel-73", "from": "f_tm", "to": "cpu", "type": "软件部署", "description": "遥测采集处理 部署运行于主处理单元"}, {"id": "rel-74", "from": "f_fdir", "to": "cpu", "type": "软件部署", "description": "状态监测与重构 部署运行于主处理单元"}, {"id": "rel-75", "from": "f_tm", "to": "mem", "type": "数据存放", "description": "遥测记录与路由表存放于存储单元"}, {"id": "rel-76", "from": "cpu", "to": "mem", "type": "存储访问", "description": "主处理单元读写存储单元"}, {"id": "rel-77", "from": "pwr", "to": "cpu", "type": "供电", "description": "二次电源为主处理单元供电"}, {"id": "rel-78", "from": "pwr", "to": "bisw", "type": "供电", "description": "二次电源为 SpaceWire 接口供电"}, {"id": "rel-79", "from": "bi1553", "to": "i_bus1553", "type": "接口实现", "description": "1553B 总线接口实现 1553B 控制总线"}, {"id": "rel-80", "from": "bi422", "to": "i_422", "type": "接口实现", "description": "RS422 串行接口实现 RS422 指令线"}, {"id": "rel-81", "from": "bisw", "to": "i_sw", "type": "接口实现", "description": "SpaceWire 接口实现 SpaceWire 数据通道"}, {"id": "rel-82", "from": "tm_tc", "to": "i_plat", "type": "接口实现", "description": "平台遥测遥控接口实现平台接口"}, {"id": "rel-83", "from": "i_bus1553", "to": "beam_ctrl", "type": "外部接口", "description": "波控机挂接 1553B 控制总线"}, {"id": "rel-84", "from": "i_bus1553", "to": "atp_coarse", "type": "外部接口", "description": "ATP 粗跟踪机构挂接 1553B 控制总线"}, {"id": "rel-85", "from": "i_sw", "to": "dswitch", "type": "外部接口", "description": "星上交换矩阵经 SpaceWire 数据通道配置"}, {"id": "rel-86", "from": "i_422", "to": "deploy_ctrl", "type": "外部接口", "description": "展开控制器经 RS422 指令线受控"}, {"id": "rel-87", "from": "i_422", "to": "laser_ctrl", "type": "外部接口", "description": "激光通信控制器经 RS422 指令线受控"}, {"id": "rel-88", "from": "beam_ctrl", "to": "feed_array", "type": "控制接口", "description": "波控机向馈源阵下发幅相权值"}, {"id": "rel-89", "from": "deploy_ctrl", "to": "deploy_mech", "type": "伺服接口", "description": "展开控制器驱动展开机构动作"}, {"id": "rel-90", "from": "atp_coarse", "to": "fsm", "type": "伺服接口", "description": "粗跟踪机构与精跟踪 FSM 伺服衔接"}, {"id": "rel-91", "from": "deploy_mech", "to": "reflector", "type": "机械接口", "description": "展开机构与反射面面板机械连接"}, {"id": "rel-92", "from": "dswitch", "to": "dpsk_modem", "type": "数据接口", "description": "交换矩阵向激光调制解调模块路由数据"}, {"id": "rel-93", "from": "epc", "to": "sspa", "type": "供电", "description": "EPC 为固态功放供电"}]};
+/* ================= 通信载荷知识结构化管理工作台 · 核心层 ================= */
+"use strict";
+const LS_KEY = "plkgwb.v1";
+const BUILD = "2026-09-21c";   /* 构建戳：用于确认浏览器里跑的是哪一版 */
+const SEED_REV = (typeof SEED !== "undefined" && SEED.version) || 0;
+let DB = null;                 // 知识库数据（v4 schema）
+let META = { user: "", proj: "", file: "" };
+const S = {                    // UI 状态
+  sel: null, expanded: new Set(), view: "comp", q: "",
+  hlAttr: null, scope: "ALL", rot: true, showRel: true,
+  layout: "tiered", showAttr: false, showCons: true, unitChain: true, flow: true,
+  hlRel: true, g3src: "unit", unitLabels: true,
+};
+const CATC = { "载荷总体": "#38BDF8", "分系统": "#60A5FA", "分组": "#94A3B8", "体制": "#FBBF24",
+  "单机": "#34D399", "链路": "#A78BFA", "指标": "#FB923C", "基础": "#94A3B8",
+  "硬件": "#2DD4BF", "软件": "#F472B6", "接口": "#FDE047" };
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function uid(p) { return p + "-" + Math.random().toString(36).slice(2, 8); }
+function ont() { return DB.ontologies; }
+function ontMap() { const m = {}; ont().forEach((o) => (m[o.id] = o)); return m; }
+function childrenOf(pid) { return ont().filter((o) => o.parentId === pid).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+function subtreeIds(id) { const out = []; (function w(i) { out.push(i); childrenOf(i).forEach((c) => w(c.id)); })(id); return out; }
+function ancestors(id) { const m = ontMap(), out = []; let c = m[id]; while (c) { out.unshift(c); c = c.parentId ? m[c.parentId] : null; } return out; }
+function attrsOf(oid) { return DB.attributes.filter((a) => a.ontologyId === oid); }
+function consOfAttr(aid) { return DB.constraints.filter((c) => c.members.some((m) => m.attributeId === aid)); }
+function consOfOnt(oid) { const ids = new Set(attrsOf(oid).map((a) => a.id)); return DB.constraints.filter((c) => c.members.some((m) => ids.has(m.attributeId))); }
+function relsOf(id) { return (DB.relations || []).filter((r) => r.from === id || r.to === id); }
+function l1List() { return childrenOf(rootId()); }
+function rootId() { const r = ont().find((o) => !o.parentId); return r ? r.id : null; }
+function scopeIds() { if (S.scope === "ALL") return null; const s = new Set(subtreeIds(S.scope)); s.add(rootId()); return s; }
+
+/* ---------- 持久化 ---------- */
+function save() { try { localStorage.setItem(LS_KEY, JSON.stringify({ rev: SEED_REV, DB, META, sel: S.sel, exp: [...S.expanded] })); } catch (e) {} }
+function loadPersist() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const o = JSON.parse(raw);
+    if (!o || !o.DB || !Array.isArray(o.DB.ontologies) || !o.DB.ontologies.length) return false;
+    if (o.rev !== SEED_REV) return false;
+    DB = o.DB; META = o.META || META; S.sel = o.sel || null; S.expanded = new Set(o.exp || []);
+    return true;
+  } catch (e) { return false; }
+}
+function normalize(d) {
+  d.ontologies = d.ontologies || []; d.attributes = d.attributes || []; d.constraints = d.constraints || [];
+  d.relations = d.relations || [];
+  d.ontologies.forEach((o, i) => { o.order = o.order == null ? i : o.order; o.category = o.category || "分组"; });
+  d.attributes.forEach((a) => { a.symbol = a.symbol || ""; a.description = a.description || ""; });
+  d.constraints.forEach((c) => { c.members = c.members || []; });
+  alignCons(d);
+  return d;
+}
+/* 符号兜底：过短直接用名称，过长取前两字符，避免出现空符号 */
+function symFallback(name) { const t = String(name == null ? "" : name).trim(); if (!t) return "x"; return t.length <= 4 ? t : t.slice(0, 2); }
+/* 加载/导入后一次性对齐：保证约束成员 role 与其属性当前 symbol 一致，并同步替换公式文本 */
+function alignCons(d) {
+  const am = {}; (d.attributes || []).forEach((a) => (am[a.id] = a));
+  (d.constraints || []).forEach((c) => {
+    let f = c.formula || "";
+    (c.members || []).forEach((m) => {
+      const a = am[m.attributeId];
+      if (a && a.symbol && m.role && a.symbol !== m.role) { f = f.split(m.role).join(a.symbol); m.role = a.symbol; }
+    });
+    c.formula = f;
+  });
+}
+
+/* ---------- toast / modal ---------- */
+let toastT = null;
+function toast(msg, type) {
+  const t = $("#toast"); t.textContent = msg; t.className = "toast" + (type ? " " + type : "");
+  t.style.display = "block"; clearTimeout(toastT);
+  toastT = setTimeout(() => (t.style.display = "none"), type === "err" ? 3400 : 2200);
+}
+function openModal(html) { $("#modalBox").innerHTML = html; $("#mask").classList.add("on"); }
+function closeModal() { $("#mask").classList.remove("on"); }
+$("#mask").addEventListener("mousedown", (e) => { if (e.target.id === "mask") closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+/* ---------- CRUD ---------- */
+function addOnt(name, desc, parentId, category) {
+  const sib = childrenOf(parentId);
+  const o = { id: uid("ont"), name, description: desc || "", parentId, order: sib.length, category: category || "分组" };
+  DB.ontologies.push(o); S.expanded.add(parentId); save(); refreshAll(); return o.id;
+}
+function updOnt(id, patch) { const o = ontMap()[id]; if (o) Object.assign(o, patch); save(); refreshAll(); }
+function delOnt(id) {
+  const ids = new Set(subtreeIds(id));
+  const lostA = DB.attributes.filter((a) => ids.has(a.ontologyId)).map((a) => a.id);
+  DB.ontologies = DB.ontologies.filter((o) => !ids.has(o.id));
+  DB.attributes = DB.attributes.filter((a) => !ids.has(a.ontologyId));
+  DB.constraints = DB.constraints.filter((c) => !c.members.some((m) => lostA.includes(m.attributeId)));
+  DB.relations = (DB.relations || []).filter((r) => !ids.has(r.from) && !ids.has(r.to));
+  if (S.sel && ids.has(S.sel)) S.sel = null;
+  save(); refreshAll(); toast("已删除本体及其子树");
+}
+function addAttr(oid, name, desc, sym) {
+  const a = { id: uid("attr"), ontologyId: oid, name, description: desc || "", symbol: String(sym || "").trim() || symFallback(name) };
+  DB.attributes.push(a); save(); refreshAll(); return a.id;
+}
+/* 属性符号变更时，联动更新包含该属性的约束：成员 role 改为新符号，公式文本中的旧符号一并替换 */
+function updAttr(id, patch) {
+  const a = DB.attributes.find((x) => x.id === id); if (!a) return;
+  const old = a.symbol;
+  Object.assign(a, patch);
+  if (patch.symbol !== undefined && patch.symbol !== old && old) {
+    DB.constraints.forEach((c) => {
+      if (!c.members.some((m) => m.attributeId === id)) return;
+      c.members.forEach((m) => { if (m.attributeId === id) m.role = patch.symbol; });
+      if (c.formula) c.formula = c.formula.split(old).join(patch.symbol);
+    });
+  }
+  save(); refreshAll();
+}
+function delAttr(id) {
+  /* 只处理“原本包含该属性”的约束：单属性门限约束（如 I_trp >= 80 dB）不应被顺带删除 */
+  const affected = DB.constraints.filter((c) => (c.members || []).some((m) => m.attributeId === id));
+  const before = affected.length;
+  DB.attributes = DB.attributes.filter((a) => a.id !== id);
+  affected.forEach((c) => (c.members = c.members.filter((m) => m.attributeId !== id)));
+  const dead = affected.filter((c) => c.members.length < 2);
+  DB.constraints = DB.constraints.filter((c) => !dead.includes(c));
+  const gone = dead.length;
+  save(); refreshAll();
+  if (gone) toast("已删除属性，同时移除 " + gone + " 条成员不足 2 个的约束", "err");
+}
+function addCons(formula, desc, members) { const c = { id: uid("con"), formula, description: desc || "", members }; DB.constraints.push(c); save(); refreshAll(); return c.id; }
+function updCons(id, patch) { const c = DB.constraints.find((x) => x.id === id); if (c) Object.assign(c, patch); save(); refreshAll(); }
+function delCons(id) { DB.constraints = DB.constraints.filter((c) => c.id !== id); save(); refreshAll(); }
+
+/* ---------- 导入 / 导出 ---------- */
+function exportText() { return JSON.stringify(Object.assign({}, DB, { exportedAt: new Date().toISOString() }), null, 2); }
+function exportJSON() {
+  const blob = new Blob([exportText()], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (META.proj || "通信有效载荷知识图谱") + "_导出.json";
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast("已导出 JSON");
+}
+function importJSON(text, quiet) {
+  try {
+    const d = JSON.parse(text);
+    if (!d || !Array.isArray(d.ontologies)) { toast("导入失败：缺少 ontologies 数组", "err"); return false; }
+    DB = normalize(d); S.sel = rootId(); S.hlAttr = null; S.expanded = new Set(DB.ontologies.map((o) => o.id));
+    save(); refreshAll();
+    if (!quiet) toast("导入成功：" + DB.ontologies.length + " 本体 / " + DB.attributes.length + " 属性", "ok");
+    return true;
+  } catch (e) { toast("导入失败：" + e.message, "err"); return false; }
+}
+
+/* ---------- 本体树 ---------- */
+function renderTree() {
+  const q = S.q.trim().toLowerCase();
+  const hit = (o) => q && (o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q));
+  function row(o, depth) {
+    const kids = childrenOf(o.id);
+    const open = S.expanded.has(o.id);
+    const na = attrsOf(o.id).length;
+    return '<div class="tnode">' +
+      '<div class="trow' + (S.sel === o.id ? " sel" : "") + (hit(o) ? " hit" : "") + '" data-id="' + o.id + '" style="padding-left:' + (6 + depth * 13) + 'px">' +
+      '<span class="car' + (open && kids.length ? " open" : "") + '" data-car="' + o.id + '">' + (kids.length ? "▶" : "") + "</span>" +
+      '<span class="dot" style="background:' + (CATC[o.category] || "#94A3B8") + '"></span>' +
+      '<span class="nm" title="' + esc(o.name) + " (" + esc(o.id) + ')">' + esc(o.name) + "</span>" +
+      (na ? '<span class="bdg">' + na + "</span>" : "") +
+      '<span class="ops"><button data-op="add" data-id="' + o.id + '" title="添加子本体">＋</button>' +
+      '<button data-op="edit" data-id="' + o.id + '" title="编辑">✎</button>' +
+      '<button data-op="del" data-id="' + o.id + '" title="删除子树">✕</button></span></div>' +
+      (open ? kids.map((k) => row(k, depth + 1)).join("") : "") + "</div>";
+  }
+  const r = rootId();
+  $("#tree").innerHTML = r ? row(ontMap()[r], 0) : '<div class="empty">空知识库，请导入 JSON</div>';
+  $("#treeCnt").textContent = DB.ontologies.length + " 本体";
+}
+$("#tree").addEventListener("click", (e) => {
+  const op = e.target.closest("[data-op]");
+  if (op) {
+    const id = op.dataset.id;
+    if (op.dataset.op === "add") modalOnt(null, id);
+    else if (op.dataset.op === "edit") modalOnt(id, null);
+    else if (op.dataset.op === "del") { const o = ontMap()[id]; if (confirm("删除「" + o.name + "」及其子树、相关属性与约束？")) delOnt(id); }
+    e.stopPropagation(); return;
+  }
+  const car = e.target.closest("[data-car]");
+  if (car && car.textContent) { const id = car.dataset.car; S.expanded.has(id) ? S.expanded.delete(id) : S.expanded.add(id); save(); renderTree(); return; }
+  const tr = e.target.closest(".trow");
+  if (tr) { S.sel = tr.dataset.id; S.hlAttr = null; save(); renderTree(); renderDetail(); renderStatus(); drawView(); }
+});
+
+/* ---------- 右侧详情 ---------- */
+function renderDetail() {
+  const box = $("#detail");
+  const o = S.sel ? ontMap()[S.sel] : null;
+  if (!o) { box.innerHTML = '<div class="empty" style="padding:18px">在左侧本体树或中间视图中选择一个节点查看详情。</div>'; $("#rightCnt").textContent = ""; return; }
+  const path = ancestors(o.id).map((x) => x.name).join(" / ");
+  const attrs = attrsOf(o.id);
+  const cons = consOfOnt(o.id);
+  const rels = relsOf(o.id);
+  const m = ontMap();
+  let h = '<div id="detail"><div class="dtitle"><h3>' + esc(o.name) + '</h3><span class="catbadge" style="background:' +
+    (CATC[o.category] || "#94A3B8") + '22;color:' + (CATC[o.category] || "#94A3B8") + ';border:1px solid ' + (CATC[o.category] || "#94A3B8") + '55">' + esc(o.category) + "</span></div>" +
+    '<div class="dpath">' + esc(path) + " ・ " + esc(o.id) + "</div>" +
+    (o.description ? '<div class="ddesc">' + esc(o.description) + "</div>" : "") +
+    '<div class="kv"><span class="k">子节点</span><span>' + (childrenOf(o.id).map((c) => c.name).join("、") || "—") + "</span></div>";
+  if (o.chain && o.chain.length) {
+    h += '<div class="sect"><h5>组成链 chain<span class="n">' + o.chain.length + "</span></h5><div class=\"body\"><div class=\"crow2\">" +
+      o.chain.map((u, i) => (i ? '<span class="carr">→</span>' : "") + '<span class="uchip" data-sel="' + esc(u) + '" style="--c:#34D399">' + esc((m[u] || {}).name || u) + "<i>" + esc(u) + "</i></span>").join("") +
+      "</div></div></div>";
+  }
+  h += '<div class="sect"><h5>属性<span class="n">' + attrs.length + '</span><button data-mk="attr">＋ 新增</button></h5><div class="body">' +
+    (attrs.map((a) => '<div class="arow" data-attr="' + a.id + '"><div class="l1"><b>' + esc(a.name) + '</b><span class="sym">' + esc(a.symbol || "—") + '</span><span class="ops2"><button data-aop="edit" data-id="' + a.id + '">编辑</button><button data-aop="del" data-id="' + a.id + '">删除</button></span></div>' +
+      (a.description ? '<div class="l2">' + esc(a.description) + "</div>" : "") + "</div>").join("") || '<div class="empty">暂无属性</div>') +
+    "</div></div>";
+  h += '<div class="sect"><h5>相关约束<span class="n">' + cons.length + '</span><button data-mk="cons">＋ 新增</button></h5><div class="body">' +
+    (cons.map((c) => '<div class="ccard" data-cons="' + c.id + '"><div class="f">' + esc(c.formula) + "</div>" +
+      (c.description ? '<div class="d">' + esc(c.description) + "</div>" : "") +
+      '<div class="mchips">' + c.members.map((mm) => { const a = DB.attributes.find((x) => x.id === mm.attributeId); return '<span class="mchip" data-attrjump="' + esc(mm.attributeId) + '"><span class="r">' + esc(mm.role) + "</span> " + esc(a ? a.name : mm.attributeId) + "</span>"; }).join("") + "</div>" +
+      '<div class="ops2" style="margin-top:6px"><button data-cop="edit" data-id="' + c.id + '">编辑</button><button data-cop="del" data-id="' + c.id + '">删除</button></div></div>').join("") || '<div class="empty">暂无约束</div>') +
+    "</div></div>";
+  if (rels.length) {
+    h += '<div class="sect"><h5>关系<span class="n">' + rels.length + '</span></h5><div class="body">' +
+      rels.slice(0, 40).map((r) => { const other = r.from === o.id ? r.to : r.from; const dir = r.from === o.id ? "→" : "←"; return '<div class="arow" data-selrow="' + esc(other) + '"><div class="l1"><b style="font-weight:400">' + dir + " " + esc(r.type) + " · " + esc((m[other] || {}).name || other) + "</b></div></div>"; }).join("") +
+      "</div></div>";
+  }
+  h += "</div>";
+  box.innerHTML = h;
+  $("#rightCnt").textContent = attrs.length + " 属性 / " + cons.length + " 约束";
+}
+$("#detail").addEventListener("click", (e) => {
+  const mk = e.target.closest("[data-mk]");
+  if (mk) { mk.dataset.mk === "attr" ? modalAttr(null, S.sel) : modalCons(null, S.sel); return; }
+  const aop = e.target.closest("[data-aop]");
+  if (aop) { aop.dataset.aop === "edit" ? modalAttr(aop.dataset.id, null) : (confirm("删除该属性？") && delAttr(aop.dataset.id)); e.stopPropagation(); return; }
+  const cop = e.target.closest("[data-cop]");
+  if (cop) { cop.dataset.cop === "edit" ? modalCons(cop.dataset.id, null) : (confirm("删除该约束？") && delCons(cop.dataset.id)); e.stopPropagation(); return; }
+  const aj = e.target.closest("[data-attrjump]");
+  if (aj) { const a = DB.attributes.find((x) => x.id === aj.dataset.attrjump); if (a) { S.sel = a.ontologyId; S.hlAttr = a.id; save(); renderTree(); renderDetail(); renderStatus(); setView("coup"); } return; }
+  const sr = e.target.closest("[data-selrow]");
+  if (sr) { S.sel = sr.dataset.selrow; save(); renderTree(); renderDetail(); renderStatus(); drawView(); return; }
+  const sl = e.target.closest("[data-sel]");
+  if (sl) { S.sel = sl.dataset.sel; save(); renderTree(); renderDetail(); renderStatus(); drawView(); return; }
+  const ar = e.target.closest("[data-attr]");
+  if (ar) { S.hlAttr = ar.dataset.attr; renderStatus(); setView("coup"); }
+});
+
+/* ---------- 模态框 ---------- */
+function modalOnt(id, parentId) {
+  const o = id ? ontMap()[id] : null;
+  const cats = Object.keys(CATC).map((c) => '<option value="' + c + '"' + (o && o.category === c ? " selected" : "") + ">" + c + "</option>").join("");
+  const parents = ont().map((x) => '<option value="' + x.id + '"' + ((o ? o.parentId : parentId) === x.id ? " selected" : "") + ">" + esc(x.name) + "</option>").join("");
+  openModal('<h4>' + (o ? "编辑本体" : "新增本体") + '<button class="x" onclick="closeModal()">×</button></h4><div class="mb">' +
+    '<div class="fld"><label>名称</label><input id="fName" value="' + esc(o ? o.name : "") + '"></div>' +
+    '<div class="fld"><label>类别</label><select id="fCat">' + cats + '</select></div>' +
+    '<div class="fld"><label>父本体</label><select id="fParent"><option value="">（根）</option>' + parents + '</select></div>' +
+    '<div class="fld"><label>描述</label><textarea id="fDesc" rows="4">' + esc(o ? o.description : "") + '</textarea></div></div>' +
+    '<div class="mf"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" id="fOk">保存</button></div>');
+  $("#fOk").onclick = () => {
+    const name = $("#fName").value.trim(); if (!name) { toast("名称不能为空"); return; }
+    const patch = { name, category: $("#fCat").value, parentId: $("#fParent").value || null, description: $("#fDesc").value.trim() };
+    if (o) { if (patch.parentId && subtreeIds(o.id).includes(patch.parentId)) { toast("父本体不能位于自身子树内"); return; } updOnt(o.id, patch); }
+    else { const nid = addOnt(name, patch.description, patch.parentId || rootId(), patch.category); S.sel = nid; save(); renderTree(); renderDetail(); }
+    closeModal();
+  };
+}
+function modalAttr(id, ontId) {
+  const a = id ? DB.attributes.find((x) => x.id === id) : null;
+  openModal('<h4>' + (a ? "编辑属性" : "新增属性") + '<button class="x" onclick="closeModal()">×</button></h4><div class="mb">' +
+    '<div class="fld"><label>名称</label><input id="fName" value="' + esc(a ? a.name : "") + '"></div>' +
+    '<div class="fld"><label>符号 symbol</label><input id="fSym" value="' + esc(a ? a.symbol : "") + '" placeholder="如 G_ant、C_dsw"></div>' +
+    '<div class="fld"><label>描述</label><textarea id="fDesc" rows="3">' + esc(a ? a.description : "") + '</textarea></div></div>' +
+    '<div class="mf"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" id="fOk">保存</button></div>');
+  $("#fOk").onclick = () => {
+    const name = $("#fName").value.trim(); if (!name) { toast("名称不能为空"); return; }
+    if (a) updAttr(a.id, { name, symbol: $("#fSym").value.trim(), description: $("#fDesc").value.trim() });
+    else addAttr(ontId, name, $("#fDesc").value.trim(), $("#fSym").value.trim());
+    closeModal();
+  };
+}
+function modalCons(id, ontId) {
+  const c = id ? DB.constraints.find((x) => x.id === id) : null;
+  let members = c ? c.members.map((m) => ({ attributeId: m.attributeId, role: m.role })) : [];
+  const host = () => ontId || S.sel || rootId();
+  let inOpen = false;
+  function inlineBox() {
+    const h = host(), hn = (ontMap()[h] || {}).name || h || "（根）";
+    return '<div id="mInlineBox" style="display:' + (inOpen ? "block" : "none") + ';margin-top:8px;border:1px dashed var(--line2);border-radius:7px;padding:8px;background:#0E1728">' +
+      '<div style="font-size:11px;color:var(--dim);margin-bottom:6px">就地新建属性 → 挂到本体：<b style="color:var(--cyan2)">' + esc(hn) + "</b>（" + esc(h || "") + "）</div>" +
+      '<div style="display:flex;gap:6px;align-items:center"><input id="inName" placeholder="属性名称" style="flex:1">' +
+      '<input id="inSym" placeholder="符号 如 G_ant" style="width:132px">' +
+      '<button class="btn pri" id="inOk">创建并加入</button></div>' +
+      '<div style="font-size:10.5px;color:var(--dim2);margin-top:5px">符号留空时按名称自动生成；创建后立即作为成员加入本约束，角色默认取符号。</div></div>';
+  }
+  const optAll = () => ont().map((o) => attrsOf(o.id).map((a) => '<option value="' + a.id + '">' + esc(ancestors(o.id).map((x) => x.name).join("/") + "." + a.name) + "</option>").join("")).join("");
+  function rows() {
+    return members.map((m, i) => '<div class="mrow"><select data-mi="' + i + '"><option value="">选择属性…</option>' +
+      ont().map((o) => attrsOf(o.id).map((a) => '<option value="' + a.id + '"' + (a.id === m.attributeId ? " selected" : "") + ">" + esc(a.name + "（" + o.name + "）") + "</option>").join("")).join("") +
+      '</select><input data-mr="' + i + '" placeholder="角色 如 G_ant" value="' + esc(m.role) + '"><button data-md="' + i + '">✕</button></div>').join("");
+  }
+  function paint() {
+    $("#mBody").innerHTML = '<div class="fld"><label>公式 formula</label><input id="fFormula" value="' + esc(c ? c.formula : "") + '" placeholder="如 EIRP = P_out + G_ant − L_feed"></div>' +
+      '<div class="fld"><label>描述</label><textarea id="fDesc" rows="3">' + esc(c ? c.description : "") + '</textarea></div>' +
+      '<div class="fld"><label>成员（属性 + 角色）</label><div id="mRows" style="display:flex;flex-direction:column;gap:6px">' + rows() + "</div>" +
+      '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="mAdd">＋ 成员</button>' +
+      '<button class="btn" id="mInline">＋ 就地新建属性并加入</button></div>' + inlineBox() + "</div>";
+    $("#mRows").addEventListener("change", (e) => {
+      const i = e.target.dataset.mi != null ? +e.target.dataset.mi : e.target.dataset.mr != null ? +e.target.dataset.mr : null;
+      if (i == null) return;
+      if (e.target.dataset.mi != null) members[i].attributeId = e.target.value; else members[i].role = e.target.value;
+    });
+    $("#mRows").addEventListener("click", (e) => { const d = e.target.closest("[data-md]"); if (d) { members.splice(+d.dataset.md, 1); paint(); } });
+    $("#mAdd").onclick = () => { members.push({ attributeId: "", role: "" }); paint(); };
+    $("#mInline").onclick = () => { inOpen = !inOpen; paint(); if (inOpen) { const n = $("#inName"); if (n) n.focus(); } };
+    const iok = $("#inOk"); if (iok) iok.onclick = () => {
+      const nm = ($("#inName").value || "").trim();
+      if (!nm) { toast("属性名称不能为空", "err"); return; }
+      const sym = ($("#inSym").value || "").trim() || symFallback(nm);
+      const aid = addAttr(host(), nm, "", sym);
+      members.push({ attributeId: aid, role: sym });
+      inOpen = false; paint(); toast("已新建属性 " + nm + "（" + sym + "）并加入成员", "ok");
+    };
+  }
+  openModal('<h4>' + (c ? "编辑约束" : "新增约束") + '<button class="x" onclick="closeModal()">×</button></h4><div class="mb" id="mBody"></div>' +
+    '<div class="mf"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" id="fOk">保存</button></div>');
+  paint();
+  $("#fOk").onclick = () => {
+    const formula = $("#fFormula").value.trim(); if (!formula) { toast("公式不能为空"); return; }
+    const ms = members.filter((m) => m.attributeId);
+    if (!ms.length) { toast("至少需要一个成员"); return; }
+    if (c) updCons(c.id, { formula, description: $("#fDesc").value.trim(), members: ms });
+    else addCons(formula, $("#fDesc").value.trim(), ms);
+    closeModal();
+  };
+}
+
+/* ---------- 工具栏 / 状态 ---------- */
+function renderStatus() {
+  $("#stOnt").textContent = DB.ontologies.length;
+  $("#stAttr").textContent = DB.attributes.length;
+  $("#stCst").textContent = DB.constraints.length;
+  $("#stRel").textContent = (DB.relations || []).length;
+  $("#stPath").textContent = S.sel ? ancestors(S.sel).map((x) => x.name).join(" / ") : "—";
+  $("#stVer").textContent = (DB.name || "知识库") + " · v" + (DB.version || 1) + " · build " + BUILD;
+  const pa = S.sel ? ancestors(S.sel) : [];
+  const pt = $("#pathTxt");
+  if (pt) pt.innerHTML = pa.length
+    ? pa.map((x, i) => (i ? "<em>/</em>" : "") + '<span' + (i === pa.length - 1 ? ' class="cur"' : "") + ">" + esc(x.name) + "</span>").join("")
+    : "未选择本体";
+  const li = $("#linkInd");
+  if (li) {
+    const ha = S.hlAttr ? DB.attributes.find((x) => x.id === S.hlAttr) : null;
+    const so = S.sel ? ontMap()[S.sel] : null;
+    li.innerHTML = ha ? "联动：<b>" + esc(ha.symbol || "—") + "</b> " + esc(ha.name)
+      : so ? "本体：<b>" + esc(so.name) + "</b>" : "点击节点联动左右面板";
+  }
+}
+function refreshAll() { renderTree(); renderDetail(); renderStatus(); buildViewTools(); drawView(); }
+$("#tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (b) setView(b.dataset.v); });
+function setView(v) {
+  S.view = v;
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+  $("#cv").style.display = v === "dsm" || v === "chain" ? "none" : "block";
+  $("#dsmView").style.display = v === "dsm" ? "block" : "none";
+  $("#chainView").style.display = v === "chain" ? "block" : "none";
+  buildViewTools(); drawView();
+}
+$("#search").addEventListener("input", (e) => { S.q = e.target.value; renderTree(); drawView(); });
+/* ---------- 远程同步：REST GET/POST {base}/api/kg?user=&project=&file= ---------- */
+const DEF_BASE = "http://119.80.252.20:5173";
+const SYNC = {
+  base: (function () { try { return localStorage.getItem("plkgwb.syncbase") || DEF_BASE; } catch (e) { return DEF_BASE; } })(),
+  tpl: "{user}/{project}/{file}", auto: false, timer: null, busy: "", ok: false, last: null,
+};
+function ctxReady() { return !!(String(META.user || "").trim() && String(META.proj || "").trim() && String(META.file || "").trim()); }
+function syncURL() {
+  const q = new URLSearchParams({ user: String(META.user || "").trim(), project: String(META.proj || "").trim(), file: String(META.file || "").trim() });
+  return String(SYNC.base || DEF_BASE).replace(/\/+$/, "") + "/api/kg?" + q.toString();
+}
+function fetchTO(url, opt) {
+  const o = Object.assign({ cache: "no-store" }, opt || {});
+  try { if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) o.signal = AbortSignal.timeout(9000); } catch (e) {}
+  return fetch(url, o);
+}
+function syncStatusText() {
+  const el = $("#syncSt"); if (!el) return;
+  let kind, txt;
+  if (SYNC.busy === "pull") { kind = "busy"; txt = '<span class="spi">◐</span> 同步中…'; }
+  else if (SYNC.busy === "save") { kind = "busy"; txt = '<span class="spi">◐</span> 保存中…'; }
+  else if (SYNC.ok && SYNC.last) { kind = "ok"; txt = "✔ 已同步 " + new Date(SYNC.last).toLocaleTimeString("zh-CN"); }
+  else if (SYNC.ok) { kind = "ok"; txt = "✔ 已连接"; }
+  else { kind = "off"; txt = "⚠ 离线模式"; }
+  el.className = kind; el.innerHTML = txt;
+  el.title = SYNC.ok ? ("服务地址 " + SYNC.base + " ・ 路径模板 " + SYNC.tpl) : ("未连接到 " + SYNC.base);
+  const ready = ctxReady();
+  ["#btnSave", "#btnSync", "#btnAuto"].forEach((k) => { const b = $(k); if (b) b.disabled = !ready || (SYNC.busy !== "" && k !== "#btnAuto"); });
+  const w = $("#ctxWarn"); if (w) w.textContent = ready ? "" : "请填写用户名 / 项目名 / 文件名后才能同步";
+}
+function dbSig(d) { try { return JSON.stringify([d.ontologies, d.attributes, d.constraints, d.relations || []]); } catch (e) { return ""; } }
+async function syncPull(silent) {
+  if (!ctxReady()) { if (!silent) toast("请先填写用户名 / 项目名 / 文件名", "err"); syncStatusText(); return false; }
+  SYNC.busy = "pull"; syncStatusText();
+  try {
+    const res = await fetchTO(syncURL());
+    if (!res.ok) throw new Error(res.status === 404 ? "文件不存在（404）" : "HTTP " + res.status);
+    const text = await res.text();
+    const d = JSON.parse(text);
+    if (!d || !Array.isArray(d.ontologies)) throw new Error("返回内容缺少 ontologies 数组");
+    SYNC.ok = true; SYNC.last = Date.now(); SYNC.busy = ""; syncStatusText();
+    if (dbSig(normalize(JSON.parse(JSON.stringify(d)))) === dbSig(DB)) { if (!silent) toast("服务器数据与本地一致，无需覆盖", "ok"); }
+    else { importJSON(text, true); toast(silent ? "自动同步：已载入服务器最新数据" : "同步成功", "ok"); }
+    return true;
+  } catch (e) {
+    SYNC.busy = ""; SYNC.ok = false; syncStatusText();
+    if (!silent) toast("同步失败：" + e.message, "err");
+    return false;
+  }
+}
+async function syncSave() {
+  if (!ctxReady()) { toast("请先填写用户名 / 项目名 / 文件名", "err"); syncStatusText(); return false; }
+  SYNC.busy = "save"; syncStatusText();
+  try {
+    const res = await fetchTO(syncURL(), { method: "POST", headers: { "Content-Type": "application/json" }, body: exportText() });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    SYNC.ok = true; SYNC.last = Date.now(); SYNC.busy = ""; syncStatusText();
+    toast("已保存到服务器：" + META.user + "/" + META.proj + "/" + META.file, "ok");
+    return true;
+  } catch (e) {
+    SYNC.busy = ""; SYNC.ok = false; syncStatusText();
+    toast("保存失败：" + e.message, "err");
+    return false;
+  }
+}
+function toggleAuto() {
+  if (!ctxReady()) { toast("请先填写用户名 / 项目名 / 文件名", "err"); syncStatusText(); return; }
+  SYNC.auto = !SYNC.auto;
+  clearInterval(SYNC.timer); SYNC.timer = null;
+  const b = $("#btnAuto");
+  if (b) { b.classList.toggle("on", SYNC.auto); b.title = SYNC.auto ? "自动同步已开启，点击关闭" : "开启自动同步（每 25 秒拉取一次）"; }
+  if (SYNC.auto) { SYNC.timer = setInterval(() => syncPull(true), 25000); toast("自动同步已开启（每 25 秒拉取一次）", "ok"); syncPull(true); }
+  else toast("自动同步已关闭");
+}
+function loadSyncCfg() {
+  try {
+    fetchTO(String(SYNC.base || DEF_BASE).replace(/\/+$/, "") + "/api/kg-config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && d.template) { SYNC.tpl = d.template; const b = $("#btnSync"); if (b) b.title = "从服务器拉取数据（路径模板 " + SYNC.tpl + "）"; syncStatusText(); } })
+      .catch(() => {});
+  } catch (e) {}
+}
+
+/* ---------- 工具栏接线 ---------- */
+$("#btnExport").onclick = exportJSON;
+$("#btnImport").onclick = () => $("#fileIn").click();
+$("#fileIn").onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { if (confirm("确认导入「" + f.name + "」？当前数据将被覆盖。")) { if (importJSON(r.result)) { SYNC.ok = false; syncStatusText(); } } };
+  r.readAsText(f); e.target.value = "";
+};
+$("#btnReset").onclick = () => { if (confirm("确认重置为内置知识库？当前编辑内容将丢失。")) { localStorage.removeItem(LS_KEY); DB = normalize(JSON.parse(JSON.stringify(SEED))); boot2(); toast("已重置为内置知识库", "ok"); } };
+$("#btnSave").onclick = () => syncSave();
+$("#btnSync").onclick = () => syncPull(false);
+$("#btnAuto").onclick = () => toggleAuto();
+(function initMeta() {
+  const mb = $("#mBase");
+  if (mb) {
+    mb.value = SYNC.base;
+    mb.addEventListener("change", (e) => {
+      let v = e.target.value.trim();
+      if (v && !/^https?:\/\//i.test(v)) v = "http://" + v;
+      SYNC.base = v || DEF_BASE; e.target.value = SYNC.base;
+      try { localStorage.setItem("plkgwb.syncbase", SYNC.base); } catch (err) {}
+      SYNC.ok = false; syncStatusText(); loadSyncCfg(); toast("同步服务器已设为 " + SYNC.base);
+    });
+  }
+  const mf = $("#mFile"); if (mf) mf.value = META.file || "";
+  [["mUser", "user"], ["mProj", "proj"], ["mFile", "file"]].forEach((p) => {
+    const el = $("#" + p[0]); if (!el) return;
+    el.addEventListener("input", (e) => { META[p[1]] = e.target.value; save(); syncStatusText(); });
+  });
+  syncStatusText(); loadSyncCfg();
+})();
+
+/* ============ part4：3D 布局模式（10 种）· 纯坐标计算，无外部依赖，离线可用 ============ */
+const LAY3D = [
+  { mode: null, label: "自由" },
+  { mode: "tiered", label: "层级环" },
+  { mode: "td", label: "向下" },
+  { mode: "bu", label: "向上" },
+  { mode: "lr", label: "左→右" },
+  { mode: "rl", label: "右→左" },
+  { mode: "zout", label: "向外" },
+  { mode: "zin", label: "向内" },
+  { mode: "radialout", label: "辐射" },
+  { mode: "radialin", label: "向心" }
+];
+
+const applyLayout3D = (function () {
+  const LXY = 620, LZ = 430;
+  const GA = Math.PI * (3 - Math.sqrt(5));
+
+  function clamp(v, lim) {
+    const n = Number(v);
+    if (!isFinite(n)) return 0;
+    return n < -lim ? -lim : (n > lim ? lim : n);
+  }
+
+  /* BFS 分层：优先 hier 边，退化时依次用关系边 / 全部边；层内按分系统+标签+id 稳定排序 */
+  function layersOf(g) {
+    const ids = new Set(g.nodes.map((n) => n.id));
+    const inc = {}, adj = {};
+    g.nodes.forEach((n) => { inc[n.id] = 0; adj[n.id] = []; });
+    const ok = (e) => ids.has(e.a) && ids.has(e.b) && e.a !== e.b;
+    /* 用全部有效边分层：属性靠 own 边、约束靠 cons 边挂接，
+       只看 hier 会把它们误判成第 0 层的“根”。结构边优先入队以稳定层级。 */
+    const PRIO = { hier: 0, own: 1, cons: 2, chain: 3, uchain: 3, rel: 4, urel: 4, agg: 4, coup: 5 };
+    const es = g.edges.filter(ok).slice().sort((p, q) => {
+      const a = PRIO[p.t] === undefined ? 6 : PRIO[p.t], b = PRIO[q.t] === undefined ? 6 : PRIO[q.t];
+      return a - b;
+    });
+    es.forEach((e) => { inc[e.b] = (inc[e.b] || 0) + 1; adj[e.a].push(e.b); });
+    const depth = {}, order = [];
+    g.nodes.forEach((n) => { if (!inc[n.id]) { depth[n.id] = 0; order.push(n.id); } });
+    if (!order.length && g.nodes.length) { depth[g.nodes[0].id] = 0; order.push(g.nodes[0].id); }
+    for (let h = 0; h < order.length; h++) {
+      const cur = order[h];
+      (adj[cur] || []).forEach((b) => { if (depth[b] === undefined) { depth[b] = depth[cur] + 1; order.push(b); } });
+    }
+    let maxD = 0;
+    g.nodes.forEach((n) => { if (depth[n.id] !== undefined && depth[n.id] > maxD) maxD = depth[n.id]; });
+    g.nodes.forEach((n) => { if (depth[n.id] === undefined) depth[n.id] = maxD + 1; });
+    const buckets = [];
+    for (let d = 0; d <= maxD + 1; d++) buckets.push([]);
+    g.nodes.forEach((n) => buckets[depth[n.id]].push(n));
+    const out = buckets.filter((a) => a.length);
+    const sv = (v) => String(v === null || v === undefined ? "" : v);
+    out.forEach((a) => a.sort((p, q) => {
+      const s1 = sv(p.sub), s2 = sv(q.sub);
+      if (s1 !== s2) return s1 < s2 ? -1 : 1;
+      const l1 = sv(p.label), l2 = sv(q.label);
+      if (l1 !== l2) return l1 < l2 ? -1 : 1;
+      const i1 = sv(p.id), i2 = sv(q.id);
+      return i1 < i2 ? -1 : (i1 > i2 ? 1 : 0);
+    }));
+    return out;
+  }
+
+  function grid(count, aspect) {
+    const cols = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, count) * aspect)));
+    return { cols: cols, rows: Math.max(1, Math.ceil(count / cols)) };
+  }
+
+  /* 计算原始坐标（未归一化） */
+  function place(mode, g) {
+    const layers = layersOf(g), NL = layers.length, raw = {};
+    if (!NL) return raw;
+    const mid = (NL - 1) / 2;
+    const put = (n, x, y, z) => { raw[n.id] = { x: x, y: y, z: z }; };
+
+    if (mode === "tiered") {
+      layers.forEach((arr, i) => {
+        const y = (i - mid) * 178;
+        if (arr.length === 1) { put(arr[0], 0, y, 0); return; }
+        const r = Math.max(72, arr.length * 11.6);
+        arr.forEach((n, j) => {
+          const a = (2 * Math.PI * j) / arr.length + i * 0.42;
+          put(n, Math.cos(a) * r, y, Math.sin(a) * r);
+        });
+      });
+      return raw;
+    }
+
+    if (mode === "radialout" || mode === "radialin") {
+      const inv = mode === "radialin";
+      layers.forEach((arr, i) => {
+        const t = NL === 1 ? 1 : ((inv ? (NL - 1 - i) : i) / (NL - 1));
+        let R = 300 * t;
+        if (R < 1) R = arr.length > 1 ? 72 : 0;
+        if (R === 0) { arr.forEach((n) => put(n, 0, 0, 0)); return; }
+        arr.forEach((n, j) => {
+          const yy = arr.length === 1 ? 0 : 1 - (2 * (j + 0.5)) / arr.length;
+          const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
+          const th = GA * j + i * 0.7;
+          put(n, Math.cos(th) * rr * R, yy * R, Math.sin(th) * rr * R);
+        });
+      });
+      return raw;
+    }
+
+    const LH = 188, LW = 215, LZS = 168;
+    layers.forEach((arr, i) => {
+      const count = arr.length;
+      if (mode === "td" || mode === "bu") {
+        const sgn = mode === "td" ? 1 : -1;
+        const y = sgn * (i - mid) * LH, gr = grid(count, 2.2);
+        arr.forEach((n, j) => {
+          const c = j % gr.cols, r = Math.floor(j / gr.cols);
+          put(n, (c - (gr.cols - 1) / 2) * 102, y, (r - (gr.rows - 1) / 2) * 80);
+        });
+      } else if (mode === "lr" || mode === "rl") {
+        const sgn = mode === "lr" ? 1 : -1;
+        const x = sgn * (i - mid) * LW, gr = grid(count, 2.6);
+        arr.forEach((n, j) => {
+          const c = j % gr.cols, r = Math.floor(j / gr.cols);
+          put(n, x, (c - (gr.cols - 1) / 2) * 94, (r - (gr.rows - 1) / 2) * 80);
+        });
+      } else {
+        const sgn = mode === "zin" ? -1 : 1;
+        const z = sgn * (i - mid) * LZS, gr = grid(count, 1.35);
+        arr.forEach((n, j) => {
+          const c = j % gr.cols, r = Math.floor(j / gr.cols);
+          put(n, (c - (gr.cols - 1) / 2) * 102, (r - (gr.rows - 1) / 2) * 90, z);
+        });
+      }
+    });
+    return raw;
+  }
+
+  /* 去质心 + 统一缩放到安全范围，保证投影 f=900/(900+z) 不发散 */
+  function fit(raw) {
+    const ks = Object.keys(raw);
+    if (!ks.length) return raw;
+    let cx = 0, cy = 0, cz = 0;
+    ks.forEach((k) => { cx += raw[k].x; cy += raw[k].y; cz += raw[k].z; });
+    cx /= ks.length; cy /= ks.length; cz /= ks.length;
+    let ex = 1e-6, ey = 1e-6, ez = 1e-6;
+    ks.forEach((k) => {
+      const p = raw[k];
+      ex = Math.max(ex, Math.abs(p.x - cx));
+      ey = Math.max(ey, Math.abs(p.y - cy));
+      ez = Math.max(ez, Math.abs(p.z - cz));
+    });
+    const s = Math.min(LXY / ex, LXY / ey, LZ / ez);
+    ks.forEach((k) => { const p = raw[k]; p.x = (p.x - cx) * s; p.y = (p.y - cy) * s; p.z = (p.z - cz) * s; });
+    return raw;
+  }
+
+  const KNOWN = { tiered: 1, td: 1, bu: 1, lr: 1, rl: 1, zout: 1, zin: 1, radialout: 1, radialin: 1 };
+
+  return function applyLayout3D(mode, g, M) {
+    if (!g || !g.nodes || !g.nodes.length || !M || typeof M.get !== "function") return;
+    if (mode === null || mode === undefined || mode === "") return;
+    const use = KNOWN[mode] ? mode : "tiered";
+    let raw;
+    try { raw = fit(place(use, g)); } catch (e) { return; }
+    g.nodes.forEach((n) => {
+      const p = M.get(n.id);
+      if (!p) return;
+      const q = raw[n.id];
+      if (!q) return;
+      p.x = clamp(q.x, LXY); p.y = clamp(q.y, LXY); p.z = clamp(q.z, LZ);
+      p.vx = 0; p.vy = 0; p.vz = 0;
+    });
+  };
+})();
+/* ================= 视图层：组成网络 / 单机连接 / 属性耦合 / 3D / DSM / 链路 ================= */
+const POS = new Map(), POS3 = new Map();
+let G = null, T = { k: 1, x: 0, y: 0 }, hover = null, dragN = null, panning = null, rotating = null;
+let YAW = 0.6, PITCH = 0.35, Z3 = 1;
+const cv = $("#cv"), ctx = cv.getContext("2d");
+const tip = $("#tooltip");
+if (S.focusOn === undefined) S.focusOn = false;
+if (S.mode3d === undefined) S.mode3d = null;
+if (S.labels3d === undefined) S.labels3d = false;
+
+function subsysOf(id) { const m = ontMap(); let c = m[id], p = c && c.parentId ? m[c.parentId] : null; while (p && p.parentId && p.parentId !== rootId()) { c = p; p = m[p.parentId]; } return c ? (p && p.parentId === rootId() ? c.id : (p ? p.id : c.id)) : id; }
+function catR(cat) { return cat === "载荷总体" ? 20 : cat === "分系统" ? 15 : cat === "分组" ? 9 : cat === "体制" ? 10 : cat === "链路" ? 9 : cat === "指标" ? 8 : cat === "硬件" ? 9 : cat === "软件" ? 9 : cat === "接口" ? 8 : 7; }
+const SUBC = { ant_subsys: "#60A5FA", trp_subsys: "#FBBF24", laser_subsys: "#34D399", pcu_subsys: "#A78BFA", comm_payload: "#38BDF8" };
+/* 单机间关系类型配色 */
+const RELC = {
+  "体制组成单机": "#60A5FA", "链路组成单机": "#A78BFA", "软件部署": "#F472B6", "数据存放": "#2DD4BF",
+  "存储访问": "#2DD4BF", "供电": "#F87171", "接口实现": "#FDE047", "外部接口": "#FB923C",
+  "控制接口": "#34D399", "伺服接口": "#34D399", "机械接口": "#94A3B8", "数据接口": "#38BDF8"
+};
+function relColor(t) { return RELC[t] || "#7C8DA6"; }
+function nodeColor(n) {
+  if (n.kind === "attr") return SUBC[n.sub] || "#CBD5E1";
+  if (n.kind === "cons") return "#F59E0B";
+  if (n.kind === "unit") return SUBC[n.sub] || "#34D399";
+  return CATC[n.cat] || "#94A3B8";
+}
+
+/* 知识图谱层级模式：组成网络/单机连接 + 层级布局时，采用盒状分层 + 约束底带 */
+function kgMode() { return S.layout === "tiered" && (S.view === "comp" || S.view === "unit"); }
+/* ---------- 组成网络（可叠加属性 / 约束） ---------- */
+function compGraph() {
+  const sc = scopeIds(), m = ontMap(), kg = kgMode();
+  const nodes = ont().filter((o) => !sc || sc.has(o.id)).map((o) => ({ id: o.id, label: o.name, cat: o.category, kind: "ont", sub: subsysOf(o.id), r: catR(o.category), desc: o.description || "" }));
+  const ids = new Set(nodes.map((n) => n.id));
+  const edges = [];
+  nodes.forEach((n) => { const o = m[n.id]; if (o.parentId && ids.has(o.parentId)) edges.push({ a: o.parentId, b: n.id, t: "hier" }); });
+  ont().forEach((o) => { if (!o.chain || !ids.has(o.id)) return; for (let i = 0; i < o.chain.length - 1; i++) if (ids.has(o.chain[i]) && ids.has(o.chain[i + 1])) edges.push({ a: o.chain[i], b: o.chain[i + 1], t: "chain", src: o.id }); });
+  if (S.showRel && !kg) (DB.relations || []).forEach((r) => { if (r.type === "体制组成单机" || r.type === "链路组成单机") return; if (ids.has(r.from) && ids.has(r.to)) edges.push({ a: r.from, b: r.to, t: "rel", label: r.type }); });
+  const inCons = new Set();
+  if (S.showCons) (DB.constraints || []).forEach((c) => (c.members || []).forEach((x) => inCons.add(x.attributeId)));
+  const attrOwner = {};
+  DB.attributes.forEach((a) => (attrOwner[a.id] = a.ontologyId));
+  const aIds = new Set();
+  if (!kg) DB.attributes.forEach((a) => {
+    if (!ids.has(a.ontologyId)) return;
+    if (!S.showAttr && !(S.showCons && inCons.has(a.id))) return;
+    const aid = "a:" + a.id; aIds.add(a.id);
+    nodes.push({ id: aid, label: a.symbol || a.name, cat: "属性", kind: "attr", attrId: a.id, ref: a.id, ont: a.ontologyId, sub: subsysOf(a.ontologyId), r: 4.4, desc: a.name + (a.description ? " ・ " + a.description : "") });
+    edges.push({ a: a.ontologyId, b: aid, t: "own" });
+  });
+  if (S.showCons) (DB.constraints || []).forEach((c) => {
+    const ms = (c.members || []).filter((x) => aIds.has(x.attributeId) || (kg && attrOwner[x.attributeId] && ids.has(attrOwner[x.attributeId])));
+    if (!ms.length) return;   /* 单属性门限约束（如 I_trp >= 80 dB）同样要画出来 */
+    const cid = "c:" + c.id;
+    nodes.push({ id: cid, label: c.formula || c.name || c.id, cat: "约束", kind: "cons", consId: c.id, sub: "cons", band: !!kg, r: 9, desc: (c.description || "") + " ・ " + ms.length + " 个属性成员" });
+    if (kg) {
+      const seenO = new Set();
+      ms.forEach((x) => { const ow = attrOwner[x.attributeId]; if (ow && ids.has(ow) && !seenO.has(ow)) { seenO.add(ow); edges.push({ a: ow, b: cid, t: "cons", label: x.role }); } });
+    } else ms.forEach((x) => edges.push({ a: "a:" + x.attributeId, b: cid, t: "cons", label: x.role }));
+  });
+  return { nodes, edges };
+}
+/* ---------- 属性耦合 ---------- */
+function coupGraph() {
+  const sc = scopeIds();
+  const attrs = DB.attributes.filter((a) => { const o = ontMap()[a.ontologyId]; return o && (!sc || sc.has(o.id)); });
+  const ids = new Set(attrs.map((a) => a.id));
+  const deg = {}, em = {};
+  DB.constraints.forEach((c) => {
+    const ms = c.members.filter((m) => ids.has(m.attributeId));
+    for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) {
+      const k = [ms[i].attributeId, ms[j].attributeId].sort().join("|");
+      (em[k] = em[k] || { a: k.split("|")[0], b: k.split("|")[1], t: "coup", cs: [] }).cs.push(c.id);
+      deg[ms[i].attributeId] = (deg[ms[i].attributeId] || 0) + 1; deg[ms[j].attributeId] = (deg[ms[j].attributeId] || 0) + 1;
+    }
+  });
+  const nodes = attrs.map((a) => ({ id: a.id, label: a.name, cat: "属性", kind: "attr", attrId: a.id, ref: a.id, ont: a.ontologyId, sub: subsysOf(a.ontologyId), r: 5 + Math.min(9, (deg[a.id] || 0) * 1.1), desc: (a.symbol ? a.symbol + " ← " : "") + (a.description || "") }));
+  return { nodes, edges: Object.values(em) };
+}
+/* ---------- 单机连接关系图（新增视图） ---------- */
+function unitGraph() {
+  const sc = scopeIds(), m = ontMap();
+  const units = ont().filter((o) => o.category === "单机" && (!sc || sc.has(o.id)));
+  const ids = new Set(units.map((o) => o.id));
+  const nodes = units.map((o) => ({ id: o.id, label: o.name, cat: "单机", kind: "unit", sub: subsysOf(o.id), r: 12, desc: o.description || "" }));
+  const edges = [], seen = new Set();
+  (DB.relations || []).forEach((r) => {
+    if (!ids.has(r.from) || !ids.has(r.to) || r.from === r.to) return;
+    const k = r.from + "|" + r.to + "|" + r.type; if (seen.has(k)) return; seen.add(k);
+    edges.push({ a: r.from, b: r.to, t: "urel", rt: r.type, label: r.type, desc: r.description || "" });
+  });
+  if (S.unitChain) ont().forEach((o) => {
+    if (!o.chain || !o.chain.length) return;
+    for (let i = 0; i < o.chain.length - 1; i++) {
+      const A = o.chain[i], B = o.chain[i + 1];
+      if (!ids.has(A) || !ids.has(B) || A === B) continue;
+      const k = "ch|" + A + "|" + B; if (seen.has(k)) continue; seen.add(k);
+      edges.push({ a: A, b: B, t: "uchain", label: (m[o.id] || {}).name || o.id, src: o.id, desc: "同属 " + ((m[o.id] || {}).name || o.id) + " 的相邻环节" });
+    }
+  });
+  return { nodes, edges };
+}
+/* ---------- 3D 数据源之一：分系统 / 分组 / 体制 之间的关系（把单机层关系聚合上来） ---------- */
+function groupGraph() {
+  const m = ontMap(), r0 = rootId(), sc = scopeIds();
+  const keep = new Set();
+  ont().forEach((o) => {
+    if (sc && !sc.has(o.id)) return;
+    if (o.id === r0 || o.category === "分系统" || o.category === "分组" || o.category === "体制") keep.add(o.id);
+  });
+  const upTo = (id) => { let c = m[id]; while (c && c.parentId && !keep.has(c.id)) c = m[c.parentId]; return c && keep.has(c.id) ? c.id : null; };
+  const un = {};
+  ont().forEach((o) => { if (o.category !== "单机") return; const t = upTo(o.id); if (t) un[t] = (un[t] || 0) + 1; });
+  const nodes = ont().filter((o) => keep.has(o.id)).map((o) => ({
+    id: o.id, label: o.name, cat: o.category, kind: "ont", sub: subsysOf(o.id),
+    r: o.id === r0 ? 18 : o.category === "分系统" ? 13 : 7 + Math.min(7, (un[o.id] || 0) * .6),
+    desc: (o.description || "") + " ・ 下辖单机 " + (un[o.id] || 0) + " 台"
+  }));
+  const edges = [];
+  nodes.forEach((n) => { const o = m[n.id]; if (o.parentId && keep.has(o.parentId)) edges.push({ a: o.parentId, b: n.id, t: "hier" }); });
+  const agg = {};
+  const bump = (x, y, t) => {
+    const A = upTo(x), B = upTo(y);
+    if (!A || !B || A === B) return;
+    const k = [A, B].sort().join("|");
+    const e0 = agg[k] || (agg[k] = { a: A, b: B, t: "agg", w: 0, ts: {} });
+    e0.w++; e0.ts[t] = (e0.ts[t] || 0) + 1;
+  };
+  (DB.relations || []).forEach((r) => bump(r.from, r.to, r.type));
+  ont().forEach((o) => { if (!o.chain) return; for (let i = 0; i < o.chain.length - 1; i++) bump(o.chain[i], o.chain[i + 1], "chain"); });
+  Object.keys(agg).forEach((k) => {
+    const e = agg[k];
+    e.label = e.w + " 条关系";
+    e.desc = Object.keys(e.ts).map((t) => t + "×" + e.ts[t]).join(" ・ ");
+    edges.push(e);
+  });
+  return { nodes, edges };
+}
+/* 3D 数据源：单机关系（默认） / 分系统·分组聚合 / 组成网络 */
+function g3dGraph() { return S.g3src === "group" ? groupGraph() : S.g3src === "comp" ? compGraph() : unitGraph(); }
+/* 选中节点的直接关联集合（含自身），节点不在图里时返回 null */
+function hlSet(g, id) { if (!id || !g.nodes.some((n) => n.id === id)) return null; return focusSet(g, id); }
+function focusSet(g, id) {
+  const s = new Set([id]);
+  g.edges.forEach((e) => { if (e.a === id) s.add(e.b); if (e.b === id) s.add(e.a); });
+  return s;
+}
+/* ---------- 布局 ---------- */
+function sectorSeed(n, three) {
+  const l1 = l1List(), i = l1.findIndex((x) => x.id === n.sub);
+  const ang = (i < 0 ? -1 : i) * (2 * Math.PI / Math.max(1, l1.length)) - Math.PI / 2;
+  const R = n.cat === "载荷总体" ? 0 : 250 + Math.random() * 130;
+  const a = ang + (Math.random() - .5) * 1.1;
+  const o = { x: Math.cos(a) * R, y: Math.sin(a) * R, z: 0, vx: 0, vy: 0, vz: 0 };
+  if (three) o.z = (Math.random() - .5) * 300;
+  return o;
+}
+function ensurePos(g, three) {
+  const M = three ? POS3 : POS;
+  g.nodes.forEach((n) => { if (!M.has(n.id)) M.set(n.id, sectorSeed(n, three)); });
+  M.forEach((v, k) => { if (!g.nodes.some((n) => n.id === k)) M.delete(k); });
+}
+function nodeW(n) { return n.r * 2 + (n.kind === "cons" ? 62 : 40); }
+/* 盒状节点宽度：中日韩字符按 11.5px、其余按 6.4px 估算，再加内边距 */
+function kgBoxW(n) {
+  const t = String(n.label || "");
+  let w = 0;
+  for (let i = 0; i < t.length; i++) w += t.charCodeAt(i) > 255 ? 11.5 : 6.4;
+  return Math.max(46, w + 20);
+}
+function truncLabel(t, maxW) {
+  t = String(t == null ? "" : t);
+  if (ctx.measureText(t).width <= maxW) return t;
+  let s = t;
+  while (s.length > 1 && ctx.measureText(s + "…").width > maxW) s = s.slice(0, -1);
+  return s + "…";
+}
+/* 知识图谱层级模式下把整图缩放到画布可见范围 */
+function fitKg() {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  G.nodes.forEach((n) => { const p = POS.get(n.id); if (!p) return; const hw = (n.w || 24) / 2, hh = (n.h || 24) / 2; x0 = Math.min(x0, p.x - hw); x1 = Math.max(x1, p.x + hw); y0 = Math.min(y0, p.y - hh); y1 = Math.max(y1, p.y + hh); });
+  if (x1 <= x0 || y1 <= y0) return;
+  const r = cv.getBoundingClientRect();
+  T.k = Math.max(.3, Math.min(1.15, Math.min((r.width - 46) / (x1 - x0), (r.height - 46) / (y1 - y0))));
+  T.x = 0; T.y = 0;
+}
+/* 层级布局：BFS 分层 + 层内按分系统聚类 + 超宽自动折行，整体以原点为中心；
+   知识图谱模式下节点为盒状（记录 n.w/n.h），约束节点单独排成底部横带 */
+function tieredLayout(g, three) {
+  const M = three ? POS3 : POS;
+  ensurePos(g, three);
+  if (!g.nodes.length) return;
+  const kg = kgMode();
+  if (kg) g.nodes.forEach((n) => { n.w = kgBoxW(n); n.h = n.band ? 26 : (n.cat === "分系统" || n.cat === "载荷总体" ? 30 : 26); });
+  const main = kg ? g.nodes.filter((n) => !n.band) : g.nodes;
+  const band = kg ? g.nodes.filter((n) => n.band) : [];
+  const inc = {}, adj = {};
+  main.forEach((n) => { inc[n.id] = 0; adj[n.id] = []; });
+  g.edges.forEach((e) => { if (inc[e.b] !== undefined && inc[e.a] !== undefined) { inc[e.b]++; adj[e.a].push(e.b); } });
+  const depth = {}, order = [];
+  main.forEach((n) => { if (!inc[n.id]) { depth[n.id] = 0; order.push(n.id); } });
+  if (!order.length) { depth[main[0].id] = 0; order.push(main[0].id); }
+  for (let h = 0; h < order.length; h++) { const id = order[h]; (adj[id] || []).forEach((b) => { if (depth[b] === undefined) { depth[b] = depth[id] + 1; order.push(b); } }); }
+  let maxD = 0;
+  main.forEach((n) => { if (depth[n.id] > maxD) maxD = depth[n.id]; });
+  main.forEach((n) => { if (depth[n.id] === undefined) depth[n.id] = maxD + 1; });
+  const layers = {};
+  main.forEach((n) => { (layers[depth[n.id]] = layers[depth[n.id]] || []).push(n); });
+  const keys = Object.keys(layers).map(Number).sort((a, b) => a - b);
+  const nw = (n) => (kg ? n.w : nodeW(n));
+  const cw0 = cv.getBoundingClientRect().width || 1200;
+  const MAXW = kg ? Math.max(760, Math.min(1560, cw0 - 40)) : 1500, GAP = kg ? 18 : 0, ROWH = kg ? 46 : 68, LH = kg ? 66 : 138;
+  let yCur = 0;
+  keys.forEach((k) => {
+    const arr = layers[k].slice().sort((a, b) => String(a.sub || "").localeCompare(String(b.sub || "")) || String(a.label).localeCompare(String(b.label)) || String(a.id).localeCompare(String(b.id)));
+    const rows = []; let cur = [], cw = 0;
+    arr.forEach((n) => { const w = nw(n) + GAP; if (cw + w > MAXW && cur.length) { rows.push(cur); cur = []; cw = 0; } cur.push(n); cw += w; });
+    if (cur.length) rows.push(cur);
+    rows.forEach((row, ri) => {
+      const tw = row.reduce((sm, n) => sm + nw(n) + GAP, 0) - GAP;
+      let x = -tw / 2; const y = yCur + ri * ROWH;
+      row.forEach((n) => { const w = nw(n), p = M.get(n.id); p.x = x + w / 2; p.y = y; p.z = 0; p.vx = p.vy = p.vz = 0; x += w + GAP; });
+    });
+    yCur += (rows.length - 1) * ROWH + LH;
+  });
+  const mainH = Math.max(0, yCur - LH);
+  let totalH = mainH;
+  if (kg && band.length) {
+    /* 约束底带：主图下方独立横排，超宽折行 */
+    const BH = 34, BGAP = 14;
+    let by = mainH + 40;
+    const rows = []; let cur = [], cw = 0;
+    band.forEach((n) => { const w = n.w + BGAP; if (cw + w > MAXW && cur.length) { rows.push(cur); cur = []; cw = 0; } cur.push(n); cw += w; });
+    if (cur.length) rows.push(cur);
+    rows.forEach((row) => {
+      const tw = row.reduce((sm, n) => sm + n.w + BGAP, 0) - BGAP;
+      let x = -tw / 2;
+      row.forEach((n) => { const p = M.get(n.id); p.x = x + n.w / 2; p.y = by; p.z = 0; p.vx = p.vy = p.vz = 0; x += n.w + BGAP; });
+      by += BH;
+    });
+    totalH = by - BH + 26;
+  }
+  const off = totalH / 2;
+  g.nodes.forEach((n) => { const p = M.get(n.id); p.y -= off; });
+}
+function simStep(g, three) {
+  const M = three ? POS3 : POS, N = g.nodes, n = N.length;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const a = M.get(N[i].id), b = M.get(N[j].id);
+    let dx = a.x - b.x, dy = a.y - b.y, dz = three ? a.z - b.z : 0;
+    let d2 = dx * dx + dy * dy + dz * dz + 40;
+    const f = 6200 / d2;
+    const d = Math.sqrt(d2); dx /= d; dy /= d; if (three) dz /= d;
+    a.vx += dx * f; a.vy += dy * f; if (three) a.vz += dz * f;
+    b.vx -= dx * f; b.vy -= dy * f; if (three) b.vz -= dz * f;
+  }
+  g.edges.forEach((e) => {
+    const a = M.get(e.a), b = M.get(e.b); if (!a || !b) return;
+    const rest = e.t === "hier" ? 84 : e.t === "own" ? 44 : e.t === "cons" ? 74 : e.t === "chain" ? 104
+      : e.t === "uchain" ? 150 : e.t === "urel" ? 178 : e.t === "coup" ? 104 : 175;
+    const kk = e.t === "own" ? .03 : e.t === "cons" ? .022 : .012;
+    let dx = b.x - a.x, dy = b.y - a.y, dz = three ? b.z - a.z : 0;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) + .01, f = (d - rest) * kk;
+    dx /= d; dy /= d; if (three) dz /= d;
+    a.vx += dx * f * d * .06; a.vy += dy * f * d * .06; if (three) a.vz += dz * f * d * .06;
+    b.vx -= dx * f * d * .06; b.vy -= dy * f * d * .06; if (three) b.vz -= dz * f * d * .06;
+  });
+  N.forEach((x) => {
+    const p = M.get(x.id);
+    p.vx -= p.x * 0.0022; p.vy -= p.y * 0.0022; if (three) p.vz -= p.z * 0.0022;
+    if (dragN && dragN.id === x.id && !three) { p.vx = 0; p.vy = 0; return; }
+    p.vx *= .82; p.vy *= .82; if (three) p.vz *= .82;
+    p.x += Math.max(-14, Math.min(14, p.vx)); p.y += Math.max(-14, Math.min(14, p.vy)); if (three) p.z += Math.max(-14, Math.min(14, p.vz));
+  });
+  if (n > 0) {
+    let mx = 0, my = 0, mz = 0;
+    N.forEach((x) => { const p = M.get(x.id); mx += p.x; my += p.y; if (three) mz += p.z; });
+    mx /= n; my /= n; mz /= n;
+    N.forEach((x) => { const p = M.get(x.id); p.x -= mx * .05; p.y -= my * .05; if (three) p.z -= mz * .05; });
+  }
+}
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  return r;
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+function hitNode(mx, my, g, M, proj) {
+  let best = null, bd = 1e9;
+  g.nodes.forEach((n) => {
+    const p = proj(n); if (!p) return;
+    const dx = p.x - mx, dy = p.y - my, d2 = dx * dx + dy * dy;
+    let hit;
+    if (n.kind === "cons" && n._hw) hit = Math.abs(dx) <= n._hw + 5 && Math.abs(dy) <= n._hh + 5;
+    else if (n.w && p.k) hit = Math.abs(dx) <= (n.w / 2) * p.k + 4 && Math.abs(dy) <= (n.h / 2) * p.k + 4;
+    else { const rr = n.r * p.k + 6; hit = d2 < rr * rr; }
+    if (hit && d2 < bd) { bd = d2; best = n; }
+  });
+  return best;
+}
+/* ---------- 绘制 ---------- */
+function draw2D(g, three) {
+  const r = sizeCanvas(), dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  const M = three ? POS3 : POS;
+  const cx = r.width / 2, cy = r.height / 2;
+  const proj = three
+    ? (n) => { const p = M.get(n.id); const cyaw = Math.cos(YAW), syaw = Math.sin(YAW), cp = Math.cos(PITCH), sp = Math.sin(PITCH);
+        let x = p.x * cyaw + p.z * syaw, z = -p.x * syaw + p.z * cyaw; let y = p.y * cp - z * sp; z = p.y * sp + z * cp;
+        const f = 900 / (900 + z); return { x: cx + (x * f * T.k + T.x), y: cy + (y * f * T.k + T.y), k: f * T.k, z }; }
+    : (n) => { const p = M.get(n.id); return { x: cx + p.x * T.k + T.x, y: cy + p.y * T.k + T.y, k: T.k, z: 0 }; };
+  const P = {}; g.nodes.forEach((n) => (P[n.id] = proj(n)));
+  const NR = {}; g.nodes.forEach((n) => (NR[n.id] = n));
+  const hb = new Set();
+  const hl = g.hl || null, selId = S.sel;
+  if (hover) g.edges.forEach((e) => { if (e.a === hover.id) hb.add(e.b); if (e.b === hover.id) hb.add(e.a); });
+  g.edges.forEach((e) => {
+    const a = P[e.a], b = P[e.b]; if (!a || !b) return;
+    const inc = !!(hover && (e.a === hover.id || e.b === hover.id));
+    const dim = !!(g.focus && !(g.focus.has(e.a) && g.focus.has(e.b)));
+    const incSel = !!(hl && (e.a === selId || e.b === selId));
+    let dash = [], lw = 1, col = "#22364F", arrow = false, al = three ? .8 : 1;
+    if (e.t === "hier") { col = "#22364F"; lw = 1; }
+    else if (e.t === "own") { col = "#2A3B55"; lw = .7; al = .8; }
+    else if (e.t === "cons") { col = "#F59E0B"; lw = .9; al = .42; }
+    else if (e.t === "chain") { col = "#38BDF8"; lw = 1.6; arrow = true; al = .72; }
+    else if (e.t === "uchain") { col = "#38BDF8"; lw = 1.5; dash = [6, 4]; arrow = true; al = .62; }
+    else if (e.t === "urel") { col = relColor(e.rt); lw = inc ? 3 : 2; arrow = true; al = .9; }
+    else if (e.t === "coup") { col = "#FBBF24"; lw = 1 + Math.min(2.4, (e.cs ? e.cs.length : 1) * .5); al = .42; }
+    else if (e.t === "agg") { col = "#9FB3CC"; lw = 1 + Math.min(4, (e.w || 1) * .55); al = .5; }
+    else { col = "#FB923C"; lw = inc ? 2.4 : 1.1; dash = [4, 3]; al = .5; }
+    if (g.kg && !three) {
+      if (e.t === "hier") { col = "#7C6BD8"; dash = [5, 4]; lw = 1; al = .55; }
+      else if (e.t === "cons") { col = "#F59E0B"; dash = [4, 4]; lw = .9; al = .5; }
+      else if (e.t === "chain" || e.t === "uchain") { col = "#38BDF8"; dash = [6, 4]; lw = 1.4; arrow = true; al = .62; }
+      else if (e.t === "urel") { col = relColor(e.rt); dash = [6, 4]; lw = inc ? 2.6 : 1.9; arrow = true; al = .85; }
+      else if (e.t === "rel") { col = "#FB923C"; dash = [4, 3]; lw = inc ? 2.2 : 1; al = .45; }
+    }
+    ctx.globalAlpha = dim ? .06 : (hl ? (incSel ? Math.min(.95, al + .35) : al * .22) : al);
+    ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = lw + (hl && incSel ? .5 : 0);
+    if (dash.length && S.flow && !three) ctx.lineDashOffset = -((performance.now() / 45) % 64);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    if (arrow) {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x), bn = NR[e.b];
+      const rr = (bn ? (bn.kind === "cons" ? (bn._hh || 9) / Math.max(.2, b.k) : bn.r) : 7) * b.k + 3;
+      const tx = b.x - Math.cos(ang) * rr, ty = b.y - Math.sin(ang) * rr;
+      ctx.fillStyle = col; ctx.beginPath();
+      ctx.moveTo(tx, ty); ctx.lineTo(tx - Math.cos(ang - .42) * 7, ty - Math.sin(ang - .42) * 7);
+      ctx.lineTo(tx - Math.cos(ang + .42) * 7, ty - Math.sin(ang + .42) * 7); ctx.closePath(); ctx.fill();
+    }
+    if (e.label && (incSel || inc || (S.view === "unit" && !three && (e.t === "urel" ? S.unitLabels : T.k > 1.9)))) {
+      const mxp = (a.x + b.x) / 2, myp = (a.y + b.y) / 2;
+      ctx.font = '10px Consolas,"Microsoft YaHei",monospace'; ctx.textAlign = "center";
+      const tw = ctx.measureText(e.label).width;
+      ctx.globalAlpha = dim ? .06 : (hl && !incSel ? .14 : .92);
+      ctx.fillStyle = "#0B1220"; ctx.fillRect(mxp - tw / 2 - 3, myp - 9, tw + 6, 13);
+      ctx.fillStyle = inc ? col : "#9FB3CC"; ctx.fillText(e.label, mxp, myp + 1.5);
+    }
+  });
+  ctx.setLineDash([]);
+  const order = three ? g.nodes.slice().sort((a, b) => (P[b.id].z || 0) - (P[a.id].z || 0)) : g.nodes;
+  order.forEach((n) => {
+    const p = P[n.id]; if (!p) return;
+    const col = nodeColor(n);
+    const dim = !!(g.focus && !g.focus.has(n.id));
+    const isHi = (n.ref && S.hlAttr === n.ref);
+    ctx.globalAlpha = dim ? .16 : (hl && !hl.has(n.id) ? .32 : 1);
+    if (g.kg && !three && n.w) {
+      const w = n.w * p.k, h = n.h * p.k;
+      if (n.band) {
+        roundRect(p.x - w / 2, p.y - h / 2, w, h, 5);
+        ctx.fillStyle = "#33250A"; ctx.fill();
+        ctx.lineWidth = hover === n ? 1.8 : 1; ctx.strokeStyle = hover === n ? "#FCD34D" : "#B47611"; ctx.stroke();
+        ctx.font = (10 * p.k).toFixed(2) + 'px Consolas,"Microsoft YaHei",monospace'; ctx.textAlign = "center"; ctx.fillStyle = "#FCD34D";
+        ctx.fillText(truncLabel(n.label, (w - 12 * p.k)), p.x, p.y + 3.4 * p.k);
+      } else {
+        roundRect(p.x - w / 2, p.y - h / 2, w, h, 7);
+        ctx.fillStyle = "#131A2B"; ctx.fill();
+        ctx.lineWidth = hover === n ? 2 : 1.2;
+        ctx.strokeStyle = hover === n ? "#F8FAFC" : (S.sel === n.id ? "#38BDF8" : col + "AA");
+        ctx.stroke();
+        if (isHi) { roundRect(p.x - w / 2 - 3, p.y - h / 2 - 3, w + 6, h + 6, 9); ctx.lineWidth = 1.6; ctx.strokeStyle = "#FBBF24"; ctx.stroke(); }
+        if (hl && hl.has(n.id) && n.id !== selId) { roundRect(p.x - w / 2 - 3, p.y - h / 2 - 3, w + 6, h + 6, 9); ctx.lineWidth = 1.6; ctx.strokeStyle = "#7DD3FC"; ctx.stroke(); }
+        ctx.font = (n.cat === "分系统" || n.cat === "载荷总体" ? "600 " : "") + (10.5 * p.k).toFixed(2) + 'px "Microsoft YaHei",sans-serif';
+        ctx.textAlign = "center"; ctx.fillStyle = (hover === n || S.sel === n.id) ? "#EAF3FC" : "#C6D6EA";
+        ctx.fillText(truncLabel(n.label, (w - 12 * p.k)), p.x, p.y + 3.6 * p.k);
+      }
+      if (S.q && String(n.label).toLowerCase().includes(S.q.toLowerCase())) { roundRect(p.x - w / 2 - 5, p.y - h / 2 - 5, w + 10, h + 10, 10); ctx.strokeStyle = "#FBBF2488"; ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    if (n.kind === "cons") {
+      ctx.font = '10px Consolas,"Microsoft YaHei",monospace';
+      let lab = String(n.label || ""); if (lab.length > 34) lab = lab.slice(0, 33) + "…";
+      const tw = ctx.measureText(lab).width, hw = tw / 2 + 7, hh = 8.5;
+      n._hw = hw; n._hh = hh;
+      roundRect(p.x - hw, p.y - hh, hw * 2, hh * 2, 4.5);
+      ctx.fillStyle = "#33250A"; ctx.fill();
+      ctx.lineWidth = hover === n ? 1.9 : 1; ctx.strokeStyle = hover === n ? "#FCD34D" : "#B47611"; ctx.stroke();
+      ctx.textAlign = "center"; ctx.fillStyle = "#FCD34D"; ctx.fillText(lab, p.x, p.y + 3.4);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const rr = Math.max(1.4, n.r * p.k);
+    ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, 7);
+    ctx.fillStyle = col + (three ? "D0" : n.kind === "attr" ? "C8" : "E8"); ctx.fill();
+    ctx.lineWidth = hover === n ? 2.2 : 1.2; ctx.strokeStyle = hover === n ? "#F8FAFC" : col; ctx.stroke();
+    if (S.sel === n.id || (n.ont && S.sel === n.ont)) { ctx.beginPath(); ctx.arc(p.x, p.y, rr + 4, 0, 7); ctx.strokeStyle = "#38BDF8"; ctx.lineWidth = 2; ctx.stroke(); }
+    if (isHi) { ctx.beginPath(); ctx.arc(p.x, p.y, rr + 4, 0, 7); ctx.strokeStyle = "#FBBF24"; ctx.lineWidth = 2; ctx.stroke(); }
+    if (hl && hl.has(n.id) && n.id !== selId) { ctx.beginPath(); ctx.arc(p.x, p.y, rr + 4, 0, 7); ctx.strokeStyle = "#7DD3FC"; ctx.lineWidth = 1.8; ctx.stroke(); }
+    if (S.q && String(n.label).toLowerCase().includes(S.q.toLowerCase())) { ctx.beginPath(); ctx.arc(p.x, p.y, rr + 6, 0, 7); ctx.strokeStyle = "#FBBF2488"; ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
+    let showLabel = n.cat === "分系统" || n.cat === "载荷总体" || n.kind === "unit" || hover === n || hb.has(n.id) || S.sel === n.id || isHi || (hl && hl.has(n.id) && n.kind !== "attr");
+    if (three && S.labels3d) showLabel = true;
+    const showLabel2 = showLabel || (!three && ((T.k > 1.05 && (n.cat === "体制" || n.cat === "链路" || n.cat === "分组")) || (T.k > 1.6 && (n.cat === "单机" || n.cat === "属性" || n.cat === "指标"))));
+    if (showLabel2) {
+      ctx.font = (n.cat === "分系统" || n.cat === "载荷总体" ? "600 12px " : "10.5px ") + '"Microsoft YaHei",sans-serif';
+      ctx.textAlign = "center"; ctx.fillStyle = three ? "#C9D8EC" : "#B9C9DE";
+      ctx.fillText(n.label, p.x, p.y + rr + 13);
+    }
+  });
+  if (!g.nodes.length || (S.view === "unit" && !g.edges.length)) {
+    ctx.font = '13px "Microsoft YaHei",sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#8CA3BF";
+    ctx.fillText(g.nodes.length ? "当前知识库的 relations 为空：单机之间没有可显示的关系线（请先导入含 relations 的图谱 JSON）" : "当前视图没有可显示的节点", cx, cy);
+  }
+  ctx.globalAlpha = 1;
+  return { proj, P };
+}
+/* ---- DSM ---- */
+function buildDSM() {
+  const sc = scopeIds();
+  const order = [];
+  (function w(id) { const o = ontMap()[id]; if (!o) return; if (!sc || sc.has(id)) order.push(o); childrenOf(id).forEach((c) => w(c.id)); })(rootId());
+  const chainSet = new Set(), hierSet = new Set();
+  ont().forEach((o) => { if (o.chain) for (let i = 0; i < o.chain.length - 1; i++) chainSet.add(o.chain[i] + ">" + o.chain[i + 1]); });
+  order.forEach((o) => { if (o.parentId) hierSet.add(o.parentId + ">" + o.id); });
+  const attrOnt = {}; DB.attributes.forEach((a) => (attrOnt[a.id] = a.ontologyId));
+  const coupSet = new Set(), coupCnt = {};
+  DB.constraints.forEach((c) => {
+    const os = [...new Set(c.members.map((m) => attrOnt[m.attributeId]).filter(Boolean))];
+    for (let i = 0; i < os.length; i++) for (let j = 0; j < os.length; j++) if (i !== j) { const k = os[i] + ">" + os[j]; coupSet.add(k); coupCnt[k] = (coupCnt[k] || 0) + 1; }
+  });
+  let h = '<table><thead><tr><th class="rl">DSM ・ 行=影响源 ・ 列=受影响</th>' +
+    order.map((o) => '<th class="cl"><div title="' + esc(o.name) + '">' + esc(o.name.length > 9 ? o.name.slice(0, 9) + "…" : o.name) + "</div></th>").join("") + "</tr></thead><tbody>";
+  order.forEach((ro) => {
+    h += '<tr><th class="rl" title="' + esc(ro.id) + '">' + esc(ro.name) + "</th>";
+    order.forEach((co) => {
+      const k = ro.id + ">" + co.id;
+      const ch = chainSet.has(k), cp = coupSet.has(k), hi = hierSet.has(k);
+      let cls = "", txt = "", bg = "", tt = "";
+      if (ch && cp) { txt = "◆"; bg = "#123A46"; cls = "mk"; tt = ro.name + " → " + co.name + "：chain 组成 + 约束耦合(" + coupCnt[k] + ")"; }
+      else if (ch) { txt = "▸"; bg = "#0E3341"; cls = "mk"; tt = ro.name + " → " + co.name + "：chain 有序组成"; }
+      else if (cp) { txt = "●"; bg = "#33270E"; cls = "mk"; tt = ro.name + " ↔ " + co.name + "：共现于 " + coupCnt[k] + " 条约束"; }
+      else if (hi) { txt = "·"; bg = "#101A2C"; tt = ro.name + " → " + co.name + "：层级父子"; }
+      else bg = "#0C1422";
+      h += '<td class="' + cls + '" style="background:' + bg + ";color:" + (ch ? "#7DD3FC" : cp ? "#FBBF24" : "#3B4A61") + '"' + (tt ? ' title="' + esc(tt) + '"' : "") + (cls ? ' data-dsm="' + esc(co.id) + '"' : "") + ">" + txt + "</td>";
+    });
+    h += "</tr>";
+  });
+  $("#dsmView").innerHTML = h + "</tbody></table>";
+}
+$("#dsmView").addEventListener("click", (e) => { const td = e.target.closest("[data-dsm]"); if (td) { S.sel = td.dataset.dsm; save(); renderTree(); renderDetail(); renderStatus(); } });
+/* ---- chain ---- */
+function buildChain() {
+  const sc = scopeIds(), m = ontMap();
+  const groups = S.scope === "ALL" ? l1List() : [m[S.scope]];
+  let h = "";
+  groups.forEach((g0) => {
+    const items = subtreeIds(g0.id).map((i) => m[i]).filter((o) => o && o.chain && o.chain.length);
+    if (!items.length) return;
+    h += '<div class="cvgrp"><h4>' + esc(g0.name) + " ・ " + items.length + " 条链</h4>";
+    items.forEach((o) => {
+      h += '<div class="cvitem"><div class="h"><b>' + esc(o.name) + '</b><span class="cat">' + esc(o.category) + '</span><span class="cid">' + esc(o.id) + "</span></div>" +
+        '<div class="d">' + esc(o.description || "") + '</div><div class="crow2">' +
+        o.chain.map((u, i) => (i ? '<span class="carr">→</span>' : "") + '<span class="uchip" data-csel="' + esc(u) + '" style="--c:' + (CATC[(m[u] || {}).category] || "#94A3B8") + '">' + esc((m[u] || {}).name || u) + "<i>" + esc(u) + "</i></span>").join("") +
+        "</div></div>";
+    });
+    h += "</div>";
+  });
+  $("#chainView").innerHTML = h || '<div class="empty">当前范围内没有带 chain 的节点</div>';
+}
+$("#chainView").addEventListener("click", (e) => { const c = e.target.closest("[data-csel]"); if (c) { S.sel = c.dataset.csel; save(); renderTree(); renderDetail(); renderStatus(); } });
+/* ---- 图例 ---- */
+function lgDot(c, t) { return '<span class="lg-i"><i style="background:' + c + '"></i>' + esc(t) + "</span>"; }
+function lgSq(t) { return '<span class="lg-i"><i class="sq"></i>' + esc(t) + "</span>"; }
+function lgLine(c, t) { return '<span class="lg-i"><i class="ln" style="background:' + c + '"></i>' + esc(t) + "</span>"; }
+function buildLegend() {
+  const el = $("#legend"); if (!el) return;
+  const it = [];
+  if (S.view !== "dsm" && S.view !== "chain") {
+    l1List().forEach((o) => it.push(lgDot(SUBC[o.id] || CATC[o.category] || "#94A3B8", o.name)));
+    if (S.view === "comp") {
+      if (kgMode()) it.push(lgLine("#7C6BD8", "层级（虚线流动）"), lgLine("#38BDF8", "chain 有序"), lgSq("约束公式（底带）"));
+      else {
+        it.push(lgLine("#3A5478", "层级"), lgLine("#38BDF8", "chain 有序"), lgLine("#FB923C", "跨系统关系"));
+        if (S.showAttr) it.push(lgDot("#CBD5E1", "属性"), lgLine("#2A3B55", "属性归属"));
+        if (S.showCons) it.push(lgSq("约束公式"), lgLine("#F59E0B", "约束成员"));
+      }
+    } else if (S.view === "unit") {
+      if (S.unitChain) it.push(lgLine("#38BDF8", "同链相邻（虚线）"));
+      const rts = [];
+      (G ? G.edges : []).forEach((e) => { if (e.t === "urel" && e.rt && rts.indexOf(e.rt) < 0) rts.push(e.rt); });
+      if (rts.length) rts.forEach((t) => it.push(lgLine(relColor(t), t))); else it.push(lgLine("#7C8DA6", "单机间关系"));
+    } else if (S.view === "coup") {
+      it.push(lgLine("#FBBF24", "同约束共现（越粗越多）"));
+    } else if (S.view === "g3d") {
+      if ((S.g3src || "unit") === "unit") {
+        if (S.unitChain) it.push(lgLine("#38BDF8", "同链相邻"));
+        const rts3 = [];
+        (G ? G.edges : []).forEach((e) => { if (e.t === "urel" && e.rt && rts3.indexOf(e.rt) < 0) rts3.push(e.rt); });
+        if (rts3.length) rts3.forEach((t) => it.push(lgLine(relColor(t), t))); else it.push(lgLine("#7C8DA6", "单机间关系"));
+      } else if (S.g3src === "group") {
+        it.push(lgLine("#3A5478", "层级"), lgLine("#9FB3CC", "聚合关系（越粗越多）"));
+      } else {
+        it.push(lgLine("#3A5478", "层级"), lgLine("#38BDF8", "chain"), lgDot("#CBD5E1", "属性"), lgSq("约束"));
+      }
+    }
+    if (S.hlRel && (S.view === "comp" || S.view === "unit" || S.view === "g3d")) it.push(lgLine("#7DD3FC", "点选节点的直接关联"));
+  }
+  el.innerHTML = it.join("");
+  el.style.display = it.length ? "flex" : "none";
+}
+function syncZoomBox() { const zb = $("#zoomBox"); if (zb) zb.style.display = (S.view === "dsm" || S.view === "chain") ? "none" : "flex"; }
+function zoomBy(f) { T.k = Math.max(.2, Math.min(4, T.k * f)); }
+(function () {
+  const zi = $("#zIn"), zo = $("#zOut"), zf = $("#zFit");
+  if (zi) zi.onclick = () => zoomBy(1.22);
+  if (zo) zo.onclick = () => zoomBy(1 / 1.22);
+  if (zf) zf.onclick = () => { T = { k: 1, x: 0, y: 0 }; if (S.view === "g3d") { YAW = .6; PITCH = .35; } (S.view === "g3d" ? POS3 : POS).clear(); G = null; drawView(); };
+})();
+/* ---- 视图工具条 ---- */
+function lay3dList() {
+  try { if (typeof LAY3D !== "undefined" && LAY3D && LAY3D.length) return LAY3D; } catch (e) { }
+  return [{ mode: null, label: "自由" }, { mode: "tiered", label: "层级环" }, { mode: "td", label: "向下" }, { mode: "bu", label: "向上" },
+  { mode: "lr", label: "左→右" }, { mode: "rl", label: "右→左" }, { mode: "zout", label: "向外" }, { mode: "zin", label: "向内" },
+  { mode: "radialout", label: "辐射" }, { mode: "radialin", label: "向心" }];
+}
+function buildViewTools() {
+  const box = $("#viewTools");
+  const cvs = ["comp", "unit", "coup", "g3d"];
+  if (cvs.indexOf(S.view) < 0) box.innerHTML = "";
+  else {
+    let h = '<select id="vtScope" title="显示范围"><option value="ALL">全载荷范围</option>' + l1List().map((o) => '<option value="' + o.id + '"' + (S.scope === o.id ? " selected" : "") + ">" + esc(o.name) + "</option>").join("") + "</select>";
+    if (S.view === "comp" || S.view === "unit") {
+      h += '<button class="pill' + (S.layout === "force" ? " on" : "") + '" id="vtLF" title="力导向布局">力导向</button>';
+      h += '<button class="pill' + (S.layout === "tiered" ? " on" : "") + '" id="vtLT" title="按层级自上而下排列">层级</button>';
+    }
+    if (S.view === "comp") {
+      if (!kgMode()) h += '<button class="pill a' + (S.showAttr ? " on" : "") + '" id="vtAttr" title="叠加属性节点（符号）">属性</button>';
+      h += '<button class="pill c' + (S.showCons ? " on" : "") + '" id="vtCons" title="叠加约束节点（公式）">约束</button>';
+      if (!kgMode()) h += '<button class="pill' + (S.showRel ? " on" : "") + '" id="vtRel" title="显示跨系统关系边">跨系统关系</button>';
+    }
+    if (S.view === "unit") h += '<button class="pill' + (S.unitChain ? " on" : "") + '" id="vtUChain" title="按 chain 字段连接同链相邻单机">同链相邻</button>';
+    if (S.view === "unit") h += '<button class="pill' + (S.unitLabels ? " on" : "") + '" id="vtULab" title="在每条关系连线上常显关系类型标签">关系标签</button>';
+    if (S.view === "g3d") {
+      h += '<select id="vtSrc" title="3D 数据源：单机之间的关系 / 分系统·分组聚合关系 / 完整组成网络">' + '<option value="unit"' + ((S.g3src || "unit") === "unit" ? " selected" : "") + '>单机关系</option>' + '<option value="group"' + (S.g3src === "group" ? " selected" : "") + '>分系统·分组</option>' + '<option value="comp"' + (S.g3src === "comp" ? " selected" : "") + '>组成网络</option></select>';
+      h += '<select id="vtMode" title="3D 布局模式">' + lay3dList().map((m) => '<option value="' + (m.mode || "") + '"' + ((S.mode3d || "") === (m.mode || "") ? " selected" : "") + ">" + esc(m.label) + "</option>").join("") + "</select>";
+      h += '<button class="pill' + (S.labels3d ? " on" : "") + '" id="vtLabels" title="常显全部标签">全部标签</button>';
+      h += '<button class="pill' + (S.rot ? " on" : "") + '" id="vtRot" title="自动旋转">自转</button>';
+    }
+    if (S.view === "comp" || S.view === "unit" || S.view === "g3d") h += '<button class="pill' + (S.hlRel ? " on" : "") + '" id="vtHl" title="点选节点后高亮其直接关联的节点与连线，其余淡化">关联高亮</button>';
+    if (S.view === "comp" || S.view === "unit") h += '<button class="pill' + (S.focusOn ? " on" : "") + '" id="vtFocus" title="只高亮选中节点的直接关联">聚焦选中</button>';
+    if (S.view === "comp" || S.view === "unit" || S.view === "g3d") h += '<button class="pill' + (S.flow ? " on" : "") + '" id="vtFlow" title="虚线流动动画开关">流动</button>';
+    h += '<button class="pill" id="vtRe" title="重新计算布局">重排</button>';
+    box.innerHTML = h;
+    const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+    const vs = $("#vtScope"); if (vs) vs.onchange = (e) => { S.scope = e.target.value; G = null; drawView(); };
+    const rebuild = () => { G = null; buildViewTools(); drawView(); };
+    bind("#vtLF", () => { S.layout = "force"; rebuild(); });
+    bind("#vtLT", () => { S.layout = "tiered"; rebuild(); });
+    bind("#vtAttr", () => { S.showAttr = !S.showAttr; rebuild(); });
+    bind("#vtCons", () => { S.showCons = !S.showCons; rebuild(); });
+    bind("#vtRel", () => { S.showRel = !S.showRel; rebuild(); });
+    bind("#vtUChain", () => { S.unitChain = !S.unitChain; rebuild(); });
+    bind("#vtULab", () => { S.unitLabels = !S.unitLabels; buildViewTools(); drawView(); });
+    bind("#vtLabels", () => { S.labels3d = !S.labels3d; buildViewTools(); });
+    bind("#vtRot", () => { S.rot = !S.rot; buildViewTools(); });
+    bind("#vtFocus", () => { S.focusOn = !S.focusOn; buildViewTools(); drawView(); });
+    bind("#vtHl", () => { S.hlRel = !S.hlRel; buildViewTools(); drawView(); });
+    bind("#vtFlow", () => { S.flow = !S.flow; buildViewTools(); });
+    bind("#vtRe", () => { (S.view === "g3d" ? POS3 : POS).clear(); G = null; drawView(); });
+    const vm = $("#vtMode"); if (vm) vm.onchange = (e) => { S.mode3d = e.target.value || null; G = null; drawView(); };
+    const vsr = $("#vtSrc"); if (vsr) vsr.onchange = (e) => { S.g3src = e.target.value || "unit"; G = null; drawView(); };
+  }
+  const hints = {
+    comp: "组成网络：层级布局 = 盒状知识图谱（虚线流动连线 + 底部约束带）・ 力导向可叠加属性/约束 ・ 青箭头 = chain 有序组成 ・ 橙虚线 = 跨系统关系 ・ 点击节点联动左右面板并高亮其直接关联（青圈）",
+    unit: "单机连接关系图：层级布局下每个方盒 = 一台单机，边框色 = 所属分系统 ・ 箭头虚线 = 图谱中的单机间关系（悬停显示类型）・ 青虚线 = 同一条链路/体制内相邻 ・ 关系类型标签常显在连线上（可用「关系标签」开关）・ 点击单机 → 直接关联的单机与连线高亮，其余淡化",
+    coup: "属性耦合图：同一约束内的属性两两连边，线越粗共现约束越多 ・ 点击属性节点定位到本体",
+    g3d: "3D 视图：数据源可切换（单机关系 = 各单机之间的接口/供电/部署关系 ・ 分系统·分组 = 聚合后的系统间关系 ・ 组成网络 = 全量本体）・ 点选节点高亮其直接关联 ・ 拖动旋转 ・ 滚轮缩放 ・ 10 种布局",
+    dsm: "设计结构矩阵：▸ chain 有序组成 ・ ● 约束耦合 ・ ◆ 两者兼有 ・ 点击单元格选中本体",
+    chain: "按分系统展开的有序单机链（chain 字段）・ 点击单机跳转详情"
+  };
+  $("#viewHint").textContent = hints[S.view] || "";
+  buildLegend(); syncZoomBox();
+}
+function drawView() {
+  if (S.view === "dsm") { buildDSM(); buildLegend(); syncZoomBox(); return; }
+  if (S.view === "chain") { buildChain(); buildLegend(); syncZoomBox(); return; }
+  const three = S.view === "g3d";
+  const sig = [S.view, S.scope, S.showRel, S.showAttr, S.showCons, S.unitChain, S.layout, S.mode3d || "", S.g3src || "unit"].join("|");
+  if (!G || G.sig !== sig) {
+    G = S.view === "coup" ? coupGraph() : S.view === "unit" ? unitGraph() : S.view === "g3d" ? g3dGraph() : compGraph();
+    G.sig = sig; G.scope = S.scope; G.view = S.view; G.rel = S.showRel; G.tiered = false; G.kg = kgMode();
+    ensurePos(G, three);
+    if (three && S.mode3d) {
+      let ok = false;
+      try { if (typeof applyLayout3D === "function") { applyLayout3D(S.mode3d, G, POS3); ok = true; } } catch (e) { ok = false; }
+      if (ok) G.tiered = true; else for (let i = 0; i < 160; i++) simStep(G, true);
+    } else if (!three && S.layout === "tiered" && (S.view === "comp" || S.view === "unit")) {
+      tieredLayout(G, false); G.tiered = true; if (G.kg) fitKg();
+    } else {
+      for (let i = 0; i < 160; i++) simStep(G, three);
+    }
+  }
+  G.focus = (S.focusOn && S.sel) ? focusSet(G, S.sel) : null;
+  G.hl = S.hlRel ? hlSet(G, S.sel) : null; G._hlSel = S.sel;
+  buildLegend(); syncZoomBox();
+}
+/* ---- 选中联动 ---- */
+function selectNode(n) {
+  if (!n) return;
+  if (n.kind === "attr") { S.sel = n.ont || S.sel; S.hlAttr = n.attrId || null; }
+  else if (n.kind === "cons") {
+    const c = DB.constraints.find((x) => x.id === n.consId);
+    const mid = c && c.members && c.members.length ? c.members[0].attributeId : null;
+    const a = mid ? DB.attributes.find((x) => x.id === mid) : null;
+    if (a) S.sel = a.ontologyId;
+    S.hlAttr = mid;
+  } else { S.sel = n.ont || n.id; S.hlAttr = n.ont ? (n.attrId || n.id) : null; }
+  if (S.sel && !S.expanded.has(S.sel)) ancestors(S.sel).forEach((x) => S.expanded.add(x.id));
+  save(); renderTree(); renderDetail(); renderStatus(); drawView();
+}
+/* ---- 交互 ---- */
+let lastProj = null;
+cv.addEventListener("mousedown", (e) => {
+  if (!G) return;
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (S.view === "g3d") { rotating = { x: e.clientX, y: e.clientY, yaw: YAW, pitch: PITCH }; return; }
+  const n = lastProj ? hitNode(mx, my, G, null, (nn) => lastProj[nn.id]) : null;
+  if (n) dragN = n; else panning = { x: e.clientX, y: e.clientY, tx: T.x, ty: T.y };
+});
+window.addEventListener("mousemove", (e) => {
+  const r = cv.getBoundingClientRect();
+  if (rotating) {
+    YAW = rotating.yaw + (e.clientX - rotating.x) * 0.008;
+    PITCH = Math.max(-1.45, Math.min(1.45, rotating.pitch + (e.clientY - rotating.y) * 0.006));
+    return;
+  }
+  if (dragN && lastProj) {
+    if (S.view === "g3d") { /* 3D 不拖节点 */ }
+    else { const p = POS.get(dragN.id); if (p) { p.x = (e.clientX - r.left - r.width / 2 - T.x) / T.k; p.y = (e.clientY - r.top - r.height / 2 - T.y) / T.k; p.vx = p.vy = 0; } }
+    return;
+  }
+  if (panning) { T.x = panning.tx + (e.clientX - panning.x); T.y = panning.ty + (e.clientY - panning.y); return; }
+  if (e.target !== cv || !G || !lastProj) { tip.style.display = "none"; hover = null; cv.style.cursor = "grab"; return; }
+  const n = hitNode(e.clientX - r.left, e.clientY - r.top, G, null, (nn) => lastProj[nn.id]);
+  hover = n;
+  if (n) {
+    const kindTxt = n.kind === "attr" ? "属性" : n.kind === "cons" ? "约束" : n.kind === "unit" ? "单机" : (n.cat || "");
+    tip.innerHTML = '<div class="tt">' + esc(n.label) + '</div><div class="td">' + esc((n.desc || "").slice(0, 130)) + '</div><div class="tm">' + esc(kindTxt) + " ・ " + esc(n.attrId || n.consId || n.id) + (n.ont ? " @ " + esc(n.ont) : "") + "</div>";
+    tip.style.display = "block";
+    const wr = $("#viewWrap").getBoundingClientRect();
+    tip.style.left = Math.min(wr.width - 340, e.clientX - wr.left + 14) + "px";
+    tip.style.top = Math.min(wr.height - 90, e.clientY - wr.top + 12) + "px";
+    cv.style.cursor = "pointer";
+  } else { tip.style.display = "none"; cv.style.cursor = S.view === "g3d" ? "move" : "grab"; }
+});
+window.addEventListener("mouseup", (e) => {
+  if (rotating) {
+    const moved = Math.abs(e.clientX - rotating.x) + Math.abs(e.clientY - rotating.y);
+    rotating = null;
+    if (moved < 5 && G && lastProj) {
+      const r = cv.getBoundingClientRect();
+      selectNode(hitNode(e.clientX - r.left, e.clientY - r.top, G, null, (nn) => lastProj[nn.id]));
+    }
+    return;
+  }
+  if (dragN) selectNode(dragN);
+  dragN = null; panning = null;
+});
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  T.k = Math.max(.25, Math.min(3.5, T.k * f));
+}, { passive: false });
+window.addEventListener("resize", () => drawView());
+/* ---- 主循环 ---- */
+function frame() {
+  const isCv = S.view === "comp" || S.view === "coup" || S.view === "g3d" || S.view === "unit";
+  if (isCv) {
+    if (!G) drawView();
+    if (G) {
+      const three = S.view === "g3d";
+      if (G._hlSel !== S.sel || (S.hlRel ? !G.hl : !!G.hl)) { G.hl = S.hlRel ? hlSet(G, S.sel) : null; G._hlSel = S.sel; }
+      if (!G.tiered) { simStep(G, three); simStep(G, three); }
+      if (three && S.rot) YAW += 0.0035;   /* 3D 自转只动相机，布局模式下同样可用 */
+      lastProj = {}; const rr = draw2D(G, three);
+      G.nodes.forEach((n) => { const p = rr.proj(n); if (p) lastProj[n.id] = p; });
+    }
+  }
+  requestAnimationFrame(frame);
+}
+/* ---- 启动 ---- */
+function boot2() {
+  S.sel = rootId(); S.expanded = new Set(ont().map((o) => o.id)); S.scope = "ALL"; G = null;
+  S.hlAttr = null; S.focusOn = false; S.layout = "tiered"; S.showAttr = false; S.flow = true; S.mode3d = null; S.labels3d = false;
+  S.hlRel = true; S.g3src = "unit"; S.unitLabels = true;
+  POS.clear(); POS3.clear(); T = { k: 1, x: 0, y: 0 };
+  $("#mUser").value = META.user || ""; $("#mProj").value = META.proj || "";
+  const mf = $("#mFile"); if (mf) mf.value = META.file || "";
+  refreshAll();
+}
+(function boot() {
+  if (!loadPersist()) { DB = normalize(JSON.parse(JSON.stringify(SEED))); S.sel = rootId(); S.expanded = new Set(ont().map((o) => o.id)); }
+  if (!S.sel || !ontMap()[S.sel]) S.sel = rootId();
+  if (!S.expanded.size) S.expanded = new Set(ont().map((o) => o.id));
+  $("#mUser").value = META.user || ""; $("#mProj").value = META.proj || "";
+  const mf = $("#mFile"); if (mf && !mf.value) mf.value = META.file || "";
+  refreshAll(); setView("comp");
+  requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>

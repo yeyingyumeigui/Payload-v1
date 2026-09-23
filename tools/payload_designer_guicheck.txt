@@ -1,0 +1,9 @@
+GUICHECK OK — GUI 依赖完整
+GUICHECK start frozen=False PYTHONNET_RUNTIME=netfx
+OK   WebView2 Runtime 注册表                   (True, '153.0.4234.48')
+OK   import clr                             clr imported
+OK   clr.AddReference(WinForms...)          WinForms/Collections/Threading
+OK   import System.Windows.Forms            Application=True String=x
+OK   AddReference(WebView2 interop)         Core+WinForms interop loaded
+OK   import WebView2 type                   WebView2=True
+OK   import webview edgechromium platform   edgechromium module imported

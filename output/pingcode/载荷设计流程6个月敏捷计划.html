@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>载荷设计流程 6 个月敏捷计划 · PingCode 导入包</title>
+<style>
+:root {
+  --ink:#1a1a1a; --sub:#555; --line:#d8d8d8; --bg:#f5f6f8; --card:#fff;
+  --accent:#1f4e79; --accent2:#2e75b6; --ok:#059669; --warn:#d97706; --risk:#dc2626;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Songti SC","SimSun","宋体",serif; line-height:1.75; }
+.wrap { max-width:1180px; margin:0 auto; padding:28px 22px 80px; }
+.toolbar { position:sticky; top:0; z-index:50; background:rgba(245,246,248,.96);
+  backdrop-filter:blur(6px); border-bottom:1px solid var(--line);
+  padding:10px 0; margin-bottom:22px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.btn { border:1px solid var(--accent); background:var(--accent); color:#fff;
+  padding:7px 16px; border-radius:6px; cursor:pointer; font-size:14px;
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+.btn.ghost { background:#fff; color:var(--accent); }
+.btn:hover { opacity:.9; }
+h1 { font-family:"STZhongsong","SimSun",serif; font-size:26px; text-align:center;
+  font-weight:700; margin:6px 0 4px; letter-spacing:1px; }
+.subtitle { text-align:center; color:var(--sub); font-size:14px; margin-bottom:4px;
+  font-family:"Microsoft YaHei",sans-serif; }
+.meta { text-align:center; color:#888; font-size:12.5px; margin-bottom:24px;
+  font-family:"Microsoft YaHei",sans-serif; }
+h2 { font-family:"STZhongsong","SimSun",serif; font-size:19px; color:var(--accent);
+  border-left:5px solid var(--accent2); padding-left:12px; margin:34px 0 14px; }
+h3 { font-size:16px; color:#243; margin:20px 0 8px; font-family:"Microsoft YaHei",sans-serif; }
+p { text-indent:2em; margin:8px 0; font-size:15px; }
+p.noindent { text-indent:0; }
+.lead { background:#eef4fb; border:1px solid #cfe0f2; border-radius:8px;
+  padding:14px 18px; font-size:15.5px; text-indent:0; }
+.lead b { color:var(--accent); }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px; margin:16px 0; }
+.kpi { background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:14px 12px; text-align:center; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.kpi .n { font-size:26px; font-weight:700; color:var(--accent);
+  font-family:"Microsoft YaHei",sans-serif; }
+.kpi .l { font-size:12.5px; color:var(--sub); margin-top:2px;
+  font-family:"Microsoft YaHei",sans-serif; }
+table { width:100%; border-collapse:collapse; margin:12px 0; font-size:13.5px;
+  background:var(--card); font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+th,td { border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+th { background:#e8eef6; color:#1f3a5f; font-weight:600; white-space:nowrap; }
+tr:nth-child(even) td { background:#fafbfc; }
+.tag { display:inline-block; background:#eef2f7; border:1px solid #d5dde8;
+  border-radius:4px; padding:1px 7px; font-size:12px; margin:1px 2px; color:#3a4a5f; }
+.gate { background:#fff7ed; border-left:4px solid var(--warn); }
+.pri-紧急 { color:var(--risk); font-weight:600; }
+.pri-高 { color:var(--warn); }
+.pri-中 { color:#2563eb; }
+/* 流程图 */
+.flow { display:flex; flex-wrap:wrap; gap:0; align-items:stretch; margin:16px 0; }
+.fstage { flex:1 1 150px; min-width:150px; background:var(--card); border:1px solid var(--line);
+  border-radius:8px; padding:10px; position:relative; margin-right:26px; }
+.fstage:last-child { margin-right:0; }
+.fstage:not(:last-child)::after { content:"▶"; position:absolute; right:-20px; top:50%;
+  transform:translateY(-50%); color:var(--accent2); font-size:14px; }
+.fstage .ft { font-weight:700; color:var(--accent); font-size:14px;
+  font-family:"Microsoft YaHei",sans-serif; }
+.fstage .fe { font-size:11.5px; color:#888; margin:2px 0; }
+.fstage .fd { font-size:12px; color:var(--sub); line-height:1.5; }
+.fstage .fg { margin-top:6px; font-size:11.5px; background:#fff7ed; border:1px solid #fcd9a8;
+  color:#92400e; border-radius:4px; padding:2px 6px; display:inline-block; }
+/* 甘特 */
+.gantt { overflow-x:auto; background:var(--card); border:1px solid var(--line);
+  border-radius:8px; padding:10px; }
+.gantt table { font-size:12px; }
+.gantt th { text-align:center; padding:4px 2px; font-size:11px; }
+.gantt td { padding:3px 2px; text-align:center; }
+.gantt td.lab { text-align:left; white-space:nowrap; font-weight:600; padding-left:6px; }
+.cell { height:16px; border-radius:3px; }
+/* WBS */
+.wbs { font-size:13px; }
+.wbs .ep { background:#e8eef6; font-weight:700; }
+.wbs .ft { background:#f2f6fb; }
+.wbs .st { }
+.wbs .tk { color:#555; font-size:12.5px; }
+details { margin:4px 0; }
+summary { cursor:pointer; font-weight:600; color:var(--accent); padding:3px 0;
+  font-family:"Microsoft YaHei",sans-serif; }
+.note { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px;
+  font-size:13.5px; text-indent:0; }
+.warn { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px;
+  font-size:13.5px; text-indent:0; }
+ol,ul { margin:8px 0 8px 1.4em; }
+li { font-size:14px; margin:4px 0; }
+code { background:#eef2f7; padding:1px 5px; border-radius:3px; font-size:12.5px;
+  font-family:Consolas,monospace; }
+.foot { margin-top:40px; padding-top:14px; border-top:1px solid var(--line);
+  color:#999; font-size:12px; text-align:center; font-family:"Microsoft YaHei",sans-serif; }
+@media print {
+  body { background:#fff; }
+  .toolbar { display:none; }
+  .wrap { max-width:100%; padding:0; }
+  h2 { page-break-after:avoid; }
+  table,.gantt,.flow { page-break-inside:avoid; }
+  .kpi { box-shadow:none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="toolbar">
+  <button class="btn" onclick="downloadDOC()">⬇ 下载 DOC</button>
+  <button class="btn ghost" onclick="window.print()">🖨 打印 / 导出 PDF</button>
+  <span style="color:#888;font-size:12.5px;font-family:'Microsoft YaHei',sans-serif;">
+    共 274 个工作项 · 365 故事点 · 1244 h ≈ 155.5 人日</span>
+</div>
+
+<h1>通信有效载荷设计流程 · 六个月敏捷研制计划</h1>
+<div class="subtitle">PingCode 工作项导入包 &nbsp;|&nbsp; 敏捷提效 · 质量门禁双保障</div>
+<div class="meta">编制日期 2026-09-20 &nbsp;·&nbsp; 项目周期 2026-09-21 ~ 2027-03-21（约 6 个月） &nbsp;·&nbsp; 14（1 启动周 + 12 个两周迭代 + 1 发布周）</div>
+
+<div class="lead">
+<b>一句话概要：</b>以「六阶段载荷工程设计流程」为主轴，用 <b>12 个固定两周迭代</b>把需求分析→总体方案→分系统设计→指标校核→平台适配→评审交付串成可度量、可回溯的敏捷流水线；
+通过 <b>DoR/DoD + WIP 限制 + 五道质量门禁(G0–G4) + 自动化三重校验 + 每迭代≥10% 技术债偿还</b>，实现「效率提升不以质量妥协为代价」。
+本计划已展平为 <b>274 个 PingCode 工作项</b>（7 史诗 / 20 特性 / 44 故事 / 203 任务），随附 8 个 CSV 可直接导入。
+</div>
+
+<h2>一、执行摘要</h2>
+<div class="kpis">
+  <div class="kpi"><div class="n">274</div><div class="l">工作项总数</div></div>
+  <div class="kpi"><div class="n">7</div><div class="l">史诗 Epic</div></div>
+  <div class="kpi"><div class="n">20</div><div class="l">特性 Feature</div></div>
+  <div class="kpi"><div class="n">44</div><div class="l">用户故事 Story</div></div>
+  <div class="kpi"><div class="n">203</div><div class="l">任务 Task</div></div>
+  <div class="kpi"><div class="n">365</div><div class="l">故事点合计</div></div>
+  <div class="kpi"><div class="n">1244</div><div class="l">预估工时 (h)</div></div>
+  <div class="kpi"><div class="n">5</div><div class="l">质量门禁 G0–G4</div></div>
+  <div class="kpi"><div class="n">12</div><div class="l">风险登记项</div></div>
+</div>
+<p>项目自 2026-09-21 启动，含 1 个启动周（Sprint 0 敏捷机制落地）、12 个两周迭代（Sprint 1–12 覆盖六阶段研制）与 1 个发布收尾周，至 2027-03-21 交付，历时约 6 个月。
+全部工作项按「史诗→特性→用户故事→任务」四层 WBS 组织，故事点采用斐波那契估算（1/2/3/5/8/13），任务粒度控制在 0.5–2 人日，预估总工时 1244 h ≈ 155.5 人日。</p>
+
+<h2>二、六阶段设计流程与质量门禁</h2>
+<p class="noindent">载荷工程设计遵循六阶段串行推进、门禁阻断的瀑布骨架，每个阶段内部以敏捷迭代方式并行展开。门禁未通过禁止进入下一阶段（PingCode 状态流转强制审批）。</p>
+<div class="flow">
+  <div class="fstage">
+    <div class="ft">需求分析</div>
+    <div class="fe">E1</div>
+    <div class="fd">任务场景→需求澄清闸口→顶层指标预算→频率规划</div>
+    <div class="fg">G0 需求基线</div>
+  </div>  <div class="fstage">
+    <div class="ft">总体方案与体制选择</div>
+    <div class="fe">E2</div>
+    <div class="fd">转发体制(透明/再生/DTP)→天线体制五要素→波束覆盖→货架选型</div>
+    <div class="fg">G1 总体方案 SRR</div>
+  </div>  <div class="fstage">
+    <div class="ft">分系统详细设计</div>
+    <div class="fe">E3</div>
+    <div class="fd">天线/转发器/激光/智能处理四分系统并行 + EMC-热控-供电协同</div>
+    <div class="fg">—</div>
+  </div>  <div class="fstage">
+    <div class="ft">指标校核与闭环</div>
+    <div class="fe">E4</div>
+    <div class="fd">链路预算→余量≥3dB→双回环迭代→三重校验→异常分级</div>
+    <div class="fg">G2 指标校核 PDR</div>
+  </div>  <div class="fstage">
+    <div class="ft">平台/运载适配与集成验证</div>
+    <div class="fe">E5</div>
+    <div class="fd">平台承载/姿态耦合→运载约束→ICD→试验大纲与仿真</div>
+    <div class="fg">G3 集成验证 CDR</div>
+  </div>  <div class="fstage">
+    <div class="ft">评审交付与知识沉淀</div>
+    <div class="fe">E6</div>
+    <div class="fd">方案文档→交付归档→知识图谱/货架库/规则库更新→复盘</div>
+    <div class="fg">G4 交付验收 FRR</div>
+  </div></div>
+<h3>质量门禁定义（G0–G4）</h3>
+<table>
+<tr><th>门禁</th><th>名称</th><th>所在迭代</th><th>通过准则</th><th>阻断规则</th></tr><tr class="gate"><td><b>G0</b></td><td>需求基线评审</td>
+<td>Sprint 2</td><td>需求输入齐套、指标预算分解完成并双人复核、频率规划无冲突、缺项闸口生效、需求基线已签署</td><td>未通过禁止进入下一阶段（状态流转强制审批）</td></tr><tr class="gate"><td><b>G1</b></td><td>总体方案评审 SRR</td>
+<td>Sprint 4</td><td>体制决策有依据、天线方案五要素打分完成、波束与频率规划无冲突、货架缺口风险可控、指标预算闭环</td><td>未通过禁止进入下一阶段（状态流转强制审批）</td></tr><tr class="gate"><td><b>G2</b></td><td>指标校核闭环评审 PDR</td>
+<td>Sprint 9</td><td>全部链路余量≥3dB、三重校验无阻断项、双回环收敛、异常规则生效、质量功耗预算闭环、交叉复核签署</td><td>未通过禁止进入下一阶段（状态流转强制审批）</td></tr><tr class="gate"><td><b>G3</b></td><td>集成验证评审 CDR</td>
+<td>Sprint 11</td><td>ICD 齐套且不一致项清零、试验大纲完整、仿真与模型验证对齐、可靠性分析通过、平台运载适配闭环</td><td>未通过禁止进入下一阶段（状态流转强制审批）</td></tr><tr class="gate"><td><b>G4</b></td><td>交付验收评审 FRR</td>
+<td>Sprint 12</td><td>方案文档齐套且校核通过、交付物归档受控、知识资产更新、度量与复盘完成、验收签署</td><td>未通过禁止进入下一阶段（状态流转强制审批）</td></tr></table>
+<h2>三、敏捷机制：效率与质量的双引擎</h2>
+<h3>3.1 迭代节奏与四类仪式</h3>
+<table>
+<tr><th>仪式</th><th>频率/时间盒</th><th>产出物</th><th>效率作用</th></tr>
+<tr><td>Sprint 计划会</td><td>每迭代首日 2h</td><td>迭代目标、容量核算、任务认领</td><td>聚焦高优先级，限制在制品</td></tr>
+<tr><td>每日站会</td><td>每日 15min</td><td>任务板更新、阻塞项、当日承诺</td><td>快速暴露阻塞，减少等待</td></tr>
+<tr><td>迭代评审会</td><td>每迭代末日 1.5h</td><td>交付物演示、指标核验、门禁判定</td><td>增量可见，及时反馈</td></tr>
+<tr><td>迭代回顾会</td><td>每迭代末日 1h</td><td>改进项清单（责任人+期限）</td><td>持续改进，沉淀最佳实践</td></tr>
+<tr><td>Backlog 梳理会</td><td>每迭代中期 2h</td><td>故事细化、DoR 检查、估算</td><td>保证下迭代就绪，减少返工</td></tr>
+</table>
+<p class="note"><b>仪式执行率要求：</b>连续 2 个迭代四类仪式执行率 100%，作为敏捷成熟度基线度量项。</p>
+
+<h3>3.2 就绪定义 DoR 与完成定义 DoD</h3>
+<table>
+<tr><th>类别</th><th>条目</th><th>PingCode 落地方式</th></tr>
+<tr><td rowspan="3"><b>DoR<br>就绪定义</b></td><td>① 验收标准明确、可测试</td><td>创建校验：验收标准为必填</td></tr>
+<tr><td>② 依赖项（上游输入/接口/资源）就绪</td><td>依赖关系字段 + 阻塞标记</td></tr>
+<tr><td>③ 可估算、粒度 0.5–2 人日</td><td>故事点/预估工时必填</td></tr>
+<tr><td rowspan="4"><b>DoD<br>完成定义</b></td><td>① 设计/实现完成</td><td>状态流转至「已完成」前置</td></tr>
+<tr><td>② 三重校验（语法/语义/合规）通过</td><td>DoD 检查项，自动校核</td></tr>
+<tr><td>③ 文档归档、版本受控</td><td>关联交付物附件</td></tr>
+<tr><td>④ 评审/门禁通过</td><td>阶段关闭强制审批</td></tr>
+</table>
+
+<h3>3.3 WIP 限制与技术债</h3>
+<ul>
+<li><b>WIP 限制：</b>人均并行在制任务 ≤ 2，看板每列在制品 ≤ 5，避免多任务切换损耗，缩短周期时间。</li>
+<li><b>技术债偿还：</b>每迭代预留 ≥ 10% 容量用于偿还技术债（工具固化、模型修正、文档补全），防止债务累积拖垮后期效率。</li>
+<li><b>关键计算双人交叉复核：</b>链路预算、指标分配等关键计算实行双人复核并签署，杜绝单点错误。</li>
+</ul>
+
+<h3>3.4 自动化校核替代人工检查</h3>
+<p>将既有工程知识固化为自动校核规则，作为 DoD 必过项，人工检查项减少 ≥ 50%，校核可复现、可审计：</p>
+<table>
+<tr><th>校验层</th><th>内容</th><th>规则来源</th></tr>
+<tr><td>语法校验</td><td>文档要素完整性（章节/表格/单位）</td><td>文档模板规则</td></tr>
+<tr><td>语义校验</td><td>指标一致性（EIRP/G-T 满足需求、质量功耗在平台内、工作模式匹配）</td><td>25 条工程约束</td></tr>
+<tr><td>合规校验</td><td>余量≥3dB、频段-产品匹配无错配、货架优先</td><td>25 条工程约束 + 合规库</td></tr>
+<tr><td>异常分级</td><td>L1 自动降级(8) / L2 告警放行(16) / L3 中止转人工(6)</td><td>30 条异常规则，覆盖 11 环节</td></tr>
+</table>
+
+<h3>3.5 双回环迭代优化</h3>
+<table>
+<tr><th>回环</th><th>触发条件</th><th>调整手段（优先级）</th><th>迭代上限</th></tr>
+<tr><td>内环（平台可行性）</td><td>质量/功耗超平台承载</td><td>换天线/换分系统方案 → 升级平台</td><td>≤ 3 次</td></tr>
+<tr><td>外环（链路余量）</td><td>余量 M &lt; 3dB</td><td>降阶调制 → 增 EIRP → 减带宽 → 放宽可用性 → 换天线重选</td><td>≤ 2 次</td></tr>
+</table>
+<p class="warn"><b>回环耗尽处置：</b>内/外环迭代达上限仍未收敛，转 L3 人工决策（中止并生成人工决策任务），确保问题不被掩盖。</p>
+
+<h3>3.6 度量指标（敏捷 + 质量）</h3>
+<table>
+<tr><th>维度</th><th>指标</th><th>目标</th></tr>
+<tr><td rowspan="3">效率</td><td>迭代速率（故事点/迭代）</td><td>稳定在容量 ±15%</td></tr>
+<tr><td>周期时间（故事创建→完成）</td><td>逐迭代下降</td></tr>
+<tr><td>仪式执行率</td><td>连续 2 迭代 100%</td></tr>
+<tr><td rowspan="4">质量</td><td>质量门禁一次通过率</td><td>≥ 90%</td></tr>
+<tr><td>缺陷密度 / 返工率</td><td>逐迭代下降</td></tr>
+<tr><td>链路余量达标率（M≥3dB）</td><td>100%</td></tr>
+<tr><td>三重校验阻断项清零率</td><td>阶段关闭前 100%</td></tr>
+</table>
+<h2>四、迭代甘特图</h2><div class="gantt"><table><tr><th style="text-align:left">史诗 \ 迭代</th><th>S00</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th><th>S6</th><th>S7</th><th>S8</th><th>S9</th><th>S10</th><th>S11</th><th>S12</th><th>发布</th></tr><tr><td class="lab">E0 敏捷研发机制与质量保</td><td><div class="cell" style="background:#8b5cf6"></div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td class="lab">E1 需求分析与载荷指标体</td><td></td><td><div class="cell" style="background:#2563eb"></div></td><td><div class="cell" style="background:#2563eb"></div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td class="lab">E2 载荷总体方案设计与体</td><td></td><td></td><td></td><td><div class="cell" style="background:#0891b2"></div></td><td><div class="cell" style="background:#0891b2"></div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td class="lab">E3 四分系统详细设计</td><td></td><td></td><td></td><td></td><td></td><td><div class="cell" style="background:#059669"></div></td><td><div class="cell" style="background:#059669"></div></td><td><div class="cell" style="background:#059669"></div></td><td><div class="cell" style="background:#059669"></div></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td class="lab">E4 指标校核与链路预算闭</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="cell" style="background:#d97706"></div></td><td><div class="cell" style="background:#d97706"></div></td><td><div class="cell" style="background:#d97706"></div></td><td></td><td></td><td></td><td></td></tr><tr><td class="lab">E5 平台/运载适配与集成</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="cell" style="background:#dc2626"></div></td><td><div class="cell" style="background:#dc2626"></div></td><td></td><td></td></tr><tr><td class="lab">E6 方案评审、交付与知识</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="cell" style="background:#7c3aed"></div></td><td></td></tr><tr><td class="lab" style="color:#92400e">质量门禁</td><td></td><td></td><td><div class="cell" style="background:#f59e0b" title="G0"></div></td><td></td><td><div class="cell" style="background:#f59e0b" title="G1"></div></td><td></td><td></td><td></td><td></td><td><div class="cell" style="background:#f59e0b" title="G2"></div></td><td></td><td><div class="cell" style="background:#f59e0b" title="G3"></div></td><td><div class="cell" style="background:#f59e0b" title="G4"></div></td><td></td></tr></table></div><p class="noindent" style="font-size:12.5px;color:#888">色条=史诗跨迭代区间；橙色=质量门禁所在迭代。S0=启动周，S1–S12=两周迭代，发布=收尾周。</p><h2>五、迭代日历与目标</h2><table><tr><th>迭代</th><th>开始</th><th>结束</th><th>容量(点)</th><th>迭代目标</th></tr><tr><td><b>Sprint 0 · 启动准备</b></td><td>2026-09-21</td><td>2026-09-27</td>
+<td style="text-align:center">20</td><td>敏捷机制落地：DoR/DoD、WIP 限制、质量门禁 G0-G4 定义、PingCode 项目空间与工作项模板配置、Backlog 初始化</td></tr><tr><td><b>Sprint 1</b></td><td>2026-09-28</td><td>2026-10-11</td>
+<td style="text-align:center">30</td><td>需求基线：任务场景梳理、需求澄清闸口、顶层指标预算（EIRP/G-T/容量/质量/功耗）建立并通过 G0 评审</td></tr><tr><td><b>Sprint 2</b></td><td>2026-10-12</td><td>2026-10-25</td>
+<td style="text-align:center">40</td><td>频率规划与轨道资源协调；指标分解到分系统；DoR/DoD 与 WIP 机制运行满一个迭代</td></tr><tr><td><b>Sprint 3</b></td><td>2026-10-26</td><td>2026-11-08</td>
+<td style="text-align:center">40</td><td>转发体制选型（透明/再生/DTP）决策完成；单机链定义；体制对比矩阵评审</td></tr><tr><td><b>Sprint 4</b></td><td>2026-11-09</td><td>2026-11-22</td>
+<td style="text-align:center">40</td><td>天线体制与构型方案确定（五要素加权）；波束方案与覆盖设计；货架缺口清单 → G1 总体方案评审(SRR)</td></tr><tr><td><b>Sprint 5</b></td><td>2026-11-23</td><td>2026-12-06</td>
+<td style="text-align:center">40</td><td>天线分系统详细设计启动：有源阵面 T/R 与幅相一致性、反射面精度与展开机构</td></tr><tr><td><b>Sprint 6</b></td><td>2026-12-07</td><td>2026-12-20</td>
+<td style="text-align:center">40</td><td>天线射频通道 + 转发器接收通道/功率放大详细设计；EMC 隔离方案</td></tr><tr><td><b>Sprint 7</b></td><td>2026-12-21</td><td>2027-01-03</td>
+<td style="text-align:center">40</td><td>转发器 DTP 数字化与交换设计；链路预算首轮闭环（FSPL/C-N0/C-N/余量）</td></tr><tr><td><b>Sprint 8</b></td><td>2027-01-04</td><td>2027-01-17</td>
+<td style="text-align:center">40</td><td>激光通信分系统 ATP 与光收发设计；智能处理分系统在轨处理与数据链路 → G2 指标校核评审(PDR)</td></tr><tr><td><b>Sprint 9</b></td><td>2027-01-18</td><td>2027-01-31</td>
+<td style="text-align:center">40</td><td>双回环迭代优化（内环平台可行性/外环链路余量）；三重校验体系与异常分级落地</td></tr><tr><td><b>Sprint 10</b></td><td>2027-02-01</td><td>2027-02-14</td>
+<td style="text-align:center">40</td><td>平台承载/姿态耦合与运载发射约束校核；分系统集成接口 ICD 定义</td></tr><tr><td><b>Sprint 11</b></td><td>2027-02-15</td><td>2027-02-28</td>
+<td style="text-align:center">40</td><td>集成验证试验策划与数字仿真（天线方向图/通道S参数/ATP建链/波束赋形） → G3 集成验证评审(CDR)</td></tr><tr><td><b>Sprint 12</b></td><td>2027-03-01</td><td>2027-03-14</td>
+<td style="text-align:center">30</td><td>方案文档编制与交付物归档；知识图谱/货架库/规则库更新；项目复盘 → G4 交付验收评审(FRR)</td></tr><tr><td><b>发布与收尾</b></td><td>2027-03-15</td><td>2027-03-21</td>
+<td style="text-align:center">15</td><td>基线归档、遗留缺陷清零、技术债偿还、复盘改进项入库、下一型号复用模板固化</td></tr></table><h2>六、WBS 工作分解结构</h2><p class="noindent">点击展开各史诗查看「特性→故事→任务」四层分解。故事含故事点与验收标准，任务含预估工时、负责角色与迭代。</p><div class="wbs"><details open>
+<summary style="border-left:5px solid #8b5cf6;padding-left:10px">
+E0 · E0 敏捷研发机制与质量保障体系
+<span style="color:#888;font-weight:400;font-size:12px">（23 点 / 72h / Sprint 0 · 启动准备 起 / 优先级 <span class="pri-高">高</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">贯穿 6 个月的敏捷协作与质量保障基础设施。以固定两周迭代节奏、明确 DoR/DoD、WIP 限制、五道质量门禁(G0-G4)、技术债偿还与自动化校核，实现「效率提升不以质量妥协为代价」。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F0.1 敏捷仪式与迭代节奏</b></td>
+<td>Sprint 0 · 启动准备</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F0.1-S1 建立固定迭代节奏与四类敏捷仪式</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 12 个两周迭代日历已发布；② 计划会/站会/评审会/回顾会的时间盒与产出物模板已归档；③ 连续 2 个迭代仪式执行率 100%</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 配置 PingCode 迭代与日历（12 迭代+发布）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">3h</td><td>SM</td>
+<td><span class="tag">工具</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定 Sprint 计划会议程与容量核算模板（2h/迭代首日）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">流程</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定每日站会规则（15min，任务板+阻塞项+当日承诺）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">2h</td><td>SM</td>
+<td><span class="tag">流程</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定迭代评审会议程（交付物演示+指标核验）与回顾会模板</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">流程</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立 Backlog 梳理会机制（每迭代中期，2h）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">3h</td><td>PO</td>
+<td><span class="tag">流程</span></td></tr><tr class="st"><td>故事</td><td>F0.1-S2 定义 DoR/DoD 与 WIP 限制</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① DoR 三条件（验收标准明确/依赖就绪/可估算）落地为 PingCode 必填字段；② DoD 四条件（设计完成+校核通过+文档归档+评审通过）写入工作项模板；③ WIP：人均并行≤2、看板列在制≤5；④ 任务粒度全部在 0.5~2 人日</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 编写 DoR 就绪定义清单并配置为创建校验规则</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>PO</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 编写 DoD 完成定义（含三重校核与归档要求）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>技术负责人</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 配置看板 WIP 限制（每列≤5、人均≤2）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">2h</td><td>SM</td>
+<td><span class="tag">工具</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定任务拆分粒度规范（0.5~2 人日）与示例</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">3h</td><td>SM</td>
+<td><span class="tag">流程</span></td></tr><tr class="st"><td>故事</td><td>F0.1-S3 建立质量门禁 G0-G4 与技术债机制</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① G0 需求基线/G1 总体方案(SRR)/G2 指标校核(PDR)/G3 集成验证(CDR)/G4 交付验收(FRR) 五道门禁的通过准则、评审清单、责任人已发布；② 门禁未通过禁止进入下阶段（PingCode 状态流转强制）；③ 技术债登记表建立，每迭代预留≥10%容量偿还；④ 关键计算实行双人交叉复核</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 定义五道质量门禁的通过准则与评审清单</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">8h</td><td>技术负责人</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 在 PingCode 配置门禁审批流（阶段关闭需审批）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">工具</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立技术债登记表与每迭代 10% 偿还容量规则</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>技术负责人</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定关键计算双人交叉复核制度（链路预算/指标分配）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立风险库模板（影响×概率打分、触发阈值、缓解人）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">质量</span></td></tr><tr class="st"><td>故事</td><td>F0.1-S4 配置自动化校核以替代人工检查</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 三重校验（语法/语义/合规）作为 DoD 必过项；② 25 条工程约束与 30 条异常分级规则(L1/L2/L3)接入工作流；③ 人工检查项减少≥50%，校核可复现、可审计</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 将三重校验清单固化为 DoD 检查项</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">自动化</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 接入 25 条工程约束作为自动校核规则</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 接入 30 条异常分级规则（L1自动降级/L2告警放行/L3中止转人工）</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 配置逾期提醒、门禁前置预警与自动分派规则</td>
+<td>Sprint 0 · 启动准备</td><td style="text-align:center">3h</td><td>SM</td>
+<td><span class="tag">工具</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #2563eb;padding-left:10px">
+E1 · E1 需求分析与载荷指标体系建立
+<span style="color:#888;font-weight:400;font-size:12px">（42 点 / 136h / Sprint 1 起 / 优先级 <span class="pri-紧急">紧急</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第一阶段：把任务需求转化为可估算、可校核的载荷指标基线。产出需求基线、指标预算与频率规划，通过 G0 门禁后进入方案设计。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F1.1 任务需求解析与场景定义</b></td>
+<td>Sprint 1</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F1.1-S1 梳理任务场景与业务需求输入</td>
+<td>Sprint 1</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 覆盖 GEO 高通量/LEO 宽带星座/手机直连(D2D)/遥感数传四类场景；② 每场景明确覆盖区、可用性、容量、寿命、工作模式；③ 需求输入清单（任务书/用户协议/频率协调文件）齐套率 100%</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 收集任务书与用户需求输入并建立清单</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>PO</td>
+<td><span class="tag">需求</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 梳理四类典型任务场景与业务模式</td>
+<td>Sprint 1</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">需求</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立场景-指标映射表（覆盖/可用性/容量/寿命/模式）</td>
+<td>Sprint 1</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">需求</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 明确轨道类型与覆盖特性（GEO/MEO/LEO/SSO/HEO）</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>轨道工程师</td>
+<td><span class="tag">需求</span></td></tr><tr class="st"><td>故事</td><td>F1.1-S2 建立需求澄清与缺项闸口机制</td>
+<td>Sprint 1</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 阻断级缺项（轨道/频段/EIRP/G-T/容量任一缺失）100% 拦截，不得进入选型；② 告警级缺项可带条件推进并记录；③ 澄清问答模板覆盖 7 要素；④ 模糊需求测试用例全部正确中断</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 定义阻断级/告警级缺项清单与拦截规则</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>PO</td>
+<td><span class="tag">质量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 编制需求澄清问答模板（轨道/频段/EIRP/G-T/容量/寿命/模式）</td>
+<td>Sprint 1</td><td style="text-align:center">4h</td><td>PO</td>
+<td><span class="tag">需求</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 实现缺项自动检出与澄清任务自动创建</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="st"><td>故事</td><td>F1.1-S3 需求基线冻结与变更控制</td>
+<td>Sprint 1</td><td style="text-align:center">3</td><td>—</td>
+<td style="font-size:12px">① 需求基线版本化归档；② 变更须提交影响分析（指标/进度/成本）并经 CCB 审批；③ 变更记录可追溯率 100%</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立需求基线与版本归档规则</td>
+<td>Sprint 1</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">配置管理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 制定需求变更控制流程（影响分析+CCB审批）</td>
+<td>Sprint 1</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">配置管理</span></td></tr><tr class="ft"><td>特性</td><td><b>F1.2 载荷指标体系与预算分解</b></td>
+<td>Sprint 1</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F1.2-S1 建立顶层指标预算（EIRP/G-T/容量/质量/功耗）</td>
+<td>Sprint 1</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① EIRP 预算按 P_out+G_ant−L_feed−L_tx 分解到功放与天线；② G/T 预算按 G_ant−10lg(T_sys) 分解到天线增益与 LNA 噪声系数；③ 容量预算按 N_beam×B_beam×η×k_reuse 分解；④ 质量/功耗分解到四个分系统并保留≥10% 裕度；⑤ 双人交叉复核通过</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ EIRP 预算分解（功放功率/天线增益/馈损/通道插损）</td>
+<td>Sprint 1</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ G/T 预算分解（天线增益 vs 系统噪声温度/LNA噪声系数）</td>
+<td>Sprint 1</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 容量预算（波束数×单波束带宽×频谱效率×复用因子）</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 质量预算分系统分解（含≥10%裕度）</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>结构工程师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 功耗预算分系统分解（峰值/均值区分）</td>
+<td>Sprint 1</td><td style="text-align:center">6h</td><td>电源工程师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 指标预算交叉复核与基线签署</td>
+<td>Sprint 1</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">质量</span></td></tr><tr class="ft"><td>特性</td><td><b>F1.3 频率规划与轨道资源协调</b></td>
+<td>Sprint 2</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F1.3-S1 频段选择与频率规划</td>
+<td>Sprint 2</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 频段选择权衡（雨衰/口径/器件工艺/协调难度）有量化对比；② 波束数×单波束带宽 ≤ 可用总带宽×复用因子（无频率冲突）；③ 频率指配符合 ITU-R S.466，等效限值符合 S.1528</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频段权衡分析（L/S/C/X/Ku/Ka/Q-V/激光）</td>
+<td>Sprint 2</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">频率</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频率规划与复用色数方案（4色/7色）</td>
+<td>Sprint 2</td><td style="text-align:center">8h</td><td>频率工程师</td>
+<td><span class="tag">频率</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频率指配与邻星协调计算（ITU-R S.466/S.1528）</td>
+<td>Sprint 2</td><td style="text-align:center">8h</td><td>频率工程师</td>
+<td><span class="tag">合规</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 雨衰与可用性核算（A(p)∝p^-0.6，按仰角归一）</td>
+<td>Sprint 2</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="st"><td>故事</td><td>F1.3-S2 轨道资源与覆盖特性核算</td>
+<td>Sprint 2</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 轨道高度/倾角/周期与覆盖区、重访周期、时延核算完成；② 星地斜距与最小仰角确定；③ 星座构型（如适用）相位关系明确</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 轨道参数与覆盖特性核算</td>
+<td>Sprint 2</td><td style="text-align:center">6h</td><td>轨道工程师</td>
+<td><span class="tag">轨道</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星地斜距与最小仰角确定（链路预算输入）</td>
+<td>Sprint 2</td><td style="text-align:center">4h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星座构型与星间几何关系分析</td>
+<td>Sprint 2</td><td style="text-align:center">6h</td><td>轨道工程师</td>
+<td><span class="tag">轨道</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #0891b2;padding-left:10px">
+E2 · E2 载荷总体方案设计与体制选择
+<span style="color:#888;font-weight:400;font-size:12px">（45 点 / 144h / Sprint 3 起 / 优先级 <span class="pri-紧急">紧急</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第二阶段：确定转发体制、天线体制与构型方案，完成货架产品选型与缺口识别，通过 G1(SRR)。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F2.1 转发体制选型</b></td>
+<td>Sprint 3</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F2.1-S1 透明/再生/DTP 三体制对比与决策</td>
+<td>Sprint 3</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 对比矩阵覆盖余量/灵活度/功耗/质量/成本/成熟度/时延 7 维并加权打分；② 余量不足时的体制升级判据明确（ΔM_reg≥3dB 触发再生/DTP）；③ 决策结论有评审记录与偏离项说明</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 建立体制对比矩阵（7 维加权打分）</td>
+<td>Sprint 3</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 透明体制优劣与适用场景分析</td>
+<td>Sprint 3</td><td style="text-align:center">4h</td><td>总体设计师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 再生体制余量提升(3~6dB)与时延代价核算</td>
+<td>Sprint 3</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ DTP 柔性体制在轨重构能力定义（波束/带宽/功率/路由）</td>
+<td>Sprint 3</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 体制决策评审与结论归档</td>
+<td>Sprint 3</td><td style="text-align:center">4h</td><td>技术负责人</td>
+<td><span class="tag">评审</span></td></tr><tr class="st"><td>故事</td><td>F2.1-S2 定义各体制的组成单机链</td>
+<td>Sprint 3</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 透明链 LNA→DCONV→IMUX→均衡→TWTA→OMUX→UCONV→开关矩阵 完整；② 再生链含解调/译码/路由/编码/调制；③ DTP 链含 ADC→交换矩阵→DAC→MPA；④ 单机链与知识图谱 chain 字段一致</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 透明转发单机链定义与接口梳理</td>
+<td>Sprint 3</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">单机链</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 再生体制单机链定义（基带+路由）</td>
+<td>Sprint 3</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">单机链</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ DTP 体制单机链定义（数字化+交换+功率池）</td>
+<td>Sprint 3</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">单机链</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 单机链与知识图谱 chain 字段对齐校验</td>
+<td>Sprint 3</td><td style="text-align:center">4h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="ft"><td>特性</td><td><b>F2.2 天线体制与构型方案</b></td>
+<td>Sprint 4</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F2.2-S1 天线体制五要素加权选型</td>
+<td>Sprint 4</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 按 EIRP(30)/G-T(25)/重量(20)/功耗(15)/工作模式(10) 五要素加权打分，含货架水平 0.5 系数修正；② 频段硬过滤无错配；③ 工作模式覆盖需求模式（单波束/多波束/波束跳变/在轨重构）；④ 首选与备选方案各≥1 个</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 实现五要素加权打分模型（30/25/20/15/10）</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">选型</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 相控阵 vs 反射阵 vs 反射面 vs 伞状构型对比</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>天线设计师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 口径/阵元数反推（G_pa=10lg(N_el×η)+G_el；G_refl=10lg(η(πD/λ)²)）</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>天线设计师</td>
+<td><span class="tag">指标</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频段硬过滤与工作模式匹配校核</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">选型</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 输出首选/备选天线方案与打分依据</td>
+<td>Sprint 4</td><td style="text-align:center">4h</td><td>天线设计师</td>
+<td><span class="tag">选型</span></td></tr><tr class="st"><td>故事</td><td>F2.2-S2 波束方案与覆盖设计</td>
+<td>Sprint 4</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 波束数、波束宽度 θ_3dB≈70λ/D、复用色数规划完成且满足 c-13 频率约束；② 波束赋形通道数≥波束端口数≥调度能力≥波束数（c-25 一致性）；③ 覆盖区 EIRP/G-T 等值线图输出</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束数与波束宽度规划</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">波束</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频率复用色数与波束排布设计</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>频率工程师</td>
+<td><span class="tag">波束</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束跳变/在轨重构模式定义</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">波束</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 覆盖区仿真与 EIRP/G-T 等值线图</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>仿真工程师</td>
+<td><span class="tag">仿真</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束链路能力一致性校核（c-25）</td>
+<td>Sprint 4</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">校核</span></td></tr><tr class="ft"><td>特性</td><td><b>F2.3 货架产品选型与缺口管理</b></td>
+<td>Sprint 4</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F2.3-S1 货架优先选型与缺口识别</td>
+<td>Sprint 4</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 选型优先级：飞行继承货架(4)&gt;飞行继承(3)&gt;货架在研转货架(2)&gt;定制(1)；② 货架命中率≥80%；③ 每项缺口记录需求、风险、研制周期与缓解措施；④ 缺口数 N_gap 有收敛计划</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 货架产品库盘点与真实产品数据接入</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">货架</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 实现货架优先级排序与缺口自动检出</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">选型</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 缺口项风险评估与研制周期调查</td>
+<td>Sprint 4</td><td style="text-align:center">8h</td><td>PM</td>
+<td><span class="tag">风险</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 供应商能力与批产可行性调查</td>
+<td>Sprint 4</td><td style="text-align:center">6h</td><td>采购</td>
+<td><span class="tag">货架</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #059669;padding-left:10px">
+E3 · E3 四分系统详细设计
+<span style="color:#888;font-weight:400;font-size:12px">（124 点 / 430h / Sprint 5 起 / 优先级 <span class="pri-紧急">紧急</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第三阶段：天线/转发器/激光/智能处理四分系统并行详细设计，含射频链路单机配置与 EMC-热控-供电协同。四分系统可由四个小组并行推进（敏捷并行开发），通过接口 ICD 与集成迭代收敛。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F3.1 天线分系统详细设计</b></td>
+<td>Sprint 5</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F3.1-S1 有源阵面与 T/R 组件设计</td>
+<td>Sprint 5</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 阵元数 N_el 满足增益需求；② 幅相一致性 Δ_amp≤0.5dB、Δ_phs≤5°；③ 阵面热控使结温 T_j≤125℃；④ 阵面总功耗 ≈ N_el×P_tr 在预算内；⑤ 波束赋形网络通道数≥波束数</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ T/R 组件选型与阵元数确定</td>
+<td>Sprint 5</td><td style="text-align:center">8h</td><td>天线设计师</td>
+<td><span class="tag">阵面</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 幅相一致性指标分配与校准方案设计</td>
+<td>Sprint 5</td><td style="text-align:center">8h</td><td>天线设计师</td>
+<td><span class="tag">阵面</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 阵面热控设计与结温校核（≤125℃）</td>
+<td>Sprint 5</td><td style="text-align:center">8h</td><td>热控工程师</td>
+<td><span class="tag">热控</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 阵面功耗核算与供电峰值校核</td>
+<td>Sprint 5</td><td style="text-align:center">6h</td><td>电源工程师</td>
+<td><span class="tag">供电</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束赋形网络（ABF/DBF）通道配置</td>
+<td>Sprint 5</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">阵面</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 移相器位数与指向量化误差核算</td>
+<td>Sprint 5</td><td style="text-align:center">4h</td><td>天线设计师</td>
+<td><span class="tag">阵面</span></td></tr><tr class="st"><td>故事</td><td>F3.1-S2 反射面/展开机构与电气性能设计</td>
+<td>Sprint 5</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 面精度 δ_surf≤λ/32（Ka≈0.27mm）且展开到位精度 δ_dep≤δ_surf；② 旁瓣 SLL≤−20dB（ITU-R S.1323）；③ 圆极化轴比 AR≤3dB；④ 馈源照射效率满足总增益要求</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 面精度指标分配与校核（≤λ/32）</td>
+<td>Sprint 5</td><td style="text-align:center">6h</td><td>结构工程师</td>
+<td><span class="tag">结构</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 展开机构方案与到位精度/锁定可靠性设计</td>
+<td>Sprint 5</td><td style="text-align:center">8h</td><td>结构工程师</td>
+<td><span class="tag">结构</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 旁瓣电平与方向图合规校核（S.1323）</td>
+<td>Sprint 5</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">合规</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 馈源照射效率与轴比设计（AR≤3dB）</td>
+<td>Sprint 5</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">电气</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束校准网络精度设计</td>
+<td>Sprint 5</td><td style="text-align:center">4h</td><td>天线设计师</td>
+<td><span class="tag">校准</span></td></tr><tr class="st"><td>故事</td><td>F3.1-S3 天线射频通道设计（发射/接收/波束链路）</td>
+<td>Sprint 6</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 发射通道插损 L_tx 计入 EIRP 预算且功率合成效率达标；② 接收通道噪声温度 T_sys 满足 G/T；③ 环行器隔离度≥100dB；④ 三条链路单机链与知识图谱一致</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 发射通道插损预算与功率合成效率设计</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">射频链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 接收通道噪声温度分配（T_sys）</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">射频链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 环行器/隔离器选型与收发共用方案（≥100dB）</td>
+<td>Sprint 6</td><td style="text-align:center">4h</td><td>天线设计师</td>
+<td><span class="tag">射频链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 收发滤波器带外抑制与镜像抑制设计</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">射频链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束端口/切换矩阵/指向机构配置</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>天线设计师</td>
+<td><span class="tag">射频链路</span></td></tr><tr class="ft"><td>特性</td><td><b>F3.2 转发器分系统详细设计</b></td>
+<td>Sprint 6</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F3.2-S1 接收通道与变频设计</td>
+<td>Sprint 6</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① LNA 噪声系数满足 G/T 分配（Ka≤1.6dB/Ku≤1.2dB/L≤0.8dB）且 A/B 冷备；② IMUX 通道数与间隔匹配频率规划；③ 本振相位噪声不恶化 EVM；④ 频段与任务频段一致无错配</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ LNA 噪声系数/增益选型与冗余配置</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">接收</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ IMUX 通道数与通道间隔设计</td>
+<td>Sprint 6</td><td style="text-align:center">4h</td><td>转发器设计师</td>
+<td><span class="tag">接收</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 下变频方案与镜像抑制设计</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">接收</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 本振频率源相位噪声指标分配</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">接收</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 接收通道单机频段一致性校核（防错配）</td>
+<td>Sprint 6</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">合规</span></td></tr><tr class="st"><td>故事</td><td>F3.2-S2 功率放大与输出多工设计</td>
+<td>Sprint 6</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① TWTA/SSPA/MPA 选型满足 EIRP 且 P_dc=P_out/η 在功耗预算内；② 行波管效率≥58%、固态效率合理；③ 线性度/回退量满足高阶调制 EVM（IMD3 达标）；④ OMUX 通道插损与隔离达标；⑤ EPC 保护完备</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ TWTA/SSPA/MPA 选型与效率-功率权衡</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">功放</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 直流功耗核算（P_dc=P_out/η）与供电校核</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>电源工程师</td>
+<td><span class="tag">供电</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 线性度/回退量与三阶交调(IMD3)分析</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">功放</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ OMUX 通道数/插损/隔离设计与重量核算</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">功放</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ MPA 功率池单管故障重构方案设计</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">可靠性</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ EPC 高压电源与过流过压保护设计</td>
+<td>Sprint 6</td><td style="text-align:center">4h</td><td>电源工程师</td>
+<td><span class="tag">功放</span></td></tr><tr class="st"><td>故事</td><td>F3.2-S3 DTP 数字化与星上交换设计</td>
+<td>Sprint 7</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① N_ch×B_sub≥B_trp；② C_sw≥N_beam×B_beam（无交换瓶颈）；③ ADC/DAC 采样带宽、ENOB、SFDR 满足信号质量；④ 在轨重构时间满足业务切换要求；⑤ 子带粒度与功耗权衡有量化结论</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 子带带宽 B_sub 与信道数 N_ch 设计（N_ch×B_sub≥B_trp）</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">DTP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星上交换矩阵容量 C_sw 与非阻塞架构设计</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">DTP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ ADC 采样带宽/ENOB 与 DAC SFDR 指标分配</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">DTP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 在轨重构时间与重构粒度定义</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">DTP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 子带粒度-功耗-灵活度权衡分析与优化</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>转发器设计师</td>
+<td><span class="tag">DTP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 交换容量瓶颈校核（c-14）</td>
+<td>Sprint 7</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">校核</span></td></tr><tr class="st"><td>故事</td><td>F3.2-S4 再生基带与星上路由设计（如选再生）</td>
+<td>Sprint 7</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① MODCOD 阶梯与 ACM/VCM 自适应策略由 C/N 反推（先有 C/N 再定体制）；② LDPC/BCH 编码增益纳入链路预算；③ 星上路由表规模与选路时延满足组网要求</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ MODCOD 阶梯定义与 ACM/VCM 自适应策略</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>基带设计师</td>
+<td><span class="tag">再生</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ LDPC/BCH 编码方案与编码增益核算</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>基带设计师</td>
+<td><span class="tag">再生</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 解调门限与体制降阶策略（阶梯最低阶后处置）</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>基带设计师</td>
+<td><span class="tag">再生</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星上路由协议与路由表规模设计</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>基带设计师</td>
+<td><span class="tag">再生</span></td></tr><tr class="ft"><td>特性</td><td><b>F3.3 激光通信分系统设计</b></td>
+<td>Sprint 8</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F3.3-S1 ATP 捕获跟踪瞄准设计</td>
+<td>Sprint 8</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 建链捕获概率 P_acq≥95%；② 精跟踪精度 σ_track≤1μrad；③ 捕获时间满足星座组网可用度；④ 指向抖动 σ_jit 引起的耦合损耗计入链路余量；⑤ FSM 偏转范围与带宽覆盖平台微振动</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 粗跟踪万向架范围与捕获概率设计（≥95%）</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>激光设计师</td>
+<td><span class="tag">ATP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ FSM 精跟踪精度（≤1μrad）与偏转范围/带宽设计</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>激光设计师</td>
+<td><span class="tag">ATP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 信标激光器功率/发散角与捕获时间优化</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>激光设计师</td>
+<td><span class="tag">ATP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 捕获跟踪传感器视场与探测灵敏度设计</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>激光设计师</td>
+<td><span class="tag">ATP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 指向抖动与平台微振动耦合分析</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>激光设计师</td>
+<td><span class="tag">ATP</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ ATP 状态机与建链/断链管理逻辑</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>激光设计师</td>
+<td><span class="tag">控制</span></td></tr><tr class="st"><td>故事</td><td>F3.3-S2 光收发与激光链路设计</td>
+<td>Sprint 8</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 光学天线口径（如 Φ135mm）与发散角满足 EIRP_opt≈105dBW；② DPSK 体制门限≈8dB、灵敏度优于 OOK 约 6dB；③ 星间 ISL（约 5000km/10Gbps 量级）余量达标；④ 星地链路云遮蔽概率有站址分集规避方案</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 光学天线口径与发散角设计</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>激光设计师</td>
+<td><span class="tag">光学</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 通信激光器功率/线宽与 EIRP_opt 核算</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>激光设计师</td>
+<td><span class="tag">光学</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ DPSK 调制解调与接收灵敏度设计（APD/平衡探测）</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>激光设计师</td>
+<td><span class="tag">光学</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ EDFA 增益与噪声指数设计</td>
+<td>Sprint 8</td><td style="text-align:center">4h</td><td>激光设计师</td>
+<td><span class="tag">光学</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星间 ISL 链路预算与余量校核</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星地激光链路云遮蔽与站址分集方案</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 光开关多链路切换与主备倒换设计</td>
+<td>Sprint 8</td><td style="text-align:center">4h</td><td>激光设计师</td>
+<td><span class="tag">可靠性</span></td></tr><tr class="ft"><td>特性</td><td><b>F3.4 智能处理分系统设计</b></td>
+<td>Sprint 8</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F3.4-S1 在轨处理与星内数据链路设计</td>
+<td>Sprint 8</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 数据总线速率 R_bus≥载荷数据产生率 R_pdl；② 存储容量 E_store≥R_pdl×T_blind；③ 压缩比 CR （CCSDS）有效降低总线与存储需求；④ 基带处理速率与同步精度达标</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 基带处理单元速率与同步设计</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>基带设计师</td>
+<td><span class="tag">处理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ DPU 在轨处理与 CCSDS 压缩方案设计</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>处理设计师</td>
+<td><span class="tag">处理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 存储容量核算（E_store≥R_pdl×T_blind）与 EDAC 设计</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>处理设计师</td>
+<td><span class="tag">处理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星上数据总线选型（SpaceWire/FC-AE）与速率校核</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>处理设计师</td>
+<td><span class="tag">处理</span></td></tr><tr class="st"><td>故事</td><td>F3.4-S2 AI 推理与在轨重构调度设计</td>
+<td>Sprint 8</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① AI 算力（TOPS）满足目标检测/变化检测/云检测/业务预测需求；② 重构指令链生效时间满足业务要求；③ 星载计算机 FDIR 覆盖关键单机；④ 重构链路（控制器→总线→ACU/激光控制器/DTP）闭环</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ AI 推理单元算力需求与模型部署方案</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>处理设计师</td>
+<td><span class="tag">智能</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 在轨重构控制器指令链与生效时间设计</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>处理设计师</td>
+<td><span class="tag">重构</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星载计算机 FDIR 故障检测隔离恢复设计</td>
+<td>Sprint 8</td><td style="text-align:center">8h</td><td>处理设计师</td>
+<td><span class="tag">可靠性</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星上组网与多星协同路由设计</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>基带设计师</td>
+<td><span class="tag">组网</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 重构链路闭环验证方案（ACU/激光控制器/DTP）</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>处理设计师</td>
+<td><span class="tag">重构</span></td></tr><tr class="ft"><td>特性</td><td><b>F3.5 EMC-热控-供电协同设计</b></td>
+<td>Sprint 6</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F3.5-S1 电磁兼容设计</td>
+<td>Sprint 6</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 收发隔离≥100dB、舱内隔离≥80dB；② 频段间滤波/屏蔽与互调分析无有害干扰；③ 符合 GJB 151B / MIL-STD-461 / ECSS-E-ST-20C</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 收发隔离与舱内隔离指标分配（≥100/≥80dB）</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>EMC工程师</td>
+<td><span class="tag">EMC</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 频段间滤波与屏蔽方案设计</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>EMC工程师</td>
+<td><span class="tag">EMC</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 互调与自激风险分析</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>EMC工程师</td>
+<td><span class="tag">EMC</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ EMC 标准符合性矩阵（GJB151B/461/ECSS-20C）</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>质量师</td>
+<td><span class="tag">合规</span></td></tr><tr class="st"><td>故事</td><td>F3.5-S2 热控与供电闭环校核</td>
+<td>Sprint 6</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 行波管 −10~+55℃、LNA −40~+70℃、T/R 结温≤125℃ 全部满足；② 峰值/均值功耗曲线完成且阴影期供电校核通过；③ M_pay≤M_budget、P_pay≤P_budget 且裕度≥10%</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 分系统温度范围与热控方案设计</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>热控工程师</td>
+<td><span class="tag">热控</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 峰值/均值功耗曲线与阴影期供电校核</td>
+<td>Sprint 6</td><td style="text-align:center">8h</td><td>电源工程师</td>
+<td><span class="tag">供电</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 质量功耗预算闭环校核（c-17，裕度≥10%）</td>
+<td>Sprint 6</td><td style="text-align:center">6h</td><td>质量师</td>
+<td><span class="tag">校核</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 超限处置预案（换方案/降配/换平台）</td>
+<td>Sprint 6</td><td style="text-align:center">4h</td><td>总体设计师</td>
+<td><span class="tag">风险</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #d97706;padding-left:10px">
+E4 · E4 指标校核与链路预算闭环
+<span style="color:#888;font-weight:400;font-size:12px">（52 点 / 170h / Sprint 7 起 / 优先级 <span class="pri-紧急">紧急</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第四阶段：链路预算、余量校核、双回环迭代优化与三重校验。这是「质量闸门」——余量&lt;3dB 即判不通过并触发回环调整，确保方案闭合而非纸面通过。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F4.1 链路预算与余量校核</b></td>
+<td>Sprint 7</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F4.1-S1 上行/下行链路预算与余量判据</td>
+<td>Sprint 7</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 完整计入 FSPL/雨衰/大气/指向/极化/实现损耗；② C/N0=EIRP−L_fs−ΣL+G/T−k、C/N=C/N0−10lg(B) 计算可复现；③ 全部链路余量 M≥3dB；④ 可用性（99.9%/99.99%）与雨衰对应正确；⑤ 双人交叉复核</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 自由空间损耗 FSPL 计算（斜距×频率）</td>
+<td>Sprint 7</td><td style="text-align:center">4h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 雨衰模型（A(p)∝p^-0.6，按仰角归一）与可用性核算</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 指向损耗 L_pnt=12(θ_e/θ_3dB)² 与极化/大气/实现损耗</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 上行 C/N0 与 C/N 计算（关口站 EIRP + 星上 G/T）</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 下行 C/N0 与 C/N 计算（星上 EIRP + 地面 G/T）</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">链路</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 余量 M≥3dB 判据校核与不通过项清单</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>质量师</td>
+<td><span class="tag">校核</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 链路预算双人交叉复核与签署</td>
+<td>Sprint 7</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">质量</span></td></tr><tr class="st"><td>故事</td><td>F4.1-S2 MODCOD 自适应与容量闭环</td>
+<td>Sprint 7</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 体制由实际 C/N 在 DVBS2X 阶梯上自适应选定（QPSK 1.79→8PSK 2.85→16APSK 3.70→32APSK 4.45 bps/Hz）；② 链路容量 C=B×η 与系统容量需求闭环；③ 遵循「先有 C/N 再定体制与容量」而非先锁高阶体制</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ DVBS2X 阶梯与解调门限表建立</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>基带设计师</td>
+<td><span class="tag">体制</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 由 C/N 反推可用 MODCOD 的自适应算法</td>
+<td>Sprint 7</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 链路容量与系统容量闭环核算</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">容量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 容量不足时的调整策略（带宽/波束/复用/体制）</td>
+<td>Sprint 7</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">容量</span></td></tr><tr class="st"><td>故事</td><td>F4.1-S3 激光链路校核</td>
+<td>Sprint 8</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 光学路径损耗、大气湍流代价计入；② DPSK 门限（≈8dB）余量达标；③ ISL 速率与星地云遮蔽概率满足可用度要求</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 激光链路光学路径损耗与湍流代价计算</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">激光</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ ISL 速率与余量校核（DPSK 门限）</td>
+<td>Sprint 8</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">激光</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 星地激光可用度与天气规避策略</td>
+<td>Sprint 8</td><td style="text-align:center">4h</td><td>链路工程师</td>
+<td><span class="tag">激光</span></td></tr><tr class="ft"><td>特性</td><td><b>F4.2 双回环迭代优化与三重校验</b></td>
+<td>Sprint 9</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F4.2-S1 内环（平台可行性）与外环（链路余量）迭代</td>
+<td>Sprint 9</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 内环：质量/功耗超限→换天线或分系统方案，迭代≤3 次；② 外环：余量&lt;3dB→降阶调制/增 EIRP/减带宽/放宽可用性→换天线重选，迭代≤2 次；③ 回环耗尽转 L3 人工决策；④ 每次迭代有记录与收敛判据</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 内环回环逻辑（平台可行性→换天线/换方案，≤3次）</td>
+<td>Sprint 9</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">回环</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 外环回环逻辑（余量不足→调整→换天线重选，≤2次）</td>
+<td>Sprint 9</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">回环</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 回环收敛判据与耗尽转人工(L3)机制</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>技术负责人</td>
+<td><span class="tag">回环</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 回环迭代记录与调整依据归档</td>
+<td>Sprint 9</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">配置管理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 调整手段优先级策略（降阶/增EIRP/减带宽/放宽可用性）</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>链路工程师</td>
+<td><span class="tag">回环</span></td></tr><tr class="st"><td>故事</td><td>F4.2-S2 三重校验体系（语法/语义/合规）</td>
+<td>Sprint 9</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 语法校验：文档要素完整性（章节/表格/单位）；② 语义校验：指标一致性（EIRP/G-T 满足需求、质量功耗在平台内、工作模式匹配）；③ 合规校验：余量≥3dB、频段-产品匹配无错配、货架优先；④ 校验项≥10 类且结果可导出</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 语法校验项定义（要素完整性/单位/章节）</td>
+<td>Sprint 9</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">校验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 语义校验项定义（指标一致性/模式匹配/承载校核）</td>
+<td>Sprint 9</td><td style="text-align:center">8h</td><td>质量师</td>
+<td><span class="tag">校验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 合规校验项定义（余量/频段匹配/货架优先）</td>
+<td>Sprint 9</td><td style="text-align:center">8h</td><td>质量师</td>
+<td><span class="tag">校验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 测控/信标 S 波段频段豁免规则配置</td>
+<td>Sprint 9</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">校验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 校验结果报告自动生成与阻断项清单</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">自动化</span></td></tr><tr class="st"><td>故事</td><td>F4.2-S3 异常分级与处置机制</td>
+<td>Sprint 9</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① L1 自动降级 8 条、L2 告警放行 16 条、L3 中止转人工 6 条，共 30 条规则全覆盖 11 个环节；② L3 触发即中断并生成人工决策任务；③ 异常触发日志可追溯</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ L1 自动降级规则（8条）配置与验证</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">异常</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ L2 告警放行规则（16条）配置与验证</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">异常</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ L3 中止转人工规则（6条）与中断机制</td>
+<td>Sprint 9</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">异常</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 异常触发日志与追溯报表</td>
+<td>Sprint 9</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">度量</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #dc2626;padding-left:10px">
+E5 · E5 平台/运载适配与集成验证
+<span style="color:#888;font-weight:400;font-size:12px">（45 点 / 182h / Sprint 10 起 / 优先级 <span class="pri-高">高</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第五阶段：平台承载与姿态耦合、运载发射约束、分系统集成接口与验证试验策划，通过 G3(CDR)。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F5.1 平台适配与耦合分析</b></td>
+<td>Sprint 10</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F5.1-S1 平台承载/供电/寿命适配校核</td>
+<td>Sprint 10</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 载荷质量≤平台承载、功耗≤平台供电，利用率≤90%（裕度≥10%）；② 包络尺寸与安装接口/布局可行；③ 平台设计寿命≥任务寿命（GEO≥15 年）；④ 轨道兼容性（SSO→LEO 等）校核通过</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 平台承载与功耗适配校核（利用率≤90%）</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">平台</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 包络尺寸与安装接口/布局设计</td>
+<td>Sprint 10</td><td style="text-align:center">8h</td><td>结构工程师</td>
+<td><span class="tag">平台</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 平台寿命与任务寿命匹配校核</td>
+<td>Sprint 10</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">平台</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 轨道兼容性校核与平台候选排序</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">平台</span></td></tr><tr class="st"><td>故事</td><td>F5.1-S2 姿态/轨道耦合与微振动影响分析</td>
+<td>Sprint 10</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 波束指向精度 θ_e 满足指向损耗 L_pnt=12(θ_e/θ_3dB)² 预算；② 姿态稳定度满足窄波束与激光链路要求；③ 微振动量级明确并给出 FSM 补偿需求；④ 大口径天线展开对姿态的扰动已评估</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束指向精度需求反推与指向损耗核算</td>
+<td>Sprint 10</td><td style="text-align:center">8h</td><td>链路工程师</td>
+<td><span class="tag">耦合</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 姿态稳定度对窄波束/激光链路影响分析</td>
+<td>Sprint 10</td><td style="text-align:center">8h</td><td>控制工程师</td>
+<td><span class="tag">耦合</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 平台微振动量级与 FSM 补偿需求</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>控制工程师</td>
+<td><span class="tag">耦合</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 大口径天线展开姿态扰动与侧摆能力评估</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>控制工程师</td>
+<td><span class="tag">耦合</span></td></tr><tr class="ft"><td>特性</td><td><b>F5.2 运载适配与发射约束</b></td>
+<td>Sprint 10</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F5.2-S1 运载选型与发射环境校核</td>
+<td>Sprint 10</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 整星质量≤所选运载对应轨道（GTO/LEO/SSO）运力；② 整流罩包络与大口径天线收纳/展开方案可行；③ 发射力学环境（振动/冲击/噪声）对天线与展开机构的影响已校核；④ 备选运载≥1 个</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 运载运力校核（GTO/LEO/SSO）与候选排序</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">运载</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 整流罩包络与天线收纳/展开方案设计</td>
+<td>Sprint 10</td><td style="text-align:center">8h</td><td>结构工程师</td>
+<td><span class="tag">运载</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 发射力学环境（振动/冲击/噪声）校核</td>
+<td>Sprint 10</td><td style="text-align:center">8h</td><td>结构工程师</td>
+<td><span class="tag">运载</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 发射窗口与入轨精度对覆盖的影响分析</td>
+<td>Sprint 10</td><td style="text-align:center">6h</td><td>轨道工程师</td>
+<td><span class="tag">运载</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 备选运载方案与风险预案</td>
+<td>Sprint 10</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">风险</span></td></tr><tr class="ft"><td>特性</td><td><b>F5.3 分系统集成与验证试验策划</b></td>
+<td>Sprint 11</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F5.3-S1 分系统集成接口定义（ICD）</td>
+<td>Sprint 11</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 电/机械/热/数据四类接口 ICD 齐套并受控；② 天线-转发器-激光-智能处理集成顺序与耦合分析完成；③ 接口不一致项清零</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 电接口与射频通道 ICD 定义</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">接口</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 机械/热接口 ICD 定义</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>结构工程师</td>
+<td><span class="tag">接口</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 数据协议与星内总线 ICD 定义</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>处理设计师</td>
+<td><span class="tag">接口</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 四分系统集成顺序与耦合分析</td>
+<td>Sprint 11</td><td style="text-align:center">6h</td><td>总体设计师</td>
+<td><span class="tag">集成</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 接口一致性检查与不一致项闭环</td>
+<td>Sprint 11</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">接口</span></td></tr><tr class="st"><td>故事</td><td>F5.3-S2 验证试验大纲与仿真验证</td>
+<td>Sprint 11</td><td style="text-align:center">13</td><td>—</td>
+<td style="font-size:12px">① 天线方向图/增益/轴比、转发器通道 S 参数/群时延/互调、激光 ATP 建链与跟踪精度测试方案齐套；② EMC/热真空/振动试验大纲符合 GJB150A / ECSS-Q-ST-70C；③ 链路预算模型经仿真验证并与在轨/实测数据对齐；④ 波束赋形与覆盖仿真（HFSS/STK）完成；⑤ 在轨重构场景数字孪生演练通过</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 天线方向图/增益/轴比测试方案</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>天线设计师</td>
+<td><span class="tag">试验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 转发器通道 S 参数/群时延/互调测试方案</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>转发器设计师</td>
+<td><span class="tag">试验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 激光终端 ATP 建链与跟踪精度测试方案</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>激光设计师</td>
+<td><span class="tag">试验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ EMC/热真空/振动试验大纲（GJB150A/ECSS-Q-ST-70C）</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>质量师</td>
+<td><span class="tag">试验</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 链路预算模型仿真验证与实测/在轨数据对齐</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>仿真工程师</td>
+<td><span class="tag">仿真</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束赋形与覆盖仿真（HFSS/STK）</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>仿真工程师</td>
+<td><span class="tag">仿真</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 在轨重构场景数字孪生演练</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>仿真工程师</td>
+<td><span class="tag">仿真</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 可靠性与单点故障分析（MTBF/关键单机备份）</td>
+<td>Sprint 11</td><td style="text-align:center">8h</td><td>可靠性工程师</td>
+<td><span class="tag">可靠性</span></td></tr></table></details><details >
+<summary style="border-left:5px solid #7c3aed;padding-left:10px">
+E6 · E6 方案评审、交付与知识沉淀
+<span style="color:#888;font-weight:400;font-size:12px">（34 点 / 110h / Sprint 12 起 / 优先级 <span class="pri-紧急">紧急</span>）</span></summary>
+<p style="text-indent:0;font-size:13px;color:#555;margin:6px 0 6px 14px">流程第六阶段：方案文档编制、交付物归档、知识图谱/货架库/规则库更新与项目复盘，通过 G4(FRR) 验收。</p>
+<table><tr><th>层级</th><th>标题</th><th>迭代</th><th>点/工时</th><th>负责</th><th>验收标准 / 标签</th></tr><tr class="ft"><td>特性</td><td><b>F6.1 方案文档与交付物</b></td>
+<td>Sprint 12</td><td>—</td><td>—</td><td><span class="pri-紧急">紧急</span></td></tr><tr class="st"><td>故事</td><td>F6.1-S1 载荷方案文档编制与排版</td>
+<td>Sprint 12</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 十章文档齐套（需求分析/总体方案/分系统设计/链路预算/校核结论/风险/交付物等）；② 图表完整（波束覆盖、链路预算表、单机链、质量功耗表）；③ 符合中文公文格式；④ 可导出 DOC/PDF；⑤ 文档生成自检 9 项全过</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 十章方案文档框架与内容编制</td>
+<td>Sprint 12</td><td style="text-align:center">8h</td><td>总体设计师</td>
+<td><span class="tag">文档</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 波束覆盖/链路预算/单机链/质量功耗图表制作</td>
+<td>Sprint 12</td><td style="text-align:center">8h</td><td>仿真工程师</td>
+<td><span class="tag">文档</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 公文格式排版与 DOC/PDF 导出</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>文档工程师</td>
+<td><span class="tag">文档</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 文档自检（9项）与一致性核验</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>质量师</td>
+<td><span class="tag">质量</span></td></tr><tr class="st"><td>故事</td><td>F6.1-S2 交付物清单归档与配置管理</td>
+<td>Sprint 12</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 图纸/ICD/试验大纲/风险清单/缺口清单/校核报告齐套；② 版本受控并建立基线；③ 归档可检索</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 交付物清单编制与齐套性检查</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>PM</td>
+<td><span class="tag">配置管理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 版本管理与基线归档</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>配置管理员</td>
+<td><span class="tag">配置管理</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 遗留问题与技术债清单闭环</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>技术负责人</td>
+<td><span class="tag">质量</span></td></tr><tr class="ft"><td>特性</td><td><b>F6.2 知识沉淀与工具化复用</b></td>
+<td>Sprint 12</td><td>—</td><td>—</td><td><span class="pri-高">高</span></td></tr><tr class="st"><td>故事</td><td>F6.2-S1 知识图谱与货架库/规则库更新</td>
+<td>Sprint 12</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 通信有效载荷知识图谱（分系统/单机/链路/约束）更新并与最终方案一致；② 货架库扩容并回填飞行继承数据；③ 25 条工程约束与 30 条异常规则迭代；④ 缺口项转为货架候选</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 知识图谱与最终方案一致性更新</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">知识</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 货架产品库扩容与飞行继承数据回填</td>
+<td>Sprint 12</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">货架</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 工程约束库（25条）与异常规则库（30条）迭代</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>质量师</td>
+<td><span class="tag">知识</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 缺口项转货架候选与研制跟踪</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>PM</td>
+<td><span class="tag">货架</span></td></tr><tr class="st"><td>故事</td><td>F6.2-S2 设计工具固化与模板复用</td>
+<td>Sprint 12</td><td style="text-align:center">8</td><td>—</td>
+<td style="font-size:12px">① 选型引擎/链路预算/三重校验工具固化可复用；② 文档自动生成与自检流程化；③ 复用模板与最佳实践库建立；④ 下一型号可直接复用（复用率目标≥60%）</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 选型引擎与链路预算工具固化</td>
+<td>Sprint 12</td><td style="text-align:center">8h</td><td>开发</td>
+<td><span class="tag">工具</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 三重校验与文档自动生成流程化</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>开发</td>
+<td><span class="tag">工具</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 复用模板库与最佳实践沉淀</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>技术负责人</td>
+<td><span class="tag">知识</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 工具使用手册与培训</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">知识</span></td></tr><tr class="ft"><td>特性</td><td><b>F6.3 项目复盘与持续改进</b></td>
+<td>Sprint 12</td><td>—</td><td>—</td><td><span class="pri-中">中</span></td></tr><tr class="st"><td>故事</td><td>F6.3-S1 度量统计与复盘改进</td>
+<td>Sprint 12</td><td style="text-align:center">5</td><td>—</td>
+<td style="font-size:12px">① 迭代速率/燃尽/周期时间/缺陷密度/门禁通过率/返工率统计完成；② 效率与质量指标达成情况有量化结论；③ 回顾会改进项入库并指定责任人；④ 流程模板更新</td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 迭代速率与燃尽/周期时间统计</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>SM</td>
+<td><span class="tag">度量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 缺陷密度与返工率分析</td>
+<td>Sprint 12</td><td style="text-align:center">6h</td><td>质量师</td>
+<td><span class="tag">度量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 质量门禁通过率与阻塞项复盘</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>技术负责人</td>
+<td><span class="tag">度量</span></td></tr><tr class="tk"><td>任务</td><td style="padding-left:22px">└ 回顾会改进项入库与流程模板更新</td>
+<td>Sprint 12</td><td style="text-align:center">4h</td><td>SM</td>
+<td><span class="tag">改进</span></td></tr></table></details></div><h2>七、风险登记册</h2><table><tr><th>编号</th><th>风险描述</th><th>概率</th><th>影响</th><th>缓解措施</th><th>责任人</th><th>关注迭代</th><th>触发阈值</th></tr><tr><td><b>R1</b></td><td>链路余量不足（雨衰/指向损耗超预期）</td>
+<td class="pri-紧急">高</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">外环回环：降阶调制→增EIRP→减带宽→放宽可用性；仍不足则改再生/DTP体制（ΔM_reg≥3dB）</td><td>链路工程师</td>
+<td>Sprint 7</td><td style="font-size:12px">余量 M&lt;3dB 且 MODCOD 已降至最低阶</td></tr><tr><td><b>R2</b></td><td>载荷质量/功耗超平台承载</td>
+<td class="pri-高">中</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">内环回环换天线或分系统方案（≤3次）；必要时升级平台；MPA功率池替代单管功放降功耗</td><td>总体设计师</td>
+<td>Sprint 6</td><td style="font-size:12px">M_pay&gt;M_budget 或 P_pay&gt;P_budget 或裕度&lt;10%</td></tr><tr><td><b>R3</b></td><td>货架产品缺口导致进度风险</td>
+<td class="pri-紧急">高</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">货架优先选型（命中率≥80%）；缺口项并行启动研制与替代方案；记录 N_gap 收敛计划</td><td>PM</td>
+<td>Sprint 4</td><td style="font-size:12px">关键单机缺口 N_gap&gt;3 或研制周期&gt;4个月</td></tr><tr><td><b>R4</b></td><td>相控阵阵面热控/结温超限</td>
+<td class="pri-高">中</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">阵元数与占空比优化；热控方案迭代；降功放功率或改用反射阵体制</td><td>热控工程师</td>
+<td>Sprint 5</td><td style="font-size:12px">T_j&gt;125℃ 或阵面功耗超预算</td></tr><tr><td><b>R5</b></td><td>激光 ATP 捕获概率/跟踪精度不达标</td>
+<td class="pri-高">中</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">信标功率与发散角优化；FSM 带宽提升；平台微振动抑制；站址分集（星地）</td><td>激光设计师</td>
+<td>Sprint 8</td><td style="font-size:12px">P_acq&lt;95% 或 σ_track&gt;1μrad</td></tr><tr><td><b>R6</b></td><td>DTP 交换容量成为瓶颈</td>
+<td class="pri-高">中</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">子带粒度与信道数优化；交换矩阵扩容；功耗-灵活度权衡降级方案</td><td>转发器设计师</td>
+<td>Sprint 7</td><td style="font-size:12px">C_sw &lt; N_beam×B_beam 或 N_ch×B_sub &lt; B_trp</td></tr><tr><td><b>R7</b></td><td>EMC 隔离不足导致自激/互调</td>
+<td class="pri-高">中</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">收发隔离≥100dB、舱内≥80dB；滤波与屏蔽迭代；频段间隔与频率规划调整</td><td>EMC工程师</td>
+<td>Sprint 6</td><td style="font-size:12px">隔离度不达标或互调分析发现有害干扰</td></tr><tr><td><b>R8</b></td><td>频率协调/轨道资源审批延迟</td>
+<td class="pri-紧急">高</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">提前启动 ITU 协调；准备备选频段方案；与总体单位并行推进</td><td>频率工程师</td>
+<td>Sprint 2</td><td style="font-size:12px">频率指配未在 Sprint 2 前获得初步协调意见</td></tr><tr><td><b>R9</b></td><td>四分系统并行导致接口不一致</td>
+<td class="pri-高">中</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">ICD 先行冻结（Sprint 11 前）；接口一致性自动检查；集成迭代提前到 Sprint 10</td><td>总体设计师</td>
+<td>Sprint 11</td><td style="font-size:12px">接口不一致项&gt;5 或 ICD 未按期冻结</td></tr><tr><td><b>R10</b></td><td>需求变更冲击基线</td>
+<td class="pri-高">中</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">变更控制流程（影响分析+CCB审批）；每迭代预留缓冲；DoR 拦截不完整需求</td><td>PM</td>
+<td>全程</td><td style="font-size:12px">迭代内需求变更&gt;2 项或基线变更未经审批</td></tr><tr><td><b>R11</b></td><td>关键人员单点依赖</td>
+<td class="pri-高">中</td><td class="pri-高">中</td>
+<td style="font-size:12.5px">关键计算双人交叉复核；知识文档化；结对评审；备份责任人指定</td><td>SM</td>
+<td>全程</td><td style="font-size:12px">关键岗位无备份责任人或文档缺失</td></tr><tr><td><b>R12</b></td><td>进度压力导致质量妥协</td>
+<td class="pri-紧急">高</td><td class="pri-紧急">高</td>
+<td style="font-size:12.5px">质量门禁强制阻断；技术债每迭代≥10%容量偿还；DoD 不可裁剪；回顾会跟踪返工率</td><td>技术负责人</td>
+<td>全程</td><td style="font-size:12px">门禁跳过、DoD 未满足即关闭、返工率上升</td></tr></table>
+<h2>八、PingCode 导入操作指引</h2>
+<p class="noindent">本计划随附 8 个 CSV 文件（UTF-8 带 BOM，Excel 与 PingCode 导入向导均可正确识别中文），位于 <code>output/pingcode/</code>。PingCode 无开放 API 连接器，按以下步骤手动导入：</p>
+<h3>8.1 文件清单</h3>
+<table>
+<tr><th>文件</th><th>内容</th><th>行数</th><th>用途</th></tr>
+<tr><td><code>00_迭代.csv</code></td><td>迭代名称/起止/目标/容量</td><td>14</td><td>先建迭代日历</td></tr>
+<tr><td><code>01_史诗.csv</code></td><td>7 个 Epic</td><td>7</td><td>第一层</td></tr>
+<tr><td><code>02_特性.csv</code></td><td>20 个 Feature</td><td>20</td><td>第二层（父级=Epic）</td></tr>
+<tr><td><code>03_用户故事.csv</code></td><td>44 个 Story（含故事点/验收标准）</td><td>44</td><td>第三层（父级=Feature）</td></tr>
+<tr><td><code>04_任务.csv</code></td><td>203 个 Task（含工时/角色/标签）</td><td>203</td><td>第四层（父级=Story）</td></tr>
+<tr><td><code>05_全量工作项_一次导入.csv</code></td><td>四层合一</td><td>274</td><td><b>推荐：单次导入</b></td></tr>
+<tr><td><code>06_质量门禁.csv</code></td><td>G0–G4 门禁准则</td><td>5</td><td>配置审批流参考</td></tr>
+<tr><td><code>07_风险登记册.csv</code></td><td>12 项风险</td><td>12</td><td>风险库导入参考</td></tr>
+</table>
+
+<h3>8.2 导入步骤</h3>
+<ol>
+<li><b>建项目空间：</b>PingCode → 敏捷研发 → 新建 Scrum 项目「通信有效载荷研制」。</li>
+<li><b>建迭代：</b>项目设置 → 迭代 → 按 <code>00_迭代.csv</code> 录入 14 个迭代（S0 启动周 + S1–S12 两周 + 发布周）的起止日期与目标。</li>
+<li><b>导入工作项（推荐一次性）：</b>Backlog → 导入 → 选择 <code>05_全量工作项_一次导入.csv</code>。
+  <ul>
+  <li>在字段映射向导中，将 CSV 列映射到 PingCode 字段：<br>
+  <code>工作项类型→类型</code>、<code>标题→标题</code>、<code>描述→描述</code>、<code>父级工作项→父级(按标题匹配)</code>、
+  <code>优先级→优先级</code>、<code>迭代→迭代(按名称匹配)</code>、<code>故事点→故事点</code>、
+  <code>预估工时→预估工时</code>、<code>负责人→负责人(按角色映射成员)</code>、<code>开始/截止日期→对应日期</code>、
+  <code>标签→标签</code>、<code>验收标准→验收标准/自定义字段</code>。</li>
+  <li>若向导不支持「父级按标题匹配」，改为分层导入：先 <code>01_史诗</code> → 再 <code>02_特性</code>（父级填史诗标题）→ <code>03_用户故事</code> → <code>04_任务</code>，逐层建立父子关系。</li>
+  </ul>
+</li>
+<li><b>配置质量门禁：</b>按 <code>06_质量门禁.csv</code>，在工作流中为 G0–G4 对应阶段设置「关闭需审批」，审批人=技术负责人，通过准则写入阶段说明。</li>
+<li><b>配置 DoR/DoD 校验：</b>将 DoR 三条件设为创建必填校验，DoD 四条件设为状态流转前置检查项。</li>
+<li><b>配置 WIP 限制：</b>看板每列在制品上限 5；通过报表监控人均在制 ≤ 2。</li>
+<li><b>导入风险库：</b>按 <code>07_风险登记册.csv</code> 录入 12 项风险（概率×影响、缓解措施、责任人、触发阈值）。</li>
+<li><b>校验：</b>导入后核对工作项总数 = 274、故事点合计 = 365、各迭代任务分布与「五、迭代日历」一致。</li>
+</ol>
+<p class="note"><b>提示：</b>负责人字段当前为角色名（如「链路工程师」「天线设计师」），导入后请在 PingCode 中按实际成员批量替换；标签字段可用于看板筛选与度量分组。</p>
+
+<h2>九、交付物与验收</h2>
+<ul>
+<li><b>阶段交付物：</b>需求基线 → 总体方案(SRR) → 分系统设计包 → 指标校核报告(PDR) → 集成验证大纲(CDR) → 方案文档与交付归档(FRR)。</li>
+<li><b>知识资产：</b>通信有效载荷知识图谱、货架产品库、25 条工程约束库、30 条异常规则库随项目迭代更新。</li>
+<li><b>验收标准：</b>五道门禁全部通过、链路余量 100% 达标、三重校验阻断项清零、度量指标达成、复盘改进项入库。</li>
+<li><b>复用目标：</b>设计工具（选型引擎/链路预算/三重校验/文档自动生成）固化，下一型号复用率 ≥ 60%。</li>
+</ul>
+
+<div class="foot">通信有效载荷设计流程 · 六个月敏捷研制计划 &nbsp;|&nbsp; 生成于 2026-09-20 &nbsp;|&nbsp; 数据源：build_pingcode_plan.py（274 工作项）</div>
+</div>
+
+<script>
+function downloadDOC() {
+  var html = document.documentElement.outerHTML;
+  var blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = '载荷设计流程6个月敏捷计划.doc';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body></html>

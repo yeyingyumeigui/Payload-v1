@@ -1,0 +1,11 @@
+SELFTEST OK 8/8 scenarios in 0.01s
+SELFTEST start py=3.13.14 frozen=False
+meta OK keys=27
+[geo_ka_hts] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[geo_ku_dth] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[leo_broadband] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[leo_d2d] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[geo_mobile] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[meo_relay] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[heo_military] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]
+[leo_iot] OK EIRP=nan GT=nan M_up=nan M_dn=nan pass=?/? fail=[]

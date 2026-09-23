@@ -1,0 +1,66 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# ===== PyInstaller 产物与中间件 =====
+build/
+dist/
+*.manifest
+
+# ===== 可执行文件（体积大，建议用 GitHub Release 分发）=====
+*.exe
+
+# ===== 历史备份 =====
+backup_v1_20260921/
+
+# ===== 临时调试输出（txt/log/csv 探针产物）=====
+_*.txt
+*.log
+output/_*.png
+output/_*.csv
+output/_*.svg
+PayloadDesign/output/t59_*
+PayloadDesign/output/_coverage_test.csv
+
+# ===== 前端抽取中间产物（_extract_front.py 可再生）=====
+PayloadDesign/tools/_front_extract.html
+PayloadDesign/tools/_front_extract.js
+
+# ===== 根 tools/（v1 时代）的一次性调试脚本 =====
+tools/_calibrate.py
+tools/_check_syntax.py
+tools/_diag3.py
+tools/_diag4.py
+tools/_dotnet_probe.py
+tools/_front_all.py
+tools/_front_test.py
+tools/_geo_pakistan.py
+tools/_netfx_test.py
+tools/_pak_probe.py
+tools/_pak_scan.py
+tools/_run_exe_guicheck.py
+tools/_run_exe_selftest.py
+tools/_smoke_v3.py
+tools/_toc_check.py
+tools/_wv_clr2.py
+tools/_app_js.js
+tools/_harness.js
+tools/_doc_test.html
+tools/_doc_test.js
+tools/_dom_cons.html
+tools/_dom_dump.html
+tools/_shot_*.html
+tools/_shot_*.png
+tools/_design.json
+tools/_meta.json
+
+# ===== Agent 内部工作数据（记忆/日志，非项目交付物）=====
+.workbuddy/
+
+# ===== IDE / 系统 =====
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

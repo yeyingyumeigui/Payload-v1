@@ -1,0 +1,14 @@
+SELFTEST OK 8/8 scenarios in 11.75s
+SELFTEST start py=3.13.14 frozen=False
+meta OK keys=27
+[geo_ka_hts] OK EIRP=61.40 GT=26.52 M_up=20.32 M_dn=3.40 M_e2e=3.38 judge=15/15 fail=[] warn=[] mass=567kg P=5527W plat=GEO-LRG65
+[geo_ku_dth] OK EIRP=57.47 GT=23.37 M_up=25.87 M_dn=3.20 M_e2e=3.20 judge=15/15 fail=[] warn=[] mass=128kg P=395W plat=GEO-MID42
+[leo_broadband] OK EIRP=30.68 GT=10.58 M_up=36.48 M_dn=3.61 M_e2e=8.11 judge=17/17 fail=[] warn=[] mass=593kg P=2765W plat=SSF-LEO1000
+[leo_d2d] OK EIRP=24.79 GT=2.39 M_up=60.51 M_dn=3.92 M_e2e=8.42 judge=17/17 fail=[] warn=[] mass=343kg P=2690W plat=SSF-LEO1000
+[geo_mobile] OK EIRP=50.75 GT=18.49 M_up=55.58 M_dn=3.20 M_e2e=3.20 judge=15/15 fail=[] warn=[] mass=391kg P=1360W plat=GEO-MID42
+[meo_relay] OK EIRP=50.54 GT=26.52 M_up=25.43 M_dn=3.42 M_e2e=3.41 judge=17/17 fail=[] warn=[] mass=352kg P=1354W plat=MEO-PLAT
+[heo_military] OK EIRP=42.26 GT=18.49 M_up=40.57 M_dn=3.90 M_e2e=8.40 judge=15/15 fail=[] warn=[] mass=279kg P=865W plat=HEO-PLAT
+[leo_iot] OK EIRP=27.59 GT=2.39 M_up=73.97 M_dn=3.20 M_e2e=3.20 judge=15/15 fail=[] warn=[] mass=78kg P=675W plat=SSO-PLAT
+eval OK grade=A feasible=True pass_hard=6/6 pass_soft=4/4
+suggest_closed_loop OK grade=A iters=1 feasible=True adjustments=0
+export OK chars=2717906 png=18 svg_left=0 RASTERIZED

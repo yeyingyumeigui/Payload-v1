@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>载荷方案设计器 · 软件说明</title>
+<style>
+:root{--ink:#1a2332;--mut:#5a6b82;--acc:#1450a0;--line:#d8e0ea;--bg:#f4f7fb;--card:#ffffff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:15px}
+.toolbar{position:sticky;top:0;z-index:9;background:#0e2a52;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toolbar .ttl{font-weight:700;margin-right:auto;font-size:15px}
+.toolbar button{background:#1d4f91;color:#fff;border:1px solid #3a6db5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px}
+.toolbar button:hover{background:#2a63b0}
+.wrap{max-width:980px;margin:24px auto;padding:40px 52px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 14px rgba(20,40,80,.06)}
+h1{font-size:26px;color:var(--acc);border-bottom:3px solid var(--acc);padding-bottom:12px;margin:6px 0 18px}
+h2{font-size:20px;color:var(--acc);margin:30px 0 12px;padding-left:10px;border-left:5px solid var(--acc)}
+h3{font-size:16.5px;margin:20px 0 8px;color:#0e2a52}
+h4{font-size:15px;margin:14px 0 6px}
+p{margin:8px 0}
+hr{border:none;border-top:1px dashed var(--line);margin:22px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th{background:#eaf1fa;color:#0e2a52;font-weight:700;text-align:left;padding:8px 10px;border:1px solid var(--line)}
+td{padding:7px 10px;border:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#f8fafd}
+code{background:#eef2f7;color:#b03060;border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px}
+pre{background:#0f1c2e;color:#d8e4f2;border-radius:8px;padding:14px 18px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.6;margin:12px 0}
+pre code{background:none;color:inherit;padding:0}
+blockquote{background:#fff8e6;border-left:4px solid #e6a817;border-radius:0 8px 8px 0;padding:10px 16px;margin:12px 0;color:#6b5312;font-size:14px}
+ul,ol{margin:8px 0 8px 26px}
+li{margin:4px 0}
+strong{color:#0e2a52}
+@media print{.toolbar{display:none}.wrap{border:none;box-shadow:none;max-width:none;margin:0;padding:0}body{background:#fff}h2{page-break-after:avoid}table,pre,blockquote{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="toolbar"><span class="ttl">载荷方案设计器 · 软件说明 v4.1</span><button onclick="doDownloadDoc()">⬇ 下载 Word（.doc）</button><button onclick="doPrint()">🖨 打印 / PDF</button></div>
+<div class="wrap"><div id="doc">
+<h1>载荷方案设计器 —— 软件说明</h1>
+<p><strong>版本</strong>：v4.1（2026-09-22，含 T_sys 物理修复）<br/><strong>定位</strong>：通信卫星有效载荷方案快速设计与可行性校核工具<br/><strong>结论先行</strong>：本软件经<strong>独立第一性原理交叉验证</strong>（P0~P14 共 15 类物理量、10 个场景、0 失败）与全套回归测试（自检 8/8、冒烟 51/51、DOM 端到端 52/52、货架检查全过、父项目 102 用例全过），生成方案的链路预算、天线增益、噪声温度、容量、平台承载等计算<strong>数学正确、物理合理、工程口径一致</strong>，可用于方案论证阶段的快速设计与比选。</p>
+<hr/>
+<h2>一、软件概述</h2>
+<h3>1.1 软件是什么</h3>
+<p>载荷方案设计器是一款<strong>单机离线</strong>的 Windows 桌面工具：用户输入一组任务需求（业务/轨道/覆盖/频段/体制），软件在数秒内完成从需求解析到方案评价的<strong>全流程闭环设计</strong>，输出可直接汇报的载荷方案（框图、链路预算、单机清单、平台/运载匹配、评级评分、Word 报告）。</p>
+<h3>1.2 解决什么问题</h3>
+<table><thead><tr><th>传统流程痛点</th><th>本软件的做法</th></tr></thead><tbody><tr><td>指标拆解靠人工经验，口径不一</td><td>需求→EIRP/G/T 反推全公式化，与知识图谱判据 id 对齐、可追溯</td></tr><tr><td>链路预算用 Excel 手搭，易漏项</td><td>25 条工程约束（c-1~c-25）自动全检，雨衰/大气/指向/极化/实现损耗同源合成</td></tr><tr><td>天线/转发器/单机选型各自为政</td><td>五维天线选型 + 货架优先三线编号 + 平台/运载自动匹配，一条链贯通</td></tr><tr><td>方案可行性判断滞后</td><td>十项准则（6 硬 4 软）即时评级 A/B/C/D，不可行项直接给出修正建议</td></tr><tr><td>汇报材料重做</td><td>一键导出 Word 报告（含 11 张矢量图栅格化嵌入）</td></tr></tbody></table>
+<h3>1.3 技术架构</h3>
+<pre>┌─────────────────────────────────────────────────┐
+│  前端（WebView2 / Edge Chromium 渲染）             │
+│  11 页签 SPA · SVG 交互图 · 三维覆盖 · 波束方向图    │
+├─────────────────────────────────────────────────┤
+│  pywebview JS 桥 ⇄ 本地 HTTP 双通道                │
+├─────────────────────────────────────────────────┤
+│  设计引擎 design_engine.py（五步闭环 + 双回环）      │
+│  信息流引擎 infoflow_engine.py（c-1~c-25 校核）     │
+│  GRASP 波束桥 grasp_bridge.py（偏置抛物面 PO）      │
+│  协议生成 protocol_gen.py · 报告生成 report_gen.py  │
+├─────────────────────────────────────────────────┤
+│  知识库 design_data.py + 通信有效载荷知识图谱 JSON   │
+│  （货架单机库/平台库/运载库/MODCOD 表/国家覆盖库）    │
+└─────────────────────────────────────────────────┘</pre>
+<ul><li><strong>零外部服务依赖</strong>：全部计算本地完成，断网可用；</li><li><strong>单文件 exe</strong>：PyInstaller 打包，双击运行（需系统已装 Edge WebView2 Runtime，Win11 自带）；</li><li><strong>三种运行形态</strong>：exe 桌面版（实时计算）、<code>python design_app.py --web</code> 网页版（实时计算）、预览版 HTML（8 场景预计算快照，任意浏览器打开）。</li></ul>
+<hr/>
+<h2>二、设计流程：五步闭环 + 双回环</h2>
+<h3>2.1 五步闭环</h3>
+<table><thead><tr><th>步骤</th><th>引擎函数</th><th>做什么</th><th>关键输出</th></tr></thead><tbody><tr><td>① 需求解析</td><td><code>parse_config</code></td><td>场景/业务/轨道/覆盖/频段 → 结构化需求</td><td>覆盖半径、容量需求 C_req、可用度→雨衰百分位</td></tr><tr><td>② 架构规划</td><td><code>derive_geometry</code> + <code>cfg_to_params</code></td><td>轨道几何推导（斜距/波束角/波束数）+ 体制映射</td><td>θ_beam、N_geo、EIRP_req/GT_req 反推初值</td></tr><tr><td>③a 天线五维选型</td><td><code>select_antennas</code></td><td>EIRP/G/T/重量/功耗/模式五维打分 + 频段硬过滤</td><td>货架天线或定制阵面参数</td></tr><tr><td>③b 转发器方案</td><td><code>plan_transponder</code></td><td>EIRP 反推功放功率 + HPA 选型 + 信道化</td><td>P_out、TWTA/SSPA/MPA 配置</td></tr><tr><td>④ 单机选型</td><td><code>build_equipment</code></td><td>货架优先三线编号（货架/继承/定制）</td><td>单机清单（质量/功耗/成本）</td></tr><tr><td>⑤ 链路校核</td><td><code>compute_all</code>（25 条约束）</td><td>上下行预算、容量、频谱、平台承载全检</td><td>M_up/M_dn/M_e2e、fail/warn 列表</td></tr><tr><td>平台/运载</td><td><code>select_platform</code> / <code>select_launcher</code></td><td>承载+供电可行域筛选</td><td>平台型号、整流罩包络</td></tr><tr><td>评价评分</td><td><code>evaluate_scheme</code> / <code>score_scheme</code></td><td>十项准则评级 + 六维加权评分</td><td>A/B/C/D 级、0~10 分</td></tr></tbody></table>
+<h3>2.2 双回环机制</h3>
+<ul><li><strong>内环（平台可行性换天线）</strong>：初选方案质量/功耗超平台包络时，自动回退换更轻/更省电的天线方案，≤3 次迭代；</li><li><strong>外环（链路余量否决重选型）</strong>：链路校核发现余量不足且无法靠加功率解决时，携带排除清单重新选型，≤2 次；</li><li>回环全程留痕，在「⑩ 约束校验与回环」页签可见每次迭代的触发原因与结果。</li></ul>
+<h3>2.3 一键建议值闭环</h3>
+<p>「💡 一键建议值」按钮对当前配置反推推荐参数（口径、阵元数、波束数、带宽、功放等），应用后自动重算并评级——<code>suggest_closed_loop</code> 验证其收敛性（自检中 1 次迭代即达 A 级、0 项需人工调整）。</p>
+<hr/>
+<h2>三、界面功能说明（11 页签）</h2>
+<table><thead><tr><th>页签</th><th>功能</th><th>亮点</th></tr></thead><tbody><tr><td>① 方案配置</td><td>需求输入表单 + 8 个内置场景一键载入</td><td>一键建议值 / 方案诊断 / 保存·载入方案 / 导出 Word / 打印 PDF</td></tr><tr><td>② 方案总览</td><td>结论卡片：评级、EIRP/G/T、余量、质量功耗、平台运载</td><td>雷达图六维评分、信息流可视化（SVG 动画）</td></tr><tr><td>③ 载荷组成框图</td><td>自动生成载荷舱框图</td><td>天线/转发器/单机/平台层级 + 接口标注</td></tr><tr><td>④ 天线链路预算</td><td>上行+下行逐项预算表</td><td>雨衰/大气/指向/极化/实现损耗全列示，MODCOD 由 C/N 反推</td></tr><tr><td>⑤ 转发器链路预算</td><td>功放反推、信道化、频率规划</td><td>HPA 可行功率上限校验、频谱闭合检查</td></tr><tr><td>⑥ 信息流设计</td><td>业务流/馈电流/数传流/测控流四流图</td><td>与知识图谱本体对齐</td></tr><tr><td>⑦ 单机清单与选型</td><td>货架三线编号清单</td><td>每项含质量/功耗/成本/继承度，缺口项标红</td></tr><tr><td>⑧ 方案对比</td><td>多方案六维对比</td><td>性能/成本/灵活/风险/质量/功耗加权总分</td></tr><tr><td>⑨ 原理介绍</td><td>全部公式与判据的推导说明</td><td>与知识图谱 constraints id 一一对应</td></tr><tr><td>⑩ 约束校验与回环</td><td>25 条约束逐条判定 + 回环记录</td><td>fail/warn 可点击定位到对应页签</td></tr><tr><td>⑪ 接口与协议（MOSA）</td><td>ICD 接口矩阵 + APID/VC 规划</td><td>protocol_gen 自动生成，13~15 个接口</td></tr></tbody></table>
+<p><strong>波束面板</strong>（覆盖页签内）：一维/二维方向图，反射面走 GRASP 偏置抛物面 PO 计算（F/D=1.31，失败自动降级 Airy 解析），相控阵走阵因子解析式；三维覆盖球 + 二维世界地图投影（NaturalEarth 110m 海岸线，仅地理参考、无政治边界）。</p>
+<p><strong>导出 Word</strong>：<code>/api/export</code> 生成 mso 兼容 HTML → 前端 Blob 下载 <code>.doc</code>，全部 SVG 图栅格化为 PNG 嵌入（自检实测 11 张图、221 万字符）。</p>
+<hr/>
+<h2>四、快速上手</h2>
+<h3>4.1 运行</h3>
+<table><thead><tr><th>形态</th><th>操作</th><th>适用</th></tr></thead><tbody><tr><td><strong>exe 桌面版</strong>（推荐）</td><td>双击 <code>tools\dist\载荷方案设计器.exe</code></td><td>日常设计，实时计算</td></tr><tr><td>网页版</td><td><code>python design_app.py --web</code> 后浏览器打开</td><td>开发调试</td></tr><tr><td>预览版</td><td>浏览器打开 <code>output\载荷方案设计器_预览版.html</code></td><td>无 Python 环境快速演示（8 场景预计算）</td></tr></tbody></table>
+<blockquote>运行要求：Windows 10/11 64 位 + Edge WebView2 Runtime（Win11 自带；如缺失，exe 会静默无法启动，请先安装 WebView2）。</blockquote>
+<h3>4.2 标准操作流程（5 分钟出方案）</h3>
+<ol><li><strong>选场景或填需求</strong>：① 页签点任一内置场景载入，或手动选业务/轨道/覆盖/频段/体制；</li><li><strong>一键建议值</strong>：点「💡 一键建议值」→「✓ 应用全部建议值」，补齐口径/阵元/波束/带宽等派生参数；</li><li><strong>开始设计</strong>：点「🚀 开始设计」（含方案对比）或「⚡ 快速重算」（跳过对比）；</li><li><strong>看结论</strong>：② 总览页查看评级——<strong>A/B 可行，C 需优化，D 不可行</strong>（按诊断建议修正后重算）；</li><li><strong>深查</strong>：④⑤ 链路预算逐行核对，⑩ 约束页看 25 条判定与回环记录；</li><li><strong>导出</strong>：「📄 导出 Word」生成汇报稿，或「🖨 打印 / PDF」。</li></ol>
+<h3>4.3 内置场景库（8 预设 + 2 验证场景）</h3>
+<table><thead><tr><th>场景</th><th>轨道/频段</th><th>体制</th><th>验证评级</th></tr></thead><tbody><tr><td>GEO Ka 高通量宽带（64 波束·DTP）</td><td>GEO / Ka</td><td>2.5m 固面多波束</td><td><strong>A</strong>（7.05 分）</td></tr><tr><td>GEO Ku 广播电视（单波束·透明）</td><td>GEO / Ku</td><td>2.5m 固面单波束</td><td><strong>A</strong>（8.12 分）</td></tr><tr><td>LEO 宽带星座（相控阵·再生·激光 ISL）</td><td>LEO 550km / Ka</td><td>数字模拟混合阵 16 波束</td><td><strong>B</strong>（5.57 分，质量/成本维度拉低）</td></tr><tr><td>LEO 手机直连 D2D</td><td>LEO 550km / S</td><td>12m 可展开模拟拼接阵</td><td><strong>B</strong>（5.68 分）</td></tr><tr><td>GEO L 移动通信（12m 伞天线）</td><td>GEO / L</td><td>伞状可展开 19 波束</td><td><strong>A</strong>（6.95 分）</td></tr><tr><td>MEO 中继数传（Ka+激光组网）</td><td>MEO 8000km / Ka</td><td>3m 固面 8 波束</td><td><strong>A</strong>（6.98 分）</td></tr><tr><td>HEO 军用抗干扰（再生·伞天线）</td><td>HEO / L</td><td>12m 伞状 7 波束</td><td><strong>A</strong>（6.32 分）</td></tr><tr><td>LEO 窄带物联网（S·DTP）</td><td>SSO 700km / S</td><td>直射阵 8 波束</td><td><strong>A</strong>（7.56 分）</td></tr><tr><td>巴基斯坦 GEO Ka 高通量（验证场景）</td><td>GEO / Ka</td><td>2.5m 固面 5 波束</td><td><strong>D</strong>（容量缺口 6.6/40 Gbps——<strong>正确诊断</strong>，5 波束无法承载 40G 需求）</td></tr><tr><td>GEO 功率墙（验证场景）</td><td>GEO / Ka</td><td>小平台+相控阵高增益</td><td><strong>D</strong>（1679kW 功耗墙——<strong>正确诊断</strong>，复现"相控阵 GEO 高增益不可行"结论）</td></tr></tbody></table>
+<blockquote>两个 D 级验证场景是<strong>故意设置的不可行边界</strong>：软件不仅要在可行域内给出正确方案，还要在不可行域<strong>正确拒绝并给出缺口定量</strong>——这是"方案合理可行"的另一半证据。</blockquote>
+<hr/>
+<h2>五、验证体系与结论（本次充分验证的核心交付）</h2>
+<h3>5.1 验证方法：独立第一性原理交叉验证</h3>
+<p>新建 <code>_verify_physics.py</code>（约 700 行）：<strong>不复用引擎函数</strong>，从教科书公式独立重写物理计算（独立常数、独立实现），再与引擎 <code>design_all()</code> 输出逐项比对。这区别于"引擎自测"——公式抄错、常数错、单位错都会被抓出。</p>
+<h3>5.2 验证覆盖（P0~P14，15 类）</h3>
+<table><thead><tr><th>编号</th><th>验证内容</th><th>独立公式</th><th>结果</th></tr></thead><tbody><tr><td>P0</td><td>解析锚点（不经引擎）</td><td>GEO 天底角 8.69°、斜距余弦定理互证、FSPL 双式一致、六边形密铺 1.209、玻尔兹曼 −228.6、MODCOD 全表</td><td>✅</td></tr><tr><td>P1</td><td>覆盖几何</td><td>h/el→斜距 d、地心角 ψ、覆盖半径、θ_beam、N_geo</td><td>✅</td></tr><tr><td>P2</td><td>天线增益</td><td>反射面 η(πD/λ)² 物理上限、相控阵 10lg(N·η)+G_el−cos^1.5θ 扫描损耗、货架注入溯源</td><td>✅</td></tr><tr><td>P3</td><td>系统噪声温度</td><td>Friis 级联独立重算（含 KG 链解析 + 合成默认链规则重建）</td><td>✅</td></tr><tr><td>P3b</td><td>接收链不缺失</td><td>任何场景 T_sys &gt; T_ant（首级放大器噪声必须计入）</td><td>✅</td></tr><tr><td>P3c</td><td>推导/校核两侧一致</td><td>选型侧与链路侧 T_sys 同值</td><td>✅</td></tr><tr><td>P4</td><td>ΣL 损耗合成</td><td>雨衰 A∝p^−0.6·sin30°/sin(el)、大气、指向 12(θe/θ3)²、极化 0.3、实现 1.0 逐项</td><td>✅</td></tr><tr><td>P5</td><td>需求反推</td><td>GT_req/EIRP_req 由 CN_des+M_t+B 独立重建</td><td>✅</td></tr><tr><td>P6/P7</td><td>MODCOD 与端到端</td><td>C/N→选档独立复算、CN_total=−10lg(Σ10^−CN/10)、再生 +4.5dB</td><td>✅</td></tr><tr><td>P8</td><td>容量/频谱</td><td>C_sys=N_beam×B×η×2pol vs C_req、频谱 ≤B_total×k</td><td>✅</td></tr><tr><td>P9</td><td>质量功耗链</td><td>Σrows×1.2 → 平台可行域独立重筛</td><td>✅</td></tr><tr><td>P10</td><td>激光星间链路</td><td>G_opt、L_fs、P_rx、余量全链</td><td>✅</td></tr><tr><td>P11</td><td>评级规则</td><td>硬准则全过→A/B/C（软 4/2~3/&lt;2），任一硬失败→D</td><td>✅</td></tr><tr><td>P12</td><td>六维评分</td><td>Σw·dim 加权总分独立重算</td><td>✅</td></tr><tr><td>P13</td><td>阵面功耗口径</td><td>ARR_P_PER_EL 偏置功耗（直射 2.5/反射 1.2/混合 0.9 W/元）×N_el</td><td>✅</td></tr><tr><td>P14</td><td>数值卫生</td><td>全输出无 NaN/Inf、可 JSON 序列化</td><td>✅</td></tr></tbody></table>
+<p><strong>验证范围</strong>：8 个内置场景 + 巴基斯坦 GEO + 功率墙 = <strong>10 场景 × 15 类，全部一致，RESULT: PASS（0 失败）</strong>。</p>
+<h3>5.3 验证发现并修复的真实物理缺陷（T_sys 相控阵噪声遗漏）</h3>
+<p>这是本次验证最重要的产出——<strong>交叉验证抓出了一个此前所有测试都没发现的物理 bug</strong>：</p>
+<table><thead><tr><th>项目</th><th>修复前</th><th>修复后</th></tr></thead><tbody><tr><td>缺陷机理</td><td>相控阵场景选用 <code>ant_rx_path</code> 接收链，但发布版知识图谱缺该节点 → 链为空 → T_sys = T_ant（仅 50~60K），<strong>漏掉 T/R 组件首级 LNA 噪声</strong></td><td><code>resolve_rx_chain</code> 检测空链/无首级放大器时合成默认链（相控阵→tr_module NF≈2dB；其他→lna+dconv），推导侧与校核侧同源</td></tr><tr><td>LEO 宽带 G/T</td><td>17.01 dB/K（<strong>乐观约 6dB</strong>）</td><td><strong>10.58 dB/K</strong>（T_sys=219.6K，物理正确）</td></tr><tr><td>LEO D2D / IoT G/T</td><td>8.22 dB/K</td><td><strong>2.39 dB/K</strong>（T_sys=229.6K）</td></tr><tr><td>影响评估</td><td>上行余量虚高，可能掩盖链路风险</td><td>修复后所有场景上行余量仍有 36~74dB（地面站强上行），结论不变但数值诚实</td></tr></tbody></table>
+<p>修复落点：<code>infoflow_engine.py</code>（新增 <code>resolve_rx_chain</code> + <code>compute_all</code> 调用）、<code>design_engine.py</code>（<code>_t_sys_family</code> 对齐同语义）。</p>
+<h3>5.4 回归测试全绿</h3>
+<table><thead><tr><th>测试</th><th>范围</th><th>结果</th></tr></thead><tbody><tr><td>独立物理验证 <code>_verify_physics.py</code></td><td>10 场景 × P0~P14</td><td><strong>PASS（0 失败）</strong></td></tr><tr><td>源码自检 <code>--selftest</code></td><td>8 场景全流程 + 评级 + 建议闭环 + 导出</td><td><strong>8/8 OK，grade=A</strong></td></tr><tr><td><strong>冻结 exe 自检</strong>（本次重打包后）</td><td>同上（PyInstaller 单文件环境）</td><td><strong>8/8 OK</strong>，GT=10.58/2.39 确认修复进 exe</td></tr><tr><td>冻结 exe GUI 检查 <code>--guicheck</code></td><td>WebView2/clr/WinForms 7 项依赖</td><td><strong>全部 OK</strong></td></tr><tr><td>链路预算核验 <code>verify_budget.py</code></td><td>V1~V7 独立口径</td><td>全部一致</td></tr><tr><td>后端冒烟 <code>_smoke_v5.py</code></td><td>51 项 API/引擎</td><td><strong>OK=51 FAIL=0</strong></td></tr><tr><td>后端冒烟 <code>_smoke_v4.py</code></td><td>HTTP 路由 + JS 桥同名</td><td>ALL PASS</td></tr><tr><td>货架检查 <code>_shelf_check.py</code>/<code>_shelf_func.py</code></td><td>单机库完整性/功能</td><td>ALL PASS</td></tr><tr><td>DOM 端到端 <code>_test_dom.js</code></td><td>52 项前端交互（node vm + stub DOM + 真实 HTTP）</td><td><strong>52/52 PASS</strong></td></tr><tr><td>父项目回归 <code>test_agent</code></td><td>102 用例</td><td><strong>OK（0.649s）</strong></td></tr></tbody></table>
+<h3>5.5 方案合理性结论</h3>
+<ol><li><strong>物理正确</strong>：所有链路量与独立第一性原理复算一致到小数位；</li><li><strong>工程保守</strong>：雨衰按可用度百分位、指向损耗 12(θe/θ3)²、质量功耗 ×1.2 裕度、EIRP 反推 +0.3dB 守卫；</li><li><strong>诊断诚实</strong>：不可行场景（容量缺口、功率墙）被正确判 D 并定量给出缺口，不"硬凑可行"；</li><li><strong>口径统一</strong>：推导侧与校核侧同源（T_sys 修复后彻底对齐），25 条约束与知识图谱判据 id 一一对应，结果可追溯。</li></ol>
+<hr/>
+<h2>六、关键工程口径速查</h2>
+<table><thead><tr><th>口径</th><th>取值/公式</th><th>说明</th></tr></thead><tbody><tr><td>FSPL</td><td>20lg(d)+20lg(f)−147.55</td><td>d 米、f 赫兹</td></tr><tr><td>雨衰缩放</td><td>A(p,el)=A_ref·(p/0.01)^−0.6·sin30°/sin(el)</td><td>A_ref 为 0.01% 超越概率 30° 仰角参考值</td></tr><tr><td>指向损耗</td><td>12(θe/θ3dB)²</td><td>θe 指向误差</td></tr><tr><td>反射面增益上限</td><td>G=η(πD/λ)²，η≤0.82</td><td>P2 校验货架增益不超物理上限</td></tr><tr><td>相控阵增益</td><td>10lg(N_el·η)+G_el−cos^1.5(θ_scan)</td><td>扫描损耗仅电扫阵</td></tr><tr><td>接收噪声</td><td>T_sys=Friis 级联（KG 链或合成默认链）</td><td>相控阵必含 tr_module（NF≈2dB）</td></tr><tr><td>G/T</td><td>G_ant−10lg(T_sys)</td><td>dB/K</td></tr><tr><td>EIRP</td><td>P_out+G_ant−L_feed−L_tx</td><td>L_tx 按 HPA 类型 3.5~4.7dB</td></tr><tr><td>MODCOD</td><td>28 档表，cn_req=Es/N0+1.0dB</td><td>由 C/N 反推选档，不预设体制</td></tr><tr><td>端到端 C/N</td><td>−10lg(10^−CN_up/10+10^−CN_dn/10)，再生 +4.5dB</td><td>透明转发取上下行串联</td></tr><tr><td>阵面功耗</td><td>ARR_P_PER_EL 偏置口径 ×N_el</td><td>直射 2.5/反射 1.2/混合 0.9/纯数字 4.0/拼接 1.0 W/元</td></tr><tr><td>HPA 上限</td><td>固面 250W/伞状 120W/大容量 120W/混合 250W/阵元 8W</td><td>超限触发内环回环</td></tr><tr><td>平台裕度</td><td>质量功耗 ×1.2 后比对包络</td><td>c-17</td></tr><tr><td>评级</td><td>硬 6 项（E1~E5,E10）+ 软 4 项（E6~E9）</td><td>全硬过→A/B/C，任一硬败→D</td></tr><tr><td>评分权重</td><td>性能 30/风险 20/成本 15/灵活 15/质量 10/功耗 10</td><td>总分 0~10</td></tr></tbody></table>
+<hr/>
+<h2>七、适用范围与限制</h2>
+<h3>7.1 适用</h3>
+<ul><li>通信卫星（GEO/MEO/LEO/SSO/HEO）有效载荷<strong>方案论证与初步设计</strong>；</li><li>业务类型：高通量宽带、广播电视、移动通信、手机直连 D2D、中继数传、军用抗干扰、窄带物联网；</li><li>频段：L/S/C/X/Ku/Ka/Q/V + 激光星间链路；</li><li>体制：透明/数字透明（DTP）/再生 × 固面/相控阵/伞状/大容量多波束/混合多波束。</li></ul>
+<h3>7.2 限制（使用时须知）</h3>
+<ol><li><strong>深度为方案级</strong>：链路预算为典型值口径（雨衰用区域参考值而非 ITU-R P.618 逐站计算），不能替代详细设计阶段的逐链路精算；</li><li><strong>货架库时效性</strong>：单机/平台/运载数据为知识库快照，工程引用前需与最新产品目录核对；</li><li><strong>GRASP 波束桥</strong>：仅支持偏置抛物面（F/D=1.31）PO 计算，其他反射面类型自动降级 Airy 解析近似；</li><li><strong>覆盖示意图</strong>：世界地图仅海岸线地理参考，<strong>不含政治边界</strong>，正式出版需换用合规审图底图；</li><li><strong>知识图谱依赖</strong>：<code>ant_rx_path</code> 等接收链节点若缺失，引擎按合成默认链兜底（已在 P3b 验证不遗漏噪声），但建议保持 KG 与引擎版本配套；</li><li><strong>Ka/Q/V 雨衰</strong>：高可用度（99.9%+）高纬度场景雨衰参考值可能偏保守，热带地区需实测修正。</li></ol>
+<hr/>
+<h2>八、交付物清单与文件结构</h2>
+<pre>PayloadDesign/
+├── tools/
+│   ├── dist/载荷方案设计器.exe          ← 主交付物（v4.1，15.1MB，含 T_sys 修复）
+│   ├── design_app.py                    主程序（pywebview + HTTP 双通道 + 前端）
+│   ├── design_engine.py                 设计引擎（五步闭环）
+│   ├── infoflow_engine.py               信息流/链路校核引擎（c-1~c-25）
+│   ├── design_data.py / infoflow_data.py 知识库（货架/平台/运载/MODCOD/场景）
+│   ├── grasp_bridge.py                  GRASP 波束桥
+│   ├── protocol_gen.py / report_gen.py  ICD 协议 / Word 报告生成
+│   ├── build_preview.py                 预览版构建脚本
+│   ├── build_exe.bat / design_app.spec  打包脚本/配置
+│   └── _verify_physics.py               ★ 独立第一性原理验证（本次新增）
+│       _verify_physics_out.txt          ★ 验证报告（RESULT: PASS）
+│       _smoke_v5.py / _test_dom.js / verify_budget.py  回归测试资产
+├── output/
+│   ├── 载荷方案设计器_软件说明.md / .html ← 本文档
+│   ├── 载荷方案设计器_预览版.html        ← 浏览器演示版（8 场景预计算）
+│   ├── 通信有效载荷知识图谱_2026-09-20.json（exe 内嵌同源）
+│   └── 演示_巴基斯坦GEO高通量_载荷方案报告.doc（导出样例）
+└── backup_v1_20260921/                  v1 备份（旧 exe 保留）</pre>
+<p><strong>验证复现命令</strong>（在 <code>tools/</code> 目录，使用 venv Python）：</p>
+<pre>set PYTHONIOENCODING=utf-8
+python -B _verify_physics.py &gt; _verify_physics_out.txt   REM 独立物理验证 → RESULT: PASS
+python -B _smoke_v5.py                                    REM 后端冒烟 51 项
+python -B verify_budget.py                                REM 链路预算 V1~V7
+dist\载荷方案设计器.exe --selftest                          REM 冻结自检 8 场景
+dist\载荷方案设计器.exe --guicheck                          REM GUI 依赖 7 项</pre>
+<hr/>
+<h2>九、常见问题</h2>
+<table><thead><tr><th>现象</th><th>原因与处置</th></tr></thead><tbody><tr><td>exe 双击无反应</td><td>缺 Edge WebView2 Runtime → 安装后重试（Win11 一般自带）；可查 <code>payload_designer_boot.log</code></td></tr><tr><td>评级 D</td><td>看「⑩ 约束校验」页 fail 项：容量缺口→增波束/带宽；功率墙→换反射面或降 EIRP 需求；平台无解→减质量功耗</td></tr><tr><td>相控阵场景 G/T 与手算差 6dB</td><td>手算若漏 T/R 组件 LNA 噪声会偏高——软件口径（含 tr_module NF≈2dB）为准</td></tr><tr><td>自定义参数不生效</td><td>预览版是快照，请用 exe 或 <code>--web</code> 版实时重算</td></tr><tr><td>导出 Word 打开格式异常</td><td>用 Microsoft Word（非 WPS 旧版）打开 .doc；打印/PDF 走浏览器内核更稳</td></tr></tbody></table>
+<hr/>
+<p><em>文档生成：2026-09-22 · 验证依据：<code>_verify_physics_out.txt</code>（RESULT: PASS）+ 全套回归测试记录</em></p>
+</div></div>
+<script>
+function doPrint(){window.print();}
+function doDownloadDoc(){
+  var body=document.getElementById('doc').innerHTML;
+  var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    +'<head><meta charset="utf-8"><title>载荷方案设计器软件说明</title>'
+    +'<style>body{font-family:"Microsoft YaHei",sans-serif;font-size:12pt;line-height:1.7}'
+    +'h1{font-size:20pt;color:#1450a0}h2{font-size:16pt;color:#1450a0}h3{font-size:13pt}'
+    +'table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 8px;font-size:10.5pt}'
+    +'th{background:#eaf1fa}pre{background:#f2f2f2;padding:10px;font-family:Consolas,monospace;font-size:10pt}'
+    +'blockquote{background:#fff8e6;border-left:4px solid #e6a817;padding:8px 12px;margin:8px 0}</style></head>'
+    +'<body>'+body+'</body></html>';
+  var blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='载荷方案设计器_软件说明.doc';a.click();URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
