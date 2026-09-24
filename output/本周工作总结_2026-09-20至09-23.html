@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>文生载荷项目 · 本周工作总结（2026-09-20~23）</title>
+<style>
+:root{--ink:#1a2332;--mut:#5a6b82;--acc:#1450a0;--line:#d8e0ea;--bg:#f4f7fb;--card:#ffffff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:15px}
+.toolbar{position:sticky;top:0;z-index:9;background:#0e2a52;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toolbar .ttl{font-weight:700;margin-right:auto;font-size:15px}
+.toolbar button{background:#1d4f91;color:#fff;border:1px solid #3a6db5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px}
+.toolbar button:hover{background:#2a63b0}
+.wrap{max-width:980px;margin:24px auto;padding:40px 52px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 14px rgba(20,40,80,.06)}
+h1{font-size:26px;color:var(--acc);border-bottom:3px solid var(--acc);padding-bottom:12px;margin:6px 0 18px}
+h2{font-size:20px;color:var(--acc);margin:30px 0 12px;padding-left:10px;border-left:5px solid var(--acc)}
+h3{font-size:16.5px;margin:20px 0 8px;color:#0e2a52}
+h4{font-size:15px;margin:14px 0 6px}
+p{margin:8px 0}
+hr{border:none;border-top:1px dashed var(--line);margin:22px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th{background:#eaf1fa;color:#0e2a52;font-weight:700;text-align:left;padding:8px 10px;border:1px solid var(--line)}
+td{padding:7px 10px;border:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#f8fafd}
+code{background:#eef2f7;color:#b03060;border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px}
+pre{background:#0f1c2e;color:#d8e4f2;border-radius:8px;padding:14px 18px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.6;margin:12px 0}
+pre code{background:none;color:inherit;padding:0}
+blockquote{background:#fff8e6;border-left:4px solid #e6a817;border-radius:0 8px 8px 0;padding:10px 16px;margin:12px 0;color:#6b5312;font-size:14px}
+ul,ol{margin:8px 0 8px 26px}
+li{margin:4px 0}
+strong{color:#0e2a52}
+@media print{.toolbar{display:none}.wrap{border:none;box-shadow:none;max-width:none;margin:0;padding:0}body{background:#fff}h2{page-break-after:avoid}table,pre,blockquote{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="toolbar"><span class="ttl">文生载荷项目 · 本周工作总结（2026-09-20 ~ 09-23）</span><button onclick="doDownloadDoc()">⬇ 下载 Word（.doc）</button><button onclick="doPrint()">🖨 打印 / PDF</button></div>
+<div class="wrap"><div id="doc">
+<h1>文生载荷项目 · 本周工作总结</h1>
+<blockquote><strong>统计周期</strong>：2026-09-20（周日）~ 2026-09-23（周三），连续 4 天攻坚<br/><strong>项目</strong>：文生有效载荷智能体 + 载荷方案设计器（D:\ZWL\文生载荷Workbuddy）<br/><strong>本周主线</strong>：从「智能体骨架 + 知识图谱」奠基，到「载荷方案设计器」桌面应用 v1→v5.3 连续 6 轮升级，最终形成含<strong>稳健性分析</strong>的完整方案论证工具，并推送 GitHub 仓库。</blockquote>
+<hr/>
+<h2>一、结论先行</h2>
+<p><strong>一句话</strong>：本周完成了文生载荷平台从 0 到 1 的体系化构建——以「一句自然语言需求 → 可审计卫星载荷方案」为目标，交付了<strong>智能体骨架（102 用例）+ 通信有效载荷知识图谱（121 本体）+ 13 页签桌面设计器（v5.3）+ 独立第一性原理验证体系</strong>，全部回归测试绿灯，exe 与预览版可交付，代码已入库 GitHub。</p>
+<h3>核心数字看板</h3>
+<table><thead><tr><th>维度</th><th>本周成果</th></tr></thead><tbody><tr><td>设计器版本演进</td><td>v1 → v4 → v5 → v5.1 → v5.2 → <strong>v5.3</strong>（6 轮升级）</td></tr><tr><td>前端页签</td><td>10 → <strong>13 个</strong>（新增轨道仿真、稳健性分析等）</td></tr><tr><td>内置计算引擎</td><td>新增 <strong>5 个</strong>（pattern / coverage / orbit / analysis / propagation）</td></tr><tr><td>Word 报告</td><td>9 章 → <strong>14 章</strong>，插图 11 → <strong>18 张</strong>（SVG 光栅化）</td></tr><tr><td>货架单机库</td><td>65 → <strong>86 条</strong>（对标银河航天 / SatNow / Tesat 真实产品）</td></tr><tr><td>知识图谱</td><td><strong>121 本体 / 167 属性 / 25 约束 / 129 关系</strong></td></tr><tr><td>回归测试</td><td>selftest 8/8 · DOM E2E <strong>88</strong> · smoke_v5 <strong>72</strong> · 报告 <strong>43</strong> · 智能体 <strong>102</strong> · 物理验证 <strong>0 失败</strong></td></tr><tr><td>交付 exe</td><td><strong>14.69 MB</strong>（冻结自检 grade=A）</td></tr><tr><td>GitHub 入库</td><td><strong>137 文件 / 12.46 MB</strong>（Payload-v1 仓库）</td></tr></tbody></table>
+<hr/>
+<h2>二、四阶段工作时间线</h2>
+<table><thead><tr><th>阶段</th><th>日期</th><th>主题</th><th>关键产出</th></tr></thead><tbody><tr><td><strong>一 · 奠基</strong></td><td>9/20</td><td>智能体骨架 + 知识图谱 + 设计器 v1</td><td>payload_agent 包（11 Skill / 30 异常规则 / 双回环）、通信有效载荷知识图谱 v3、pywebview 桌面设计器初版（14.2MB exe）、载荷指标拆解模块、巴基斯坦 GEO 示例验证</td></tr><tr><td><strong>二 · 能力扩展</strong></td><td>9/21</td><td>设计器 v4→v5.1 三连升级</td><td>信息流图 / 导出 Word / GRASP 波束 / 覆盖示意图 / 完整报告 report_gen / 2D 方向图 / 3D 地球 / MOSA 协议 / 一键建议闭环 / 评价标准 E1-E10 / Word SVG 光栅化；货架增补至 86 条</td></tr><tr><td><strong>三 · 物理验证 + 三引擎</strong></td><td>9/22</td><td>独立验证 + 仿真引擎集成</td><td>_verify_physics（P0-P14，<strong>抓出 T_sys 相控阵噪声遗漏 bug</strong>）、软件说明文档、v5.1 五项整改、pattern/coverage/orbit 三引擎（GRASP/SATSOFT/STK 等效）+ 前端④②⑫页签 + 报告 13 章</td></tr><tr><td><strong>四 · 稳健性 + 交付</strong></td><td>9/23</td><td>方案级稳健性分析 + 入库</td><td>analysis_engine（蒙特卡洛 / 邻星干扰 / 可靠性三 R / 工具回读）+ propagation（XPD）+ 星蚀 / 位保 ΔV、前端⑬页签、报告第 13 章→14 章 18 图、全量回归绿、exe 重打包、<strong>推送 GitHub</strong></td></tr></tbody></table>
+<hr/>
+<h2>三、五大工作板块详述</h2>
+<h3>3.1 智能体骨架与知识图谱（9/20）</h3>
+<p><strong>payload_agent 包</strong>（零依赖可运行）：把载荷设计流程 Skill 化——</p>
+<pre>SK-INTENT（意图解析）→ SK-CLARIFY（缺项阻断闸）→ SK-RETRIEVE（知识图谱检索）
+→ SK-ANTSEL / SK-EQUIP（天线与单机选型）→ SK-PLAT / SK-LAUNCH（平台与运载）
+→ SK-BUDGET（链路预算）→ SK-VALID（质量闸）→ SK-DOC / SK-WORD（文档输出）</pre>
+<ul><li><strong>双回环</strong>：内环 = 平台可行性换天线（≤3 迭代）；外环 = 链路余量否决天线重选型（≤2 次）</li><li><strong>异常三级分级</strong>：L1 自动降级 / L2 告警放行 / L3 中止转人工（30 条规则）</li><li><strong>铁律</strong>：禁止擅自假设、频段硬约束不回退、MODCOD 由 C/N 反推不预设体制</li><li>验证：<code>test_agent.py</code> <strong>102 用例全过</strong>，<code>demo.py</code> 8 用例走通</li></ul>
+<p><strong>通信有效载荷知识图谱 v3</strong>（用户反馈驱动重构）：121 本体 / 167 属性 / 25 约束 / 129 关系；L0 载荷 → L1 五分系统（天线/转发器/激光/智能处理/公共基础）→ L2 分组（22 个）→ L3 体制(9)/单机(55)/链路(12)；链路/体制节点带 <strong>chain 字段</strong>（有序单机列表）自动派生关系边。配套交互式 HTML 查看器。</p>
+<p><strong>附带产出</strong>：PingCode 载荷设计流程 6 个月敏捷计划（274 工作项 / 365 故事点 / 8 CSV + HTML + MD）；载荷信息流仿真计算器（单文件 HTML 121.8KB，射频+激光+星内数据+系统校核）。</p>
+<h3>3.2 载荷方案设计器 GUI 应用（v1→v5.3，贯穿全周）</h3>
+<p><strong>架构决策（关键）</strong>：放弃「JS 镜像引擎」→ 改 <strong>pywebview（Edge WebView2）+ 真实 Python 引擎</strong>，Python 为唯一真源，彻底消除 JS/Python 一致性问题；<strong>双通道</strong>（内置标准库 HTTP 服务 + JS 桥），网页版 <code>--web</code> 可实时计算。</p>
+<p><strong>13 个页签能力</strong>（本周从 10 扩到 13）：</p>
+<table><thead><tr><th>页签</th><th>本周新增/增强</th></tr></thead><tbody><tr><td>①需求输入</td><td>全球国家覆盖库（~60 国）、一键建议值（闭环修正 ≤3 轮）、工作模式 8 项下拉</td></tr><tr><td>②方案总览</td><td>EIRP 覆盖热力图（Canvas 栅格化）、<strong>方案评价面板</strong>（E1-E10 十项准则 → A/B/C/D 评级）</td></tr><tr><td>③载荷框图</td><td>信息流图（星地/星间/星内三段 + 数据包流动动画）</td></tr><tr><td>④天线波束</td><td>GRASP 波束性能、<strong>次级方向图 grid/cut 双视图</strong>、扫描态切换、栅瓣核查</td></tr><tr><td>⑥信息流</td><td><strong>层次化重构</strong>（业务/数据/控制/供能 × 星地段 × L1-L8 功能级三维渲染）</td></tr><tr><td>⑪接口协议</td><td><strong>MOSA 风格 ICD 自动生成</strong>（接口矩阵 / CCSDS 帧 / APID/VCID / 总线选型）</td></tr><tr><td>⑫轨道仿真</td><td><strong>新页签</strong>（STK 等效：24h 轨迹 / 快照覆盖圈 / 可见窗表 / 合理性判定 / 导出 .e）</td></tr><tr><td>⑬稳健性分析</td><td><strong>新页签</strong>（星蚀 / 位保 ΔV / 蒙特卡洛 / XPD / 可靠性三 R / 邻星干扰）</td></tr></tbody></table>
+<p><strong>Word 报告</strong>（report_gen.py）：从 9 章扩到 <strong>14 章</strong>——新增设计原理与方法论、星座组网、EIRP 覆盖、轨道仿真、稳健性分析等章；封面页 + 摘要页（结论先行）+ 图表编号题注 + 章导语；<strong>SVG 光栅化为 PNG</strong>（Edge headless 截图，解决 Word 不渲染内嵌 SVG 的问题）→ 18 张插图。</p>
+<h3>3.3 三大仿真引擎（9/22，等效商业工具）</h3>
+<table><thead><tr><th>引擎</th><th>等效工具</th><th>核心能力</th></tr></thead><tbody><tr><td><code>pattern_engine.py</code></td><td><strong>GRASP</strong></td><td>相控阵（阵元因子 × 可分离阵因子 + 扫描相位梯度）/ 反射面（Hankel 变换）次级方向图；grid 91×73 + cut ±15° + 宽角签名；栅瓣解析+数值双路；导出 <code>.grd</code></td></tr><tr><td><code>coverage_engine.py</code></td><td><strong>SATSOFT</strong></td><td>波束指向反解 → 逐格点 EIRP 精确投影 → marching squares 等值线 → 8 方位足迹度量；导出 CSV</td></tr><tr><td><code>orbit_engine.py</code></td><td><strong>STK</strong></td><td>Kepler + J2 摄动 + GMST；可见窗 / 快照 / 分轨型判定；Walker 星座；GEO 定点经度→数值标定 RAAN；导出 STK <code>.e</code> 星历</td></tr></tbody></table>
+<p>全部<strong>纯 Python 零依赖</strong>（exe 冻结禁 numpy），与前端、报告同源计算。</p>
+<h3>3.4 方案级稳健性分析（9/23，v5.3 核心）</h3>
+<p>新增 <code>analysis_engine.py</code> + <code>propagation.py</code>，实现 P0-P3 全 14 项改进：</p>
+<ul><li><strong>蒙特卡洛链路灵敏度</strong>：dB 域线性叠加（EIRP/G/T σ=0.5dB、雨衰对数正态、指向、极化、实现损耗），输出直方图 + 龙卷风图</li><li><strong>可靠性三 R 口径</strong>：r_serial（单串基线）/ r_asbuilt（按 BOM 标注）/ r_designed（标准 1:1 冗余）；series/pair/triple/k-out-of-n 全行型；MTBF_TABLE 分类保守值</li><li><strong>冗余整改建议</strong>（redundancy_advice）：二分反解 MTBF 提升倍数 + Π(1−q) 全量重算，GEO 实测 R 由 <strong>0% → 75.05%</strong>（8 加备 + 8 提 MTBF），未达 95% 诚实标注</li><li><strong>邻星干扰 C/I</strong>：ITU-R S.465-6 地面站旁瓣包络 + S.580/S.1428 卫星旁瓣，单/多入境</li><li><strong>星蚀功率核算</strong>：GEO 分点历元锚定（±400 天扫描）；<strong>位保 ΔV/寿命</strong>：齐奥尔科夫斯基（GEO 52 m/s/yr）</li><li><strong>雨致交叉极化 XPD</strong>：P.618-12 §4.1 全项（C_f/C_A/C_τ/C_θ/C_σ）</li><li><strong>GRASP/SATSOFT/STK 结果回读</strong>：4 类 RMS≈0 交叉校验</li><li>非 GEO 轨道（LEO/SSO/MEO/星座）正确降级</li></ul>
+<h3>3.5 质量验证体系（贯穿全周）</h3>
+<p><strong>独立第一性原理验证</strong> <code>_verify_physics.py</code>（~700 行）：不复用引擎函数，从教科书公式独立重写 <strong>P0~P14 共 15 类物理量</strong>交叉验证，10 个场景全部通过。</p>
+<blockquote><strong>本周最大质量收获</strong>：该验证体系<strong>抓出一个真实物理 bug</strong>——发布版知识图谱缺 <code>ant_rx_path</code> 节点 → 相控阵接收链为空 → T_sys 漏算 T/R 组件 LNA 噪声，G/T 乐观约 <strong>6 dB</strong>。修复后 leo_broadband GT 17.01→10.58 dB/K。教训：KG 数据缺节点会被静默兜底掩盖，任何"链为空就用环境值"的兜底都是物理隐患。</blockquote>
+<hr/>
+<h2>四、质量验证矩阵（本周最终基线，全绿）</h2>
+<table><thead><tr><th>验证项</th><th>结果</th><th>说明</th></tr></thead><tbody><tr><td>冻结 exe <code>--selftest</code></td><td><strong>8/8 grade=A</strong></td><td>8 场景 + 评价 + 闭环建议 + export png=18 RASTERIZED</td></tr><tr><td>冻结 exe <code>--guicheck</code></td><td><strong>7/7 OK</strong></td><td>WebView2 153.0.4234.48 / netfx 全链路</td></tr><tr><td>独立物理验证 <code>_verify_physics</code></td><td><strong>0 失败</strong></td><td>P0-P14 / 10 场景</td></tr><tr><td>链路预算复算 <code>verify_budget</code></td><td><strong>V1-V7 一致</strong></td><td>容差 0.02dB 内</td></tr><tr><td>冒烟 <code>_smoke_v5</code></td><td><strong>72/0</strong></td><td>含稳健性版式断言</td></tr><tr><td>报告章节 <code>_t63_report</code></td><td><strong>43/0</strong></td><td>目录 14 章 + 稳健性章 10 项</td></tr><tr><td>DOM 端到端 <code>_test_dom.js</code></td><td><strong>88/0</strong></td><td>含稳健页 12 项</td></tr><tr><td>三引擎 API <code>_t59_api</code></td><td><strong>6/6</strong></td><td>pattern/coverage/orbit</td></tr><tr><td>货架检查 <code>_shelf_check/func</code></td><td><strong>86 条 PASS</strong></td><td>结构完整性 + 选型功能</td></tr><tr><td>智能体 <code>test_agent</code></td><td><strong>102 OK</strong></td><td>父项目回归无破坏</td></tr><tr><td>稳健性多轨型 <code>_rb9</code></td><td><strong>PASS</strong></td><td>LEO/SSO/MEO/星座降级正确</td></tr></tbody></table>
+<hr/>
+<h2>五、关键技术突破与踩坑</h2>
+<table><thead><tr><th>类别</th><th>问题 → 解决</th></tr></thead><tbody><tr><td><strong>Word 不渲染 SVG</strong></td><td>Word/WPS 的 HTML 导入滤镜只认 <code>&lt;img&gt;</code>，内嵌 <code>&lt;svg&gt;</code> 静默空白 → Edge headless <code>--screenshot</code> 把全部 SVG 光栅化为 PNG base64（1s/张，并行 4 路）</td></tr><tr><td><strong>exe 打开没反应</strong></td><td>pywebview 默认 coreclr 需单独装 .NET Desktop Runtime，缺失时 <code>import clr</code> 静默崩溃 → 强制 <code>PYTHONNET_RUNTIME=netfx</code>（Win10/11 自带 .NET Framework 4.8）</td></tr><tr><td><strong>JS 变量遮蔽</strong></td><td>全局格式化函数 <code>n(v,nd)</code> 被局部 <code>const n</code> 遮蔽 → 波束面板整体降级；规约：单字母全局函数名禁止在函数体内复用</td></tr><tr><td><strong>T_sys 物理 bug</strong></td><td>见 3.5，KG 缺节点被静默兜底掩盖 → 独立验证抓出</td></tr><tr><td><strong>可靠性整改误报</strong></td><td>redundancy_advice 只看 series 行，通道化大数组（72× TWTA）击穿容差时误报"无需加备" → 全行型闭环 + Π(1−q) 全量重算</td></tr><tr><td><strong>并行 Edit 竞态</strong></td><td>同一文件多处 Edit 同轮并行会互相覆盖丢改动 → 同文件多处修改必须串行</td></tr><tr><td><strong>PowerShell 沙箱</strong></td><td>ConPTY ACCESS_DENIED(5) 可能持续复发 → 冻结 exe 验证改用 Python subprocess helper（CREATE_NO_WINDOW）绕开</td></tr><tr><td><strong>中文路径 git</strong></td><td><code>git diff --cached</code> 中文路径被引号转义致 shell 判断失效 → 用 Python 脚本 + <code>core.quotepath=off</code> 统计</td></tr></tbody></table>
+<hr/>
+<h2>六、交付物清单</h2>
+<table><thead><tr><th>交付物</th><th>路径</th><th>状态</th></tr></thead><tbody><tr><td>桌面应用 exe</td><td><code>PayloadDesign/tools/dist/载荷方案设计器.exe</code>（14.69MB）</td><td>冻结自检 grade=A</td></tr><tr><td>浏览器预览版</td><td><code>PayloadDesign/output/载荷方案设计器_预览版.html</code>（1770KB）</td><td>13 页签 + 8 场景预计算</td></tr><tr><td>软件说明文档</td><td><code>PayloadDesign/output/载荷方案设计器_软件说明.md/.html</code></td><td>含验证体系 + FAQ</td></tr><tr><td>方案报告样例</td><td><code>PayloadDesign/output/巴基斯坦GEO..._论证报告_预览.html</code></td><td>14 章 + 18 图</td></tr><tr><td>知识图谱</td><td><code>PayloadDesign/output/通信有效载荷知识图谱_*.json</code></td><td>121 本体</td></tr><tr><td>智能体骨架</td><td><code>payload_agent/</code> + <code>demo.py</code> + <code>test_agent.py</code></td><td>102 用例</td></tr><tr><td>业务流程文档</td><td><code>output/文生载荷业务流程梳理_*.html/.md</code></td><td>含流程图 + 异常分级表</td></tr><tr><td><strong>GitHub 仓库</strong></td><td>https://github.com/yeyingyumeigui/Payload-v1</td><td>137 文件 / 12.46MB</td></tr></tbody></table>
+<hr/>
+<h2>七、航天工程启示</h2>
+<ol><li><strong>「独立验证」是航天软件的刚需，不是可选项</strong>。本周 _verify_physics 抓出的 T_sys 漏算（G/T 乐观 6dB）若流入方案，会导致链路余量虚高、整星可行性误判。航天型号「设计、验证、复核」三线分离的原则，在工具开发中同样成立——<strong>用不复用源码的独立公式复算，才能发现源码级系统性偏差</strong>。</li></ol>
+<ol><li><strong>商业工具的「等效自研」要抓物理内核而非界面</strong>。本周用纯 Python 复刻 GRASP/SATSOFT/STK 的核心算法（方向图、覆盖投影、轨道传播），证明在方案论证阶段，<strong>抓住第一性原理（Friis、Hankel 变换、Kepler+J2）即可替代商业软件的大部分功能</strong>，且零依赖、可冻结、可审计——这对自主可控有直接意义。</li></ol>
+<ol><li><strong>稳健性分析把「可行」升级为「可靠」</strong>。传统载荷设计止于链路预算闭合（可行），本周新增的蒙特卡洛灵敏度、可靠性三 R 口径、邻星干扰、星蚀/位保，把方案推到「在轨全寿命可靠」维度。<strong>可靠性不是算出来的余量，而是设计出来的冗余</strong>——redundancy_advice 从 0% 到 75% 的整改闭环正是这一思想的代码化。</li></ol>
+<ol><li><strong>知识图谱 + 货架库 = 选型可追溯</strong>。86 条对标真实产品（银河/SatNow/Tesat）的货架 + 121 本体图谱，使每个选型决策都能回溯到 level 编号、频段约束、物理判据，<strong>杜绝「拍脑袋选型」</strong>，这正是商业航天批产、供应链协同所需的数字化底座。</li></ol>
+<hr/>
+<h2>八、遗留与下周展望</h2>
+<ul><li><strong>遗留</strong>：信息流趋势条未与外部知识库 API 联动；覆盖图 hex 栅格最多示意 61 波束；GRASP 实测路径依赖本机 ticra-tools 安装（无则解析降级）。</li><li><strong>安全跟进</strong>：本周推送 GitHub 使用的 PAT 已在对话中明文出现，<strong>需用户尽快撤销并重新生成</strong>（remote 已存干净 URL，仓库配置无 token 残留）。</li><li><strong>下周可做</strong>：①稳健性整改建议的自动回灌设计（当前仅给建议，未自动改 BOM 重算）；②多星星座的星间链路时序与覆盖可用度地图深化；③exe 用 GitHub Release 分发（当前 .gitignore 排除二进制）；④软件说明文档同步更新至 v5.3（当前标注 v4.1）。</li></ul>
+</div></div>
+<script>
+function doPrint(){window.print();}
+function doDownloadDoc(){
+  var body=document.getElementById('doc').innerHTML;
+  var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    +'<head><meta charset="utf-8"><title>本周工作总结</title>'
+    +'<style>body{font-family:"Microsoft YaHei",sans-serif;font-size:12pt;line-height:1.7}'
+    +'h1{font-size:20pt;color:#1450a0}h2{font-size:16pt;color:#1450a0}h3{font-size:13pt}'
+    +'table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 8px;font-size:10.5pt}'
+    +'th{background:#eaf1fa}pre{background:#f2f2f2;padding:10px;font-family:Consolas,monospace;font-size:10pt}'
+    +'blockquote{background:#fff8e6;border-left:4px solid #e6a817;padding:8px 12px;margin:8px 0}</style></head>'
+    +'<body>'+body+'</body></html>';
+  var blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='本周工作总结_2026-09-20至09-23.doc';a.click();URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

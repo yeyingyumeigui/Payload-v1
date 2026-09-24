@@ -144,10 +144,11 @@ try:
     import pattern_engine as PE                                     # noqa: E402
     import coverage_engine as CE                                    # noqa: E402
     import orbit_engine as OE                                       # noqa: E402
+    import reflector_engine as RFE                                  # noqa: E402
     _bootlog("design_data / design_engine / grasp_bridge / protocol_gen / report_gen "
-             "/ pattern_engine / coverage_engine / orbit_engine imported OK")
+             "/ pattern_engine / coverage_engine / orbit_engine / reflector_engine imported OK")
 except Exception:
-    _fatal("无法导入设计引擎模块（design_data / design_engine / grasp_bridge / protocol_gen / report_gen / pattern_engine / coverage_engine / orbit_engine）：\n" + _tb.format_exc())
+    _fatal("无法导入设计引擎模块（design_data / design_engine / grasp_bridge / protocol_gen / report_gen / pattern_engine / coverage_engine / orbit_engine / reflector_engine）：\n" + _tb.format_exc())
     raise
 
 # ---------- 世界陆地轮廓底图（覆盖区示意图用，仅海岸线无政治边界） ----------
@@ -523,6 +524,54 @@ class Api:
             return dict(ok=False, error=f"{type(e).__name__}: {e}",
                         trace=traceback.format_exc()[-800:])
 
+    def reflector(self, payload):
+        """偏置反射面天线设计（v4）：反射器口径/焦距/中心偏置/馈源口径 → 几何/照射/
+        效率/增益/方向图/约束校核；或由目标波束宽度反解口径。
+        payload: {D_r, f, h, d_feed, freq_ghz, f_over_d, h_over_d, edge_taper_db,
+                  feed_model, surface_rms_mm, beam_deg(反解用), want_pattern}"""
+        try:
+            p = dict(payload or {})
+            f_dn = float(p.get("freq_ghz") or 20.0)
+            taper = float(p.get("edge_taper_db") or -12.0)
+            feed_model = str(p.get("feed_model") or "cosq")
+            f_over_d = float(p.get("f_over_d") or 1.0)
+            h_over_d = float(p.get("h_over_d") or 0.55)
+            rms = p.get("surface_rms_mm")
+            rms = float(rms) if rms not in (None, "") else None
+            want_pat = bool(p.get("want_pattern", True))
+            D_r = p.get("D_r")
+            beam_deg = p.get("beam_deg")
+            D_r = float(D_r) if D_r not in (None, "") else None
+            # 反解路径：给目标波束宽度、不给口径 → synthesize
+            if (D_r is None or D_r <= 0) and beam_deg not in (None, ""):
+                r = RFE.synthesize(theta3db_target_deg=float(beam_deg), freq_ghz=f_dn,
+                                   edge_taper_db=taper, f_over_d=f_over_d,
+                                   h_over_d=h_over_d, feed_model=feed_model,
+                                   surface_rms_mm=rms)
+            else:
+                f = p.get("f")
+                h = p.get("h")
+                f = float(f) if f not in (None, "") else f_over_d * (D_r or 1.0)
+                h = float(h) if h not in (None, "") else h_over_d * (D_r or 1.0)
+                d_feed = p.get("d_feed")
+                d_feed = float(d_feed) if d_feed not in (None, "") else None
+                r = RFE.design(D_r, f, h, f_dn, d_feed, taper, feed_model,
+                               surface_rms_mm=rms, want_pattern=want_pat,
+                               n_ap=61, n_spill=81, n_ff=41)
+            # 方向图 cut 抽稀（前端 SVG 用），避免回传过大
+            if r.get("ok") and r.get("pattern") and want_pat:
+                pf = r["pattern"]
+                step = max(1, len(pf.get("cut_theta", [])) // 241)
+                pf["cut_theta"] = pf["cut_theta"][::step]
+                pf["cut_e_dbr"] = pf["cut_e_dbr"][::step]
+                pf["cut_h_dbr"] = pf["cut_h_dbr"][::step]
+            return _clean(dict(ok=bool(r.get("ok")), result=r,
+                               error=r.get("error")))
+        except Exception as e:                          # noqa: BLE001
+            import traceback
+            return dict(ok=False, error=f"{type(e).__name__}: {e}",
+                        trace=traceback.format_exc()[-800:])
+
     def coverage(self, payload):
         """地面 EIRP 覆盖（SATSOFT 等效内置计算）：方向图 → 星下点/波束指向 → EIRP 网格
         + 等值线段 + 足迹度量。payload 在 pattern 参数基础上加：
@@ -552,6 +601,11 @@ class Api:
                               for seg in CE.contour_segments(cov, lv)][:400]
                     for lv in levels}
             met = CE.coverage_metrics(cov, levels_dbw=levels)
+            # 波束角域环（±θ → 地面投影，分色标注 −3dB/−10dB/首零陷）
+            try:
+                rings = CE.beam_angle_rings(pat, h_km, sat_lat=sat_lat, sat_lon=sat_lon)
+            except Exception:                               # noqa: BLE001
+                rings = dict(ok=False, rings=[])
             # EIRP 网格抽稀给前端着色（≤61×81 点）
             st_i = max(1, len(cov["lat"]) // 60)
             st_j = max(1, len(cov["lon"]) // 80)
@@ -565,6 +619,8 @@ class Api:
                        beam_center=cov["beam_center"], scan=cov["scan"],
                        sat=cov["sat"], peak_eirp_dbw=pk,
                        contours=segs, levels=levels, metrics=met,
+                       rings=rings.get("rings") or [],
+                       th3_deg=rings.get("beamwidth_3db_deg"),
                        exact=cov["exact"], note=cov["note"])
             if p.get("export_csv"):
                 tag = _safe_name(p.get("tag") or "覆盖", "").rsplit(".", 1)[0]
@@ -635,7 +691,14 @@ class Api:
                                      raan_deg=float(raan),
                                      argp_deg=float(p.get("argp_deg") or 0.0))
             t_snap = t0 + float(p.get("t_offset_min") or 0.0) * 60.0
-            snap = OE.snapshot(t_snap, el, targets=targets, el_min_deg=el_min)
+            # v4.1：波束照射足迹参数（半锥角=θ3dB/2；GEO 电扫指向目标点）
+            bhc = p.get("beam_half_cone_deg")
+            bhc = float(bhc) if bhc not in (None, "") else None
+            btg = p.get("beam_target") or {}
+            snap = OE.snapshot(t_snap, el, targets=targets, el_min_deg=el_min,
+                               beam_half_cone_deg=bhc,
+                               beam_target=(btg if bhc else None),
+                               beam_mode=str(p.get("beam_mode") or "target"))
             snap["t_offset_min"] = round(float(p.get("t_offset_min") or 0.0), 1)
             import time as _time
             snap["t_utc"] = _time.strftime("%Y-%m-%d %H:%M:%S UTC",
@@ -813,6 +876,8 @@ def start_http_server(host="127.0.0.1", port=0):
                 self._json(_api_singleton.beam(body))
             elif path == "/api/pattern":
                 self._json(_api_singleton.pattern(body))
+            elif path == "/api/reflector":
+                self._json(_api_singleton.reflector(body))
             elif path == "/api/coverage":
                 self._json(_api_singleton.coverage(body))
             elif path == "/api/orbit":
@@ -1432,11 +1497,31 @@ function renderCfgUI(){
         '<div class="hint" id="hint_coverage_list">填写 ≥2 个覆盖区即启用多区合成：各区独立几何推导（仰角/斜距/雨衰），'+
         '链路按最差区（雨衰+斜距严重度最高）闭合，波束总数=Σ各区密铺；一键建议值同步按合成包络给出</div></div>'+
     '</div><div class="grid g4" style="margin-top:10px">'+
-      cfgField("C_req_ovr","容量需求覆盖 (Gbps)","number",null,"留空取业务库默认")+
+      cfgField("cov_half_deg","覆盖角度 ±(°)（方案选项）","number",null,"覆盖区角半径；填写后按所选口径驱动全链路几何（优先于 km 值）。例：±1.5°")+
+      cfgField("angle_basis","覆盖角口径","select",[["offaxis","天线离天底角（离轴/扫描角）"],["geocentric","地心角（星下点—边缘张角）"],["footprint","地面足迹角（按斜距折算）"]],"GEO 离轴 1.5°≈地心 8.47°≈942km 地面半径（差 5.6 倍，务必选对）")+
       cfgField("GT_term","用户终端 G/T (dB/K)","number",null,"留空取业务库默认")+
       cfgField("EIRP_term","用户终端 EIRP (dBW)","number",null,"留空取业务库默认；馈电关口站 EIRP_gs 在高级项")+
+    '</div><div class="grid g4" style="margin-top:10px">'+
       cfgField("M_target","余量门限 (dB)","number",null,"skill 规范 ≥3dB")+
     '</div><div class="note small" id="reqNote"></div></div>'+
+
+  '<div class="panel"><h2>性能约束（四指标：覆盖区域 × 波束大小 × 波束数量 × 容量，相互耦合）</h2>'+
+    '<div class="note small" style="margin-bottom:8px">四项性能指标构成闭合约束链：<b>覆盖角÷波束宽度→密铺波束数（N=1.209(r_cov/r_beam)²）；'+
+    '波束宽度→天线口径（θ3dB≈70λ/D）；波束数×单波束带宽×η×极化→容量；波束数×带宽≤频段总带宽×复用色数（频谱闭合）</b>。'+
+    '任一改动会牵动其余各项——「开始设计」后总览页逐项校核 S1~S5，<b>冲突项给出可行区间与「一键修复」</b>（按建议值回填重算）。'+
+    '覆盖区域的角度口径在上方「需求与轨道」面板配置（方案选项）。</div>'+
+    '<div class="grid g4">'+
+      cfgField("beam_deg","② 波束大小 (°)","number",null,"波束 3dB 宽度；例：0.3°。与口径耦合 D=70λ/θ3dB，留空由口径正推")+
+      cfgField("beam_deg_op","波束约束方向","select",[[">=",">= 波束不得更窄（足迹≥）"],["<=","<= 波束不得更宽（足迹≤）"],["=","= 波束约等于目标"]],"「波束>0.3°」选 &gt;=（口径不得过大）")+
+      cfgField("beam_basis","波束角口径","select",[["beamwidth","天线 3dB 波束宽度"],["offaxis","离轴角（与覆盖角同口径）"],["geocentric","地心角"]],"默认天线 3dB 波束宽度口径")+
+      cfgField("N_beam","③ 波束数量 N_beam","number",null,"留空按覆盖几何密铺 1.209(r_cov/r_beam)² 建议；①覆盖区域由覆盖角度驱动")+
+    '</div><div class="grid g4" style="margin-top:10px">'+
+      cfgField("C_req_ovr","④ 容量需求 (Gbps)","number",null,"系统容量约束 C_sys=N_beam×B_beam×η×n_pol ≥ C_req；留空取业务库默认")+
+      '<div class="field"><label>① 覆盖区域</label><div class="note small">由上方「覆盖角度 ±(°)」方案选项与覆盖区库共同确定：'+
+      '填角度→按口径严格换算地面半径；留空→用覆盖区库 km 值。总览页给出三口径互查表与覆盖国家判定。</div></div>'+
+      '<div class="field" style="grid-column:span 2"><label>冲突解决</label><div class="note small">总览页「四指标耦合校核」表逐项给冲突原因+可行区间+调整建议；'+
+      '点击「⚡ 一键修复」按可行区间自动回填（波束数→密铺值、带宽→频谱上限、口径→波束要求）并重算。</div></div>'+
+    '</div></div>'+
 
   '<div class="panel"><h2>载荷体制与天线（步骤 3：五维选型对象）</h2>'+
     '<div class="grid g4">'+
@@ -1452,8 +1537,23 @@ function renderCfgUI(){
     '</div><div class="grid g4" style="margin-top:10px">'+
       cfgField("force_custom_ant","锁定用户天线电气参数","check",null,
         "勾选后天线严格按上方 D/N_el/η/θ_scan 计算（定制路径，货架产品仅列参考）；不勾选则货架选型可替代口径。手动修改口径/阵元数会自动勾选")+
+    '</div>'+
+    '<div id="reflCfgBox" style="display:none">'+
+    '<div class="grid g4" style="margin-top:10px;border-top:1.5px dashed #b9d3ec;padding-top:10px">'+
+      '<div class="field" style="grid-column:1/-1"><label style="color:#0a7ea4;font-weight:600">偏置反射面几何（仅反射面类天线显示；四项参数全部可配置，留空自动）</label></div>'+
+      cfgField("refl_D_r","反射器口径 D_r (m)","number",null,"偏置反射面口径；留空取 D_ap，或由波束宽度指标反解（θ3dB=70λ/D）")+
+      cfgField("refl_f","反射器焦距 f (m)","number",null,"母抛物面焦距；留空 = F/D × D_r")+
+      cfgField("refl_h","发射器中心偏置 h (m)","number",null,"馈源相位中心横向偏置；留空 = h/D × D_r。h≥D_r/2 避免跨母轴遮挡")+
+      cfgField("refl_d_feed","馈源口径 d_feed (m)","number",null,"馈源喇叭物理口径；留空由照射角反推。给定后实际锥削/效率如实重算")+
     '</div><div class="grid g4" style="margin-top:10px">'+
-      cfgField("N_beam","波束数 N_beam","number",null,"留空按覆盖几何 1.209(r_cov/r_beam)² 建议")+
+      cfgField("f_over_d","焦距比 F/D","number",null,"留空 1.0（偏置面常用 0.8~1.3）")+
+      cfgField("h_over_d","偏置比 h/D","number",null,"留空 0.55（近边留间隙不跨母轴）")+
+      cfgField("refl_edge_taper_db","馈源边缘锥削 (dB)","number",null,"反射面边缘照射电平；留空 −12dB（典型 −10~−15dB）")+
+      cfgField("refl_feed_model","馈源方向图模型","select",[["cosq","cos^q（余弦幂）"],["gaussian","高斯"]],"馈源照射模型；cos^q 为喇叭工程近似")+
+    '</div><div class="grid g4" style="margin-top:10px">'+
+      cfgField("refl_surface_rms_mm","反射面面精度 σ (mm)","number",null,"表面均方根误差 → Ruze 损耗；留空不计。Ka 频段建议 ≤0.5mm")+
+    '</div></div>'+
+    '<div class="grid g4" style="margin-top:10px">'+
       cfgField("B_beam","单波束带宽 (MHz)","number",null,"频率规划 c-13：N_beam×B_beam ≤ B_total×k")+
       cfgField("B_carrier","单载波带宽 (MHz)","number",null,"链路预算噪声带宽")+
       cfgField("k_reuse","频率复用色数 k","number",null,"留空按覆盖区典型值（区域 4 / 热点 7）")+
@@ -1487,6 +1587,16 @@ function renderCfgUI(){
 
   bindCfgEvents();
   refreshReqNote();
+  updateReflCfgVisibility();
+}
+
+/* v4.1：偏置反射面配置区显隐——仅反射面族天线（固面/伞状/大容量多波束/混合多波束）显示；
+   相控阵等其它体制隐藏（与引擎 reflector_design 门控、报告/总览面板条件渲染同源一致） */
+const REFL_ANT_TYPES=["固面","伞状","大容量多波束","混合多波束","反射面"];
+function updateReflCfgVisibility(){
+  const box=el("reflCfgBox"); if(!box) return;
+  const isRefl=REFL_ANT_TYPES.includes(String(CFG.ant_type||""));
+  box.style.display=isRefl?"":"none";
 }
 
 function bindCfgEvents(){
@@ -1501,6 +1611,8 @@ function bindCfgEvents(){
         const cb=document.querySelector('#cfgui [data-k="force_custom_ant"]');
         if(cb) cb.checked=true;
       }
+      // v4.1：天线类型切换 → 偏置反射面配置区显隐（仅反射面族显示）
+      if(k==="ant_type") updateReflCfgVisibility();
       refreshReqNote();
       // 关键选择项变化 → 防抖刷新建议值提示
       if(["service","orbit","coverage","coverage_list","band","ant_type","array_subtype","mode","N_sat"].includes(k))
@@ -1637,10 +1749,13 @@ async function showSuggest(){
     SUG=r.result;
     const cl=SUG.closed||{};
     const order=["band","user_band","feeder_band","ant_type","array_subtype","mode","isl_type",
-      "el_deg","A_avail","M_target","life_yr","cov_r_km","beam_r_km","N_beam","B_beam",
+      "el_deg","A_avail","M_target","life_yr","cov_half_deg","angle_basis","beam_deg","beam_deg_op","beam_basis",
+      "cov_r_km","beam_r_km","N_beam","B_beam",
       "k_reuse","n_pol","B_carrier","C_req_ovr","GT_term","EIRP_term","EIRP_gs","D_ap","N_el",
+      "refl_D_r","refl_f","refl_h","refl_d_feed","f_over_d","h_over_d",
       "θ_scan","η_ill","amp_type","P_out","Mode","isl_r_gbps","N_sat","N_plane","incl_deg","phase_f"];
     const cn={el_deg:"最低用户仰角(°)",A_avail:"可用性(%)",M_target:"余量门限(dB)",life_yr:"设计寿命(年)",
+      cov_half_deg:"覆盖区半角±(°)",angle_basis:"覆盖角口径",beam_deg:"波束宽度(°)",beam_deg_op:"波束约束方向",beam_basis:"波束角口径",
       cov_r_km:"覆盖半径(km)",beam_r_km:"波束半径(km)",N_beam:"波束数",B_beam:"单波束带宽(MHz)",
       k_reuse:"复用色数k",n_pol:"极化复用",B_carrier:"单载波带宽(MHz)",C_req_ovr:"容量需求(Gbps)",
       GT_term:"终端G/T(dB/K)",EIRP_term:"终端EIRP(dBW)",EIRP_gs:"关口站EIRP(dBW)",D_ap:"天线口径D(m)",
@@ -1648,6 +1763,8 @@ async function showSuggest(){
       P_out:"功放功率(W)",Mode:"工作模式需求",isl_r_gbps:"星间速率(Gbps)",
       band:"用户链路频段",user_band:"用户频段",feeder_band:"馈电频段",ant_type:"天线类型",
       array_subtype:"相控阵子体制",mode:"转发体制",isl_type:"星间链路",
+      refl_D_r:"反射器口径(m)",refl_f:"焦距f(m)",refl_h:"中心偏置h(m)",refl_d_feed:"馈源口径(m)",
+      f_over_d:"焦距比F/D",h_over_d:"偏置比h/D",
       N_sat:"星座卫星数",N_plane:"轨道面数P",incl_deg:"轨道倾角(°)",phase_f:"相位因子F"};
     const rows=order.filter(k=>k in SUG.values).map(k=>{
       const v=SUG.values[k];
@@ -1674,6 +1791,35 @@ async function showSuggest(){
         ((cl.advice&&cl.advice.length&&!okc)?
           '<div style="font-size:12px;margin-top:6px;color:#c0392b"><b>未闭合（需人工决策）：</b><ul style="margin:3px 0 0 18px">'+
           cl.advice.slice(0,5).map(a=>'<li>'+h(a)+'</li>').join("")+'</ul></div>':"")+
+        '</div>';
+    }
+    // D 级救援方案（applyable：反推可实现参数 + design_all 复验，可一键带入）
+    let rescueBox="";
+    const AP=SUG.applyable||cl&&cl.applyable;
+    if(AP && (AP.items||[]).length){
+      const rok=AP.ok, rgc=rok?"#1a7a2e":"#b8860b";
+      const vf=AP.verify||{};
+      rescueBox='<div style="border:2px solid '+rgc+';border-radius:8px;padding:10px 14px;margin:6px 0 10px;background:'+(rok?"#f3fbf5":"#fdfaf3")+'">'+
+        '<div style="font-size:14.5px;font-weight:bold;color:'+rgc+'">'+
+        (rok?"🛠️ 可行修正方案（已复验闭合，评级 "+h(AP.grade||"")+"）——可一键带入":
+             "🛠️ 尽力修正方案（第 "+n(AP.ladder,0)+" 级阶梯，复验后仍为 "+h(AP.grade||"D")+" 级）")+'</div>'+
+        '<div style="font-size:12px;margin:4px 0 6px;color:#555">'+h(AP.head||"")+'</div>'+
+        '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px">'+
+        '<tr style="background:#eef5ee"><th style="padding:3px 6px;border:1px solid #cfe0cf;text-align:left">参数</th>'+
+        '<th style="padding:3px 6px;border:1px solid #cfe0cf">当前值</th>'+
+        '<th style="padding:3px 6px;border:1px solid #cfe0cf">建议值</th>'+
+        '<th style="padding:3px 6px;border:1px solid #cfe0cf;text-align:left">修正依据</th></tr>'+
+        AP.items.map(it=>'<tr><td style="padding:3px 6px;border:1px solid #cfe0cf;text-align:left;font-weight:bold">'+h(it.label)+'</td>'+
+          '<td style="padding:3px 6px;border:1px solid #cfe0cf;text-align:center">'+h(String(it.cur===""||it.cur===undefined?"（自动）":it.cur))+'</td>'+
+          '<td style="padding:3px 6px;border:1px solid #cfe0cf;text-align:center;color:'+rgc+';font-weight:bold">'+h(it.v)+'</td>'+
+          '<td style="padding:3px 6px;border:1px solid #cfe0cf;text-align:left;color:#555">'+h(it.note||"")+'</td></tr>').join("")+
+        '</table>'+
+        (vf.grade?'<div style="font-size:12px;color:#333"><b>复验结果：</b>评级 '+h(vf.grade)+' · 硬准则 '+h(vf.pass_hard||"—")+
+          ' · 余量 '+n(vf.worst_M,1)+' dB · EIRP '+n(vf.EIRP,1)+' dBW · G/T '+n(vf.GT,1)+' dB/K · C_sys '+n(vf.C_sys,1)+
+          ' Gbps · 载荷 '+n(vf.m_pay,0)+'kg/'+n(vf.p_pay,0)+'W'+
+          ((vf.fail&&vf.fail.length)?' · <span style="color:#c0392b">仍未闭合 '+h(vf.fail.join(","))+'</span>':'')+'</div>':"")+
+        (rok?'<div style="margin-top:8px"><button class="btn solid" onclick="applyRescue()" style="background:#1a7a2e;border-color:#1a7a2e">⚡ 一键带入修正方案并重新设计</button></div>':
+             '<div style="font-size:12px;margin-top:6px;color:#8a5b12">该需求在当前轨道/频段/平台体系下物理不可行。上方为最接近的尽力方案，带入后可查看剩余缺口；或调整覆盖区/频段/容量需求后重试。</div>')+
         '</div>';
     }
     // 体制第一性原理推断依据（业务+轨道+覆盖 → 频段/天线/体制/ISL）
@@ -1716,7 +1862,7 @@ async function showSuggest(){
         '</table><div style="font-size:12px;margin-top:5px;color:#5f4a20">链路按最差区（雨衰+斜距严重度最高）闭合；'+
         '波束总数=Σ各区密铺='+MC.n_beam_total+'</div></div>';
     }
-    el("sugBody").innerHTML=banner+archBox+csBox+mcBox+
+    el("sugBody").innerHTML=banner+rescueBox+archBox+csBox+mcBox+
       '<div class="note small">黄色底＝与当前配置不同。以下建议值已通过 design_all 全流程闭环验证'+
       (cl&&cl.feasible?"（方案可行，可直接应用）":"")+'；应用后仅覆盖下表参数，其余配置保持不变；应用后自动快速重算。</div>'+rows;
     el("sugMask").classList.add("on");
@@ -1726,6 +1872,20 @@ async function showSuggest(){
 function applySuggest(){
   if(!SUG) return;
   Object.keys(SUG.values).forEach(k=>{ CFG[k]=SUG.values[k]; });
+  el("sugMask").classList.remove("on");
+  renderCfgUI();
+  runDesign(false,true);
+}
+/* D 级救援方案一键带入：建议值 + 救援修正值叠加（与后端复验所用配置一致） */
+function applyRescue(){
+  if(!SUG) return;
+  const AP=SUG.applyable||(SUG.closed&&SUG.closed.applyable);
+  if(!AP||!AP.values){ alert("无可用修正方案"); return; }
+  Object.keys(SUG.values).forEach(k=>{ if(SUG.values[k]!=="") CFG[k]=SUG.values[k]; });
+  Object.keys(AP.values).forEach(k=>{
+    if(AP.values[k]===""||AP.values[k]===null){ delete CFG[k]; }   // 如相控阵→固面需清除 N_el
+    else CFG[k]=AP.values[k];
+  });
   el("sugMask").classList.remove("on");
   renderCfgUI();
   runDesign(false,true);
@@ -1763,6 +1923,39 @@ function kpi(k,v,u,cls){
     : h(v);
   return '<div class="kpi '+(cls||"")+'"><div class="k">'+h(k)+'</div><div class="v">'+
     vHtml+' <span class="u">'+h(u||"")+'</span></div></div>';
+}
+/* v4：偏置反射面口径积分方向图 cut（E面/H面双线，−40~0dB） */
+function reflPatternSVG(pat){
+  const W=640,H=230,L=54,Rt=14,T=16,B=30;
+  const th=pat.cut_theta||[],de=pat.cut_e_dbr||[],dh=pat.cut_h_dbr||[];
+  if(!th.length) return "";
+  const span=Math.max(pat.cut_span||3,0.5);
+  const X=v=>L+(v+span)/(2*span)*(W-L-Rt);
+  const Y=d=>T+(Math.max(Math.min(d,0),-40)+40)/40*(H-T-B);
+  const line=(arr,col,dash)=>{
+    let p="";
+    for(let i=0;i<th.length;i++){
+      const y=Y(arr[i]);
+      p+=(i===0?"M":"L")+X(th[i]).toFixed(1)+" "+y.toFixed(1);
+    }
+    return '<path d="'+p+'" fill="none" stroke="'+col+'" stroke-width="1.6" '+(dash?'stroke-dasharray="5 3"':'')+'/>';
+  };
+  let grid="";
+  for(let d=0;d>=-40;d-=10){
+    grid+='<line x1="'+L+'" y1="'+Y(d)+'" x2="'+(W-Rt)+'" y2="'+Y(d)+'" stroke="#e3e9f0" stroke-width="1"/>'+
+      '<text x="'+(L-6)+'" y="'+(Y(d)+3.5)+'" text-anchor="end" font-size="10" fill="#7b8794">'+d+'</text>';
+  }
+  for(let t=-span;t<=span;t+=Math.max(span/3,0.1)){
+    grid+='<line x1="'+X(t)+'" y1="'+T+'" x2="'+X(t)+'" y2="'+(H-B)+'" stroke="#eef2f7" stroke-width="1"/>'+
+      '<text x="'+X(t)+'" y="'+(H-B+13)+'" text-anchor="middle" font-size="10" fill="#7b8794">'+n(t,2)+'°</text>';
+  }
+  return '<div style="margin:8px 0"><div style="font-size:12.5px;color:#0b5cad;font-weight:600;margin-bottom:2px">'+
+    '偏置反射面口径积分方向图（主面 E'+(pat.scan_theta_deg?' 扫描'+n(pat.scan_theta_deg,1)+'°':'')+
+    ' / 正交面 H 虚线）— θ3dB='+n(pat.theta3db_deg,4)+'°，首旁瓣 '+n(pat.first_sidelobe_dbr,1)+'dBr</div>'+
+    '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;background:#fff;border:1px solid #dbe3ec;border-radius:6px">'+
+    grid+line(de,"#0b5cad",false)+line(dh,"#c0392b",true)+
+    '<line x1="'+L+'" y1="'+Y(-3)+'" x2="'+(W-Rt)+'" y2="'+Y(-3)+'" stroke="#98a4b3" stroke-width="1" stroke-dasharray="2 3"/>'+
+    '</svg></div>';
 }
 /* KPI 数字滚动：从 0 缓动到目标值（0.6s），打印/减弱动画偏好时直接终值 */
 function animateKpis(root){
@@ -1870,6 +2063,231 @@ function renderOv(){
     '<div class="'+(CS.continuous?"okbox":"warnbox")+'">'+h(CS.note||"")+'</div>';
   }
 
+  // 多星协同覆盖单一服务区（区域星座：GEO 空间分区 / LEO 时间接力）
+  const RC=R.regional_coverage;
+  if(RC){
+    const isGeoR=RC.orbit==="GEO";
+    html+='<h3>🛰️ 多星协同覆盖单区（'+h(RC.region)+' · '+(isGeoR?"GEO 空间分区":"LEO/MEO 时间接力")+'）</h3><div class="kpis">'+
+      kpi("协同星数",RC.n_sat,"颗")+
+      kpi("覆盖率",RC.cov_pct,"%")+
+      kpi("最小覆盖重数",RC.min_mult,"重")+
+      kpi("平均覆盖重数",RC.mean_mult,"重")+
+      (isGeoR?kpi("最差点最佳仰角",RC.worst_el,"°",(RC.worst_el>=RC.el_min-0.05)?"okv":"badv"):"")+
+      (isGeoR?kpi("星位展开半宽",RC.spread_half_deg,"°"):"")+
+      (isGeoR?kpi("达标最小星数",RC.min_sat_for_el||"—",RC.min_sat_for_el?"颗":""):"")+
+      (isGeoR?kpi("仰角门限",RC.el_min,"°"):"")+
+      (!isGeoR?kpi("轨道倾角",RC.incl_deg,"°"):"")+
+      (!isGeoR?kpi("轨道面数",RC.n_plane,"面"):"")+
+    '</div>';
+    if(isGeoR&&RC.sats&&RC.sats.length){
+      html+='<div class="note small">协同星位：'+RC.sats.map(s=>n(s.lon,2)+'°E').join(' · ')+'</div>';
+    }
+    html+='<div class="'+(RC.feasible?"okbox":"warnbox")+'">'+h(RC.verdict||"")+'<br><span class="muted">'+h(RC.note||"")+'</span></div>';
+  }
+
+  // 在轨同类卫星对标（参考当前在轨卫星校准设计基准）
+  const OB=R.orbital_benchmark;
+  if(OB&&OB.ok){
+    const posCls=OB.position.indexOf("保守")>=0?"warnbox":"okbox";
+    html+='<h3>🛰️ 在轨同类卫星对标（'+h(OB.orbit)+'/'+h(OB.band)+' · '+OB.n_refs+' 颗在轨参考）</h3>'+
+      '<div class="'+posCls+'">方案定位：<b>'+h(OB.position)+'</b>　容量区间对标 '+
+        (OB.cap_range&&OB.cap_range[0]!=null?(n(OB.cap_range[0],0)+"~"+n(OB.cap_range[1],0)+" Gbps"):"—")+'</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0">'+
+      '<tr style="background:#eef3fa">'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">对标维度</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">本方案</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">在轨区间</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">定位</th></tr>'+
+      OB.dims.map(d=>'<tr>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px">'+h(d.name)+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center"><b>'+
+          (d.value>0?n(d.value,1):"—")+'</b> '+h(d.unit||"")+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center">'+
+          (d.ref_min!=null?(n(d.ref_min,0)+" ~ "+n(d.ref_max,0)):"—")+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px">'+h(d.tag)+'</td></tr>').join("")+
+      '</table>'+
+      '<div class="note small">在轨同类星：'+
+        OB.refs.map(s=>h(s.cn)+'('+(s.capacity_gbps||"—")+'G/'+h(s.band||"")+')').join(" · ")+'</div>'+
+      '<div class="note small">'+h(OB.verdict||"")+'<br><span class="muted">'+h(OB.note||"")+'</span></div>';
+  }
+
+  // ---- v4：四指标耦合校核（覆盖角×波束×波束数×容量）----
+  const SC=R.spec_check, AS=R.angle_spec;
+  if(SC&&SC.rows&&SC.rows.length){
+    const scCls=SC.n_fail>0?"warnbox":"okbox";
+    html+='<h3>🔗 四指标耦合校核（覆盖角 × 波束 × 波束数 × 容量）</h3>';
+    if(AS&&AS.cov_table){
+      const ct=AS.cov_table, bt=AS.beam_table||{};
+      html+='<div class="kpis">'+
+        kpi("覆盖半角",ct.given_deg,"° "+({offaxis:"(离轴)",geocentric:"(地心)",footprint:"(足迹)"}[ct.given_basis]||""))+
+        kpi("→ 地面半径",ct.r_km,"km")+
+        kpi("地心角",ct.geocentric_deg,"°")+
+        kpi("波束宽度",bt.given_deg||"—","° "+({beamwidth:"(3dB)",offaxis:"(离轴)",geocentric:"(地心)"}[bt.given_basis]||""))+
+        kpi("波束足迹直径",bt.footprint_diam_km||"—","km")+
+        kpi("所需口径 D",bt.D_req_m||"—","m")+
+        kpi("几何密铺波束数",(SC.inputs||{}).N_geo||"—","个")+
+      '</div>';
+      html+='<div class="note small">角度口径换算：覆盖 ±'+n(ct.given_deg,2)+'°（'+h(ct.given_basis_cn)+
+        '）→ 离轴 '+n(ct.offaxis_deg,3)+'° / 地心 '+n(ct.geocentric_deg,3)+'° / 足迹 '+n(ct.footprint_deg,3)+
+        '° → 地面半径 '+n(ct.r_km,0)+'km。'+(AS.conflict_cov_km||AS.conflict_beam_km?' <b>与 km 配置冲突，已按角度口径为准。</b>':'')+'</div>';
+    }
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0">'+
+      '<tr style="background:#eef3fa">'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">校核项</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">当前值</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">要求</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">判定</th></tr>'+
+      SC.rows.map(r=>'<tr>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px"><b>'+h(r.id)+'</b> '+h(r.name)+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center">'+h(r.got)+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center">'+h(r.need)+'</td>'+
+        '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center">'+
+          (r.ok===null?'<span class="tag">未配置</span>':(r.ok?'<span class="tag ok">通过</span>':'<span class="tag warn">冲突</span>'))+'</td></tr>'+
+        (r.advice?'<tr><td colspan="4" style="border:1px solid #dbe3ec;padding:4px 8px;background:#fff8e6;font-size:11.5px;color:#8a6d1a">💡 '+h(r.advice)+'</td></tr>':'')
+      ).join("")+
+      '</table>';
+    if(SC.feed_capacity){
+      const fc=SC.feed_capacity;
+      html+='<div class="note small">焦面馈源容量：F/D='+n(fc.f_over_d,2)+'、f='+n(fc.f_m,3)+'m、覆盖离轴 ±'+n(fc.theta_cov_offaxis_deg,2)+
+        '° → 焦面半径 '+n(fc.R_focal_m*1000,1)+'mm，馈源间距 '+n(fc.pitch_m*1000,1)+'mm（0.7λ）→ 六边形可排 <b>'+fc.n_feed_max+'</b> 个馈源（多波束物理天花板）</div>';
+    }
+    html+='<div class="'+scCls+'">'+h(SC.verdict||"")+'<br><span class="muted">'+h(SC.coupling_note||"")+'</span></div>';
+
+    // v4.1：冲突解决——联立求解器给出可执行修复方案 + 一键回填重算
+    const rep=SC.repair;
+    if(rep&&rep.steps&&rep.steps.length){
+      const js=rep.joint_solution||{};
+      html+='<h3>🔧 耦合冲突解决（四指标联立求解）</h3>';
+      html+='<div class="note small" style="margin-bottom:6px">'+h(rep.note||"")+'</div>';
+      // 联立解 KPI
+      html+='<div class="kpis">'+
+        kpi("波束数 N*",js.N_beam||"—","个")+
+        kpi("单波束带宽 B*",js.B_beam||"—","MHz")+
+        kpi("复用色数 k*",js.k_reuse||"—","色")+
+        kpi("天线口径 D*",js.D_ap?n(js.D_ap,3):"—","m")+
+        kpi("焦距比 F/D*",js.f_over_d?n(js.f_over_d,3):"—","")+
+      '</div>';
+      // 逐项修复步骤
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0">'+
+        '<tr style="background:#eef3fa"><th style="border:1px solid #dbe3ec;padding:5px 8px">修改项</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">改前→改后</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:5px 8px">依据</th></tr>'+
+        rep.steps.map(s=>{
+          const fld=s.field?(' <b>'+h(s.field)+'</b>'):' <span class="tag warn">不可闭合</span>';
+          const chg=(s.field!==null&&s.field!==undefined)?(h(String(s.old))+' → <b>'+h(String(s.new))+'</b>'):'—';
+          return '<tr><td style="border:1px solid #dbe3ec;padding:5px 8px">'+fld+'</td>'+
+            '<td style="border:1px solid #dbe3ec;padding:5px 8px;text-align:center">'+chg+'</td>'+
+            '<td style="border:1px solid #dbe3ec;padding:5px 8px;font-size:11.5px;color:#33475b">'+h(s.reason||"")+'</td></tr>';
+        }).join("")+'</table>';
+      // 验证结果 + 一键修复按钮
+      const vf=rep.verified;
+      if(vf){
+        html+='<div class="'+(vf.ok?"okbox":"warnbox")+'">'+h(vf.note||"")+
+          (vf.ok?' ✅ 修复后四项耦合全部闭合':(' ⚠ 仍有冲突：'+h((vf.still_failed||[]).join("、"))))+'</div>';
+      }
+      const delta=rep.cfg_delta||{};
+      const dn=Object.keys(delta);
+      if(dn.length&&rep.n_unresolvable===0){
+        html+='<div style="margin:8px 0"><button class="btn solid" id="btnApplyRepair">⚡ 一键修复（回填联立解并重算）</button> '+
+          '<span class="note small">将回填：'+dn.map(k=>h(k)+'='+h(String(delta[k]))).join('、')+'，然后自动「快速重算」</span></div>';
+      }else if(rep.n_unresolvable>0){
+        html+='<div class="warnbox small">存在不可仅靠参数闭合的冲突（须换频段/改平台），一键修复只回填可解项，不可解项已在依据中说明。</div>'+
+          (dn.length?'<div style="margin:8px 0"><button class="btn" id="btnApplyRepair">⚡ 回填可解项（'+dn.length+' 项）</button></div>':'');
+      }
+    }else if(SC.n_fail===0){
+      html+='<div class="okbox small">✅ 四指标当前配置已自洽闭合，无需修复。</div>';
+    }
+  }
+
+  // ---- v4：覆盖区 ↔ 国家 双向耦合判定 ----
+  const CC=R.country_coupling;
+  if(CC&&CC.ok){
+    html+='<h3>🌏 覆盖区 ↔ 国家 双向耦合判定</h3>'+
+      '<div class="kpis">'+
+        kpi("波束指向",CC.center.lat.toFixed(1)+"°N/"+CC.center.lon.toFixed(1)+"°E","")+
+        kpi("覆盖半径",CC.r_cov_km,"km")+
+        kpi("指向离轴角",CC.center.pointing_offaxis_deg,"°")+
+        kpi("全覆盖国家",CC.n_full,"个")+
+        kpi("部分覆盖",CC.n_partial,"个")+
+        kpi("单星视域上限",CC.r_cap_km,"km",CC.single_sat_view_ok?"okv":"badv")+
+      '</div>';
+    if(CC.target_verdict){
+      const tvOk=CC.target_verdict.indexOf("✓")>=0;
+      html+='<div class="'+(tvOk?"okbox":"warnbox")+'">'+h(CC.target_verdict)+'</div>';
+    }
+    if(CC.need){
+      const nd=CC.need;
+      html+='<div class="note small"><b>反向推导（'+h(nd.country)+' → 所需规格）：</b>需覆盖半径 ≥'+n(nd.r_need_km,0)+'km（国土外接圆×1.05），'+
+        '波束电扫 '+n(nd.pointing_offaxis_need_deg,2)+'° 指向国土中心，覆盖外缘总离轴角 '+n(nd.offaxis_total_need_deg,2)+
+        '°；波束数需 ≥'+nd.n_beam_need+' 个密铺。当前 '+n(nd.r_have_km,0)+'km → '+(nd.ok?'<span class="tag ok">满足</span>':'<span class="tag warn">缺口 '+n(nd.gap_km,0)+'km</span>')+
+        (nd.advice?'<br>💡 '+h(nd.advice):'')+'</div>';
+    }
+    // 覆盖国家清单（全覆盖+部分覆盖，按覆盖率降序，最多 12 国）
+    const covList=(CC.countries||[]).filter(c=>c.status!=="none").slice(0,12);
+    if(covList.length){
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0">'+
+        '<tr style="background:#eef3fa">'+
+          '<th style="border:1px solid #dbe3ec;padding:4px 6px">国家/地区</th>'+
+          '<th style="border:1px solid #dbe3ec;padding:4px 6px">覆盖率</th>'+
+          '<th style="border:1px solid #dbe3ec;padding:4px 6px">圆心距</th>'+
+          '<th style="border:1px solid #dbe3ec;padding:4px 6px">边角仰角</th>'+
+          '<th style="border:1px solid #dbe3ec;padding:4px 6px">状态</th></tr>'+
+        covList.map(c=>'<tr>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px">'+h(c.cn)+'</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+n(c.cover_pct,1)+'%</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+n(c.dist_km,0)+'km</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+(c.el_edge_deg!=null?n(c.el_edge_deg,1)+'°'+(c.el_ok===false?' <span class="tag warn">不足</span>':''):'—')+'</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+(c.status==="full"?'<span class="tag ok">全覆盖</span>':'<span class="tag">部分</span>')+'</td></tr>').join("")+
+        '</table>';
+    }
+    html+='<div class="note small muted">'+h(CC.note||"")+'</div>';
+  }
+
+  // ---- v4：偏置反射面天线设计（仅反射面族天线显示；不含口径图，只给参数/效率/约束表）----
+  const RF=R.reflector;
+  const isReflAnt=["固面","伞状","大容量多波束","混合多波束","反射面"].includes(String(R.cfg.ant_type||""));
+  if(RF&&RF.ok&&isReflAnt){
+    const gm=RF.geom||{}, fd=RF.feed||{}, ef=RF.eff||{}, pf=RF.perf||{};
+    html+='<h3>📡 偏置反射面天线设计（口径/焦距/中心偏置/馈源口径）</h3>'+
+      '<div class="kpis">'+
+        kpi("反射器口径 D_r",gm.D_r,"m")+
+        kpi("焦距 f",gm.f,"m")+
+        kpi("中心偏置 h",gm.h,"m")+
+        kpi("馈源口径 d_feed",fd.d_feed_m,"m")+
+        kpi("F/D",gm.f_over_d,"")+
+        kpi("馈源倾斜 ψ0",gm.psi0_deg,"°")+
+      '</div>'+
+      '<div class="kpis">'+
+        kpi("峰值增益 G",pf.G_dbi,"dBi","okv")+
+        kpi("波束宽度 θ3dB",pf.theta3db_deg,"°")+
+        kpi("口径效率 η_ap",(ef.eta_ap*100).toFixed(1),"%")+
+        kpi("照射效率 η_ill",(ef.eta_ill*100).toFixed(1),"%")+
+        kpi("溢散效率 η_spill",(ef.eta_spill*100).toFixed(1),"%")+
+        kpi("交叉极化 XPD",pf.xpd_dB,"dB")+
+      '</div>'+
+      '<div class="note small"><b>几何：</b>'+h(gm.note||"")+'<br>'+
+        '<b>馈源：</b>'+h(fd.source||"")+'，θ3dB='+n(fd.theta3db_deg,2)+'°（需覆盖 rim 张角 ψ_span='+n(fd.psi_span_deg,2)+
+        '°，近边 '+n(fd.span_near_deg,2)+'°/远边 '+n(fd.span_far_deg,2)+'°），q='+n(fd.q,2)+'，实际边缘锥削 '+n(fd.edge_taper_actual_db,1)+'dB<br>'+
+        '<b>效率：</b>'+h(ef.formula||"")+'（口径网格 '+ef.n_points+' 点数值积分）'+
+        (ef.ruze_db>0?'；Ruze 面精度损耗 '+n(ef.ruze_db,2)+'dB':'')+'</div>';
+    if(RF.checks&&RF.checks.length){
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0">'+
+        '<tr style="background:#eef3fa"><th style="border:1px solid #dbe3ec;padding:4px 6px">约束校核</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:4px 6px">当前</th><th style="border:1px solid #dbe3ec;padding:4px 6px">要求</th>'+
+        '<th style="border:1px solid #dbe3ec;padding:4px 6px">判定</th></tr>'+
+        RF.checks.map(c=>'<tr><td style="border:1px solid #dbe3ec;padding:4px 6px">'+h(c.name)+'</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+h(c.got)+'</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+h(c.need)+'</td>'+
+          '<td style="border:1px solid #dbe3ec;padding:4px 6px;text-align:center">'+(c.ok?'<span class="tag ok">通过</span>':'<span class="tag warn">不符</span>')+'</td></tr>').join("")+
+        '</table>';
+    }
+    if(RF.advice&&RF.advice.length){
+      html+='<div class="warnbox">'+RF.advice.map(a=>'💡 '+h(a)).join('<br>')+'</div>';
+    }
+    html+='<div class="'+(RF.feasible?"okbox":"warnbox")+'">'+h(RF.verdict||"")+'</div>';
+    // v4.1：按用户要求不在总览放偏置反射面口径图（方向图统一看④天线方向图页）
+  }
+
   // 链路 KPI
   html+='<h3>链路校核结果（步骤 5）</h3><div class="kpis">'+
     kpi("星上 EIRP",s.EIRP,"dBW",s.EIRP>=der.EIRP_req-0.05?"okv":"badv")+
@@ -1915,8 +2333,31 @@ function renderOv(){
   html+='<div class="panel" id="eirpPanel"><h2>地面 EIRP 覆盖（方向图地面投影 · 等值线 · SATSOFT 等效内置计算 + CSV 导出）</h2>'+
     '<div id="eirpBody"><div class="muted"><span class="spinner" style="width:18px;height:18px;border-width:3px;display:inline-block;vertical-align:middle"></span> EIRP 覆盖计算中（次级方向图 → 地面投影）…</div></div></div>';
   el("ov").innerHTML=html;
+  bindRepairBtn();
   loadCoverageMap();
   loadEirpPanel();
+}
+
+/* v4.1：一键修复——把联立求解器的 cfg_delta 回填 CFG + 同步配置页输入框 + 快速重算 */
+function bindRepairBtn(){
+  const btn=el("btnApplyRepair");
+  if(!btn) return;
+  btn.addEventListener("click",()=>{
+    const SC=RES&&RES.spec_check;
+    const rep=SC&&SC.repair;
+    if(!rep||!rep.cfg_delta) return;
+    const delta=rep.cfg_delta;
+    const keys=Object.keys(delta);
+    if(!keys.length){ return; }
+    keys.forEach(k=>{ CFG[k]=delta[k]; });
+    // 同步配置页输入框（下次切到配置页看到的就是修复值）
+    keys.forEach(k=>{
+      const inp=document.querySelector('#cfgui [data-k="'+k+'"]');
+      if(inp){ inp.value=delta[k]; }
+    });
+    // 快速重算（跳过方案对比）→ 总览页刷新后冲突项应变绿
+    runDesign(false);
+  });
 }
 
 /* ---------- ②b 覆盖区示意图：等距圆柱投影世界陆地轮廓 + 星下点 + 波束栅格 ---------- */
@@ -1948,8 +2389,8 @@ function coverageMeta(){
     k:Math.max(1,Math.round(toF(R.cfg.k_reuse,g.k_typ||4))),
     psi:toF(g.psi_cov_deg,17.3),
     alt:toF((META.orbits[R.cfg.orbit]||{}).alt_km,35786),
-    covDeg:toF(cov.r_km||R.cfg.cov_r_km||g.cov_r_km||1500,1500)/R_e*(180/Math.PI),
-    beamDeg:toF(cov.beam_r_km||R.cfg.beam_r_km||g.beam_r_km||250,250)/R_e*(180/Math.PI),
+    covDeg:toF(g.cov_r_km||R.cfg.cov_r_km||cov.r_km||1500,1500)/R_e*(180/Math.PI),
+    beamDeg:toF(g.beam_r_km||R.cfg.beam_r_km||cov.beam_r_km||250,250)/R_e*(180/Math.PI),
     Nb:toF((R.transponder||{}).N_beam,1)};
 }
 const GPALETTE=["#0b5cad","#c0392b","#1d8a4e","#b07514","#7048a8","#0a7ea4","#d1568c"];
@@ -1973,7 +2414,7 @@ function coverageMapHTML(){
   '<div class="mapnote">三维示意图 · 正交投影 · 仅海岸线无政治边界 · 波束栅格为频率复用示意，非实际赋形</div></div>'+
   '<div id="cov2d" style="display:none">'+coverageMap2DHTML()+'</div>';
   s+='<div class="note small"><b>几何自洽：</b>星下点 '+n(M.lon0,1)+'°'+(M.lon0>=0?"E":"W")+' ｜ 单星视域地心角 ±'+n(M.psi,2)+'°（Ø'+n((M.g.cov_r_cap_km||0)*2,0)+'km）｜ '+
-    '目标覆盖 R='+n(toF(M.cov.r_km||R.cfg.cov_r_km,0),0)+'km ｜ 单波束 R='+n(toF(M.cov.beam_r_km||R.cfg.beam_r_km,0),0)+'km（张角 '+n(M.g["θ_beam_deg"],2)+'°）｜ '+
+    '目标覆盖 R='+n(toF(M.g.cov_r_km||M.cov.r_km||R.cfg.cov_r_km,0),0)+'km ｜ 单波束 R='+n(toF(M.g.beam_r_km||M.cov.beam_r_km||R.cfg.beam_r_km,0),0)+'km（张角 '+n(M.g["θ_beam_deg"],2)+'°）｜ '+
     '几何建议波束数 '+n(M.g.N_beam_geo,0)+' → 采用 '+n(M.Nb,0)+' 个（k='+M.k+' 色复用）。'+
     (M.g.need_constellation?'<span class="tag warn">需多星组网</span>':'<span class="tag ok">单星可覆盖</span>')+'</div>';
   return s;
@@ -2228,14 +2669,14 @@ function coverageMap2DHTML(){
   // 视域圈（椭圆近似，覆盖地心角 psi）
   const rxKm=g.cov_r_cap_km||0;
   // 覆盖区半径 r_km → 纬度跨度
-  const covLatSpan=(toF(cov.r_km||R.cfg.cov_r_km||g.cov_r_km||1500,1500)/R_e)*(180/Math.PI);
-  const beamLatSpan=(toF(cov.beam_r_km||R.cfg.beam_r_km||g.beam_r_km||250,250)/R_e)*(180/Math.PI);
+  const covLatSpan=(toF(g.cov_r_km||R.cfg.cov_r_km||cov.r_km||1500,1500)/R_e)*(180/Math.PI);
+  const beamLatSpan=(toF(g.beam_r_km||R.cfg.beam_r_km||cov.beam_r_km||250,250)/R_e)*(180/Math.PI);
   // 单星视域大圈
   s+='<ellipse cx="'+sx+'" cy="'+sy+'" rx="'+(X(lon0+psi)-sx)+'" ry="'+(sy-Y(psi))+'" fill="none" stroke="#0b5cad" stroke-width="1.6" stroke-dasharray="6 4" opacity=".7"/>';
   s+='<text x="'+sx+'" y="'+(sy-(sy-Y(psi))-6)+'" text-anchor="middle" font-size="10.5" fill="#0b5cad">单星视域 Ø'+n(rxKm*2,0)+'km</text>';
   // 覆盖区圈（目标覆盖）
   s+='<circle cx="'+sx+'" cy="'+sy+'" r="'+Math.max(sy-Y(covLatSpan),3)+'" fill="url(#covg)" stroke="#0a7ea4" stroke-width="1.8" class="covbeam"/>';
-  s+='<text x="'+sx+'" y="'+(sy+Math.max(sy-Y(covLatSpan),3)+14)+'" text-anchor="middle" font-size="10.5" fill="#0a7ea4">覆盖区 '+h(cov.cn||R.cfg.coverage)+' R='+n(toF(cov.r_km||R.cfg.cov_r_km,0),0)+'km</text>';
+  s+='<text x="'+sx+'" y="'+(sy+Math.max(sy-Y(covLatSpan),3)+14)+'" text-anchor="middle" font-size="10.5" fill="#0a7ea4">覆盖区 '+h(cov.cn||R.cfg.coverage)+' R='+n(toF(g.cov_r_km||R.cfg.cov_r_km||cov.r_km,0),0)+'km</text>';
   // 多波束栅格：在覆盖圆内铺 hex 波束（半径 = beamLatSpan）
   const br=Math.max(sy-Y(beamLatSpan),4);
   if(R.transponder&&R.transponder.N_beam>1&&br>3){
@@ -2285,7 +2726,7 @@ function coverageMap2DHTML(){
   s+='</svg><div class="mapnote">示意图 · 等距圆柱投影 · 仅海岸线无政治边界 · 波束栅格为频率复用示意，非实际赋形</div></div>';
   const geo=g;
   s+='<div class="note small"><b>几何自洽：</b>星下点 '+n(lon0,1)+'°'+(lon0>=0?"E":"W")+' ｜ 单星视域地心角 ±'+n(psi,2)+'°（Ø'+n((geo.cov_r_cap_km||0)*2,0)+'km）｜ '+
-    '目标覆盖 R='+n(toF(cov.r_km||R.cfg.cov_r_km,0),0)+'km ｜ 单波束 R='+n(toF(cov.beam_r_km||R.cfg.beam_r_km,0),0)+'km（张角 '+n(geo["θ_beam_deg"],2)+'°）｜ '+
+    '目标覆盖 R='+n(toF(geo.cov_r_km||R.cfg.cov_r_km||cov.r_km,0),0)+'km ｜ 单波束 R='+n(toF(geo.beam_r_km||R.cfg.beam_r_km||cov.beam_r_km,0),0)+'km（张角 '+n(geo["θ_beam_deg"],2)+'°）｜ '+
     '几何建议波束数 '+n(geo.N_beam_geo,0)+' → 采用 '+n(R.transponder.N_beam,0)+' 个（k='+k+' 色复用）。'+
     (geo.need_constellation?'<span class="tag warn">需多星组网</span>':'<span class="tag ok">单星可覆盖</span>')+'</div>';
   return s;
@@ -2430,6 +2871,29 @@ function eirpMapSvg(C){
       s+='<line x1="'+X(sg[0][1]).toFixed(1)+'" y1="'+Y(sg[0][0]).toFixed(1)+'" x2="'+X(sg[1][1]).toFixed(1)+'" y2="'+Y(sg[1][0]).toFixed(1)+'" stroke="'+col+'" stroke-width="'+(k===0?1.8:1.3)+'" opacity=".95"/>';
     });
   });
+  // 波束角域环（±θ 锥面地面投影，分色：−3dB红/−10dB橙/首零陷紫）+ 角度标注
+  let ringLbl=0;
+  (C.rings||[]).forEach(rg=>{
+    if(!rg||!rg.pts||rg.pts.length<3) return;
+    let d="",first=true;
+    rg.pts.forEach(pt=>{
+      const la=pt[0],lo=pt[1];
+      if(lo<lo0||lo>lo1||la<la0||la>la1){ first=true; return; }
+      d+=(first?"M":"L")+X(lo).toFixed(1)+","+Y(la).toFixed(1); first=false;
+    });
+    if(d){
+      s+='<path d="'+d+'" fill="none" stroke="'+rg.color+'" stroke-width="'+(ringLbl===0?2:1.4)+'" stroke-dasharray="'+(ringLbl===2?"5 3":"none")+'" opacity=".9"/>';
+      // 环顶标注 ±θ（放在环最北点上方）
+      let topPt=rg.pts[0];
+      rg.pts.forEach(pt=>{ if(pt[0]>topPt[0]&&pt[1]>=lo0&&pt[1]<=lo1&&pt[0]<=la1) topPt=pt; });
+      if(topPt[0]>=la0&&topPt[0]<=la1&&topPt[1]>=lo0&&topPt[1]<=lo1){
+        const tx=X(topPt[1]),ty=Y(topPt[0])-6;
+        s+='<g><rect x="'+(tx-34)+'" y="'+(ty-12)+'" width="68" height="14" rx="7" fill="#fff" fill-opacity=".92" stroke="'+rg.color+'" stroke-width="1"/>'+
+           '<text x="'+tx+'" y="'+(ty-1.5)+'" text-anchor="middle" font-size="9.5" font-weight="700" fill="'+rg.color+'">±'+n(rg.theta_deg,2)+'° '+h(rg.label||"")+'</text></g>';
+      }
+      ringLbl++;
+    }
+  });
   // 波束中心 + 星下点 + 峰值点
   const bc=C.beam_center||{}, pg=C.peak_ground||{}, sat=C.sat||{};
   if(bc.lat!==undefined){
@@ -2470,6 +2934,7 @@ function eirpPanelHTML(C){
   const sa=satAnchor();
   let kpis='<div class="kpis">'+
     kpi("波束峰值 EIRP",C.peak_eirp_dbw,"dBW")+
+    kpi("波束宽度 θ3dB","±"+n((C.th3_deg||0)/2,2),"°（半功率）")+
     kpi("−3dB 足迹直径",(m3.diameter_km),"km")+
     kpi("−10dB 足迹直径",(m10.diameter_km),"km")+
     kpi("−3dB 覆盖面积",(m3.area_km2),"km²")+
@@ -2485,12 +2950,25 @@ function eirpPanelHTML(C){
     metTab+='<tr><td>'+n(x,1)+' dBW（峰值'+(x===lv[0]?"−3dB":"−10dB")+'）</td><td class="num">'+n(m.diameter_km,0)+'</td><td class="num">'+n(m.area_km2,0)+'</td><td class="num">'+(m.n_rays||0)+'/8</td></tr>';
   });
   metTab+='</table>';
+  // 波束角域环表（±θ → 地面半径，分色与图上环一致）
+  let ringTab="";
+  const RG=C.rings||[];
+  if(RG.length){
+    ringTab='<h4>波束角域 → 地面投影（天线性能结合）</h4>'+
+      '<table><tr><th>角域环</th><th class="num">离轴角 ±θ</th><th class="num">地面半径 (km)</th><th>图色</th></tr>'+
+      RG.map(rg=>'<tr><td>'+h(rg.label||"—")+'</td><td class="num">±'+n(rg.theta_deg,3)+'°</td>'+
+        '<td class="num">'+n(rg.radius_km,0)+'</td>'+
+        '<td><span style="display:inline-block;width:26px;height:9px;border-radius:4px;background:'+h(rg.color||"#999")+'"></span></td></tr>').join("")+
+      '</table>'+
+      '<div class="note small">环=离波束轴等角锥面与地球交线（GEO 高度下 ±θ 与地面半径非线性：θ 越大单位角度对应地面距离越大）。'+
+      '−3dB 环即半功率波束边缘（θ3dB='+n(C.th3_deg,3)+'° → ±'+n((C.th3_deg||0)/2,3)+'°），与「④ 天线方向图」cut 剖面同源。</div>';
+  }
   return '<div class="chips"><span class="tag info">星位 '+n(sa.lon,1)+'°'+(sa.lon>=0?"E":"W")+(sa.isGeo?"（GEO 定点）":"（瞬时星下点）")+'</span>'+
     '<span class="tag mut">计算窗 '+n(lats0(C),2)+'°~'+n(lats1(C),2)+'°N · '+n(lons0(C),2)+'°~'+n(lons1(C),2)+'°E</span>'+
     '<span class="tag '+(C.exact?"ok":"warn")+'">'+(C.exact?"精确方向图逐点投影":"grid 插值")+'</span>'+
     '<span style="flex:1"></span><button class="btn sm" id="eirpExportCsv">⬇ 导出覆盖 CSV</button></div>'+
-    kpis+'<div class="plotbox"><h4>地面 EIRP 覆盖（'+n(lv[0],1)+' dBW 红 / '+n(lv[1],1)+' dBW 橙 等值线 · 海岸线仅示意无政治边界）</h4>'+eirpMapSvg(C)+'</div>'+
-    '<h4>覆盖度量（8 方位射线平均）</h4>'+metTab+csvBox+
+    kpis+'<div class="plotbox"><h4>地面 EIRP 覆盖（'+n(lv[0],1)+' dBW 红 / '+n(lv[1],1)+' dBW 橙 等值线 · 波束角域环 ±θ 分色 · 海岸线仅示意无政治边界）</h4>'+eirpMapSvg(C)+'</div>'+
+    '<h4>覆盖度量（8 方位射线平均）</h4>'+metTab+ringTab+csvBox+
     '<div class="note small"><b>计算说明：</b>'+h(C.note||"")+'</div>';
 }
 function lats0(C){return C.lat&&C.lat.length?C.lat[0]:0}
@@ -2608,10 +3086,9 @@ function ifFlowRow(f,gIdx,uid,y,G){
      '<text x="'+(G.LANE_L+38)+'" y="'+(y+44)+'" text-anchor="middle" font-size="9" font-weight="700" fill="'+col+'">'+h(G.lvCN[f.level]||"")+'</text>';
   const rt=String(f.rate||"");
   s+='<text x="'+(G.LANE_L+76)+'" y="'+(y+44)+'" font-size="8.5" fill="#5f7183">'+h(rt.length>22?rt.slice(0,21)+"…":rt)+'</text>';
-  // ---- 功能层节点盒（同层合并；列对齐 → 连线全水平，零交叉）----
-  const byL={};
-  (f.stages||[]).forEach(st=>{(byL[st.layer]=byL[st.layer]||[]).push(st.node);});
-  const ks=G.order.filter(k=>byL[k]&&byL[k].length);
+  // ---- 功能层节点盒（同层合并；按【路径首现顺序】排列 → 箭头方向=真实流向）----
+  const byL={}; const ks=[];
+  (f.stages||[]).forEach(st=>{ if(!byL[st.layer]){byL[st.layer]=[];ks.push(st.layer);} byL[st.layer].push(st.node); });
   const bid=ifBidir(f);
   const pts=[];
   ks.forEach(k=>{
@@ -2622,21 +3099,36 @@ function ifFlowRow(f,gIdx,uid,y,G){
        '<rect x="'+x+'" y="'+(ym-16)+'" width="4" height="32" rx="2" fill="'+col+'"/>';
     s+='<text x="'+(x+bw/2+2)+'" y="'+(ym-2)+'" text-anchor="middle" font-size="9.8" fill="#1c2733">'+h(txt.length>14?txt.slice(0,13)+"…":txt)+'</text>';
     s+='<text x="'+(x+bw/2+2)+'" y="'+(ym+11)+'" text-anchor="middle" font-size="8" fill="'+col+'" opacity=".8">'+h(k)+'</text>';
-    pts.push([x,x+bw]);
+    pts.push([x,x+bw,k]);
   });
-  // ---- 连线 + 流动包 ----
+  // ---- 连线 + 流动包（正向跳=实线居中向右；反向跳=虚线下方向左，方向随路径）----
   if(pts.length>=2){
     const dly=parseFloat(String(f.delay||"").match(/[\d.]+/));
     let dur=isNaN(dly)?2.6:Math.max(1.2,Math.min(3.6,1.0+dly*0.5));
     if(/电力|供能/.test(f.medium||"")) dur=4.2;
     const pid="ifp_"+uid+"_"+gIdx;
-    let d="M"+pts[0][1]+","+ym;
-    for(let i=1;i<pts.length;i++) d+=" L"+pts[i][0]+","+ym;
-    s+='<path id="'+pid+'" class="if-link" d="'+d+'" stroke="'+col+'" opacity=".3"/>';
-    s+='<path class="if-link if-anim" d="'+d+'" stroke="'+col+'" marker-end="url(#ifar_'+uid+')"/>';
-    if(bid) s+='<path class="if-link" d="M'+pts[pts.length-1][0]+','+(ym+11)+' L'+pts[0][1]+','+(ym+11)+'" stroke="'+col+'" opacity=".4" stroke-dasharray="3 4" marker-end="url(#ifar_'+uid+')"/>';
-    for(let k=0;k<2;k++){
-      s+='<circle r="3.6" fill="'+col+'" class="if-pkt"><animateMotion dur="'+dur.toFixed(2)+'s" begin="'+(k*dur/2).toFixed(2)+'s" repeatCount="indefinite"><mpath href="#'+pid+'"/></animateMotion></circle>';
+    let fwdSegs=[], lastEnd=null;
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1], b=pts[i];
+      const gi=G.layerIdx[a[2]], gj=G.layerIdx[b[2]];
+      if(gj>=gi){ // 正向：a.右 → b.左（居中实线）
+        const seg="M"+a[1]+","+ym+" L"+b[0]+","+ym;
+        s+='<path class="if-link" d="'+seg+'" stroke="'+col+'" opacity=".35"/>';
+        s+='<path class="if-link if-anim" d="'+seg+'" stroke="'+col+'" marker-end="url(#ifar_'+uid+')"/>';
+        if(lastEnd===a[1]) fwdSegs.push("L"+b[0]+","+ym); else fwdSegs.push("M"+a[1]+","+ym+" L"+b[0]+","+ym);
+        lastEnd=b[0];
+      }else{ // 反向（如供能 L8→L6）：a.左 → b.右（下方虚线，箭头向左）
+        const yy=ym+13;
+        s+='<path class="if-link" d="M'+a[0]+','+yy+' L'+b[1]+','+yy+'" stroke="'+col+'" opacity=".5" stroke-dasharray="4 3" marker-end="url(#ifar_'+uid+')"/>';
+        lastEnd=null;
+      }
+    }
+    if(bid) s+='<path class="if-link" d="M'+pts[pts.length-1][0]+','+(ym+24)+' L'+pts[0][1]+','+(ym+24)+'" stroke="'+col+'" opacity=".4" stroke-dasharray="3 4" marker-end="url(#ifar_'+uid+')"/>';
+    if(fwdSegs.length){
+      s+='<path id="'+pid+'" d="'+fwdSegs.join(" ")+'" fill="none" stroke="none"/>';
+      for(let k=0;k<2;k++){
+        s+='<circle r="3.6" fill="'+col+'" class="if-pkt"><animateMotion dur="'+dur.toFixed(2)+'s" begin="'+(k*dur/2).toFixed(2)+'s" repeatCount="indefinite"><mpath href="#'+pid+'"/></animateMotion></circle>';
+      }
     }
   }
   return s+'</g>';
@@ -2980,15 +3472,29 @@ function beamPanelHTML(B,D,f){
   const scanDeg=toF(CFG["θ_scan"],0);
   const p2head=p2?('<div class="plotbox"><h4>二维方向图（θx–θy 平面 · dBr）'+
     (scanDeg?'（扫描 '+n(scanDeg,0)+'° · cos^1.5 修正）':'（口径旋转对称）')+'</h4>'+p2+'</div>'):"";
+  // v4.1：反射面族天线——附 reflector_engine 口径积分远场方向图（E/H 双切面，真实照射分布）
+  //   这是 Word 报告 4.x 节同款图，比一维 GRASP/Airy 近似更严格（非参数化 taper）。
+  const RF=(RES.reflector&&RES.reflector.ok)?RES.reflector:null;
+  const isReflAnt=["固面","伞状","大容量多波束","混合多波束","反射面"].includes(String(RES.cfg.ant_type||""));
+  let reflPat="";
+  if(RF&&isReflAnt&&RF.pattern&&RF.pattern.ok&&RF.pattern.cut_theta){
+    reflPat='<div class="plotbox"><h4>偏置反射面口径积分远场方向图（主面 E 实线 / 正交面 H 虚线 · 真实照射分布）</h4>'+
+      reflPatternSVG(RF.pattern)+
+      '<div class="note small">由 reflector_engine 对真实照射分布做口径积分 E_ff=∫∫E(x,y)exp(jk(xu+yv))dxdy（非参数化 taper）：'+
+      'θ3dB='+n(RF.pattern.theta3db_deg,4)+'°（E面 '+n(RF.pattern.theta3db_e_deg,4)+'°/H面 '+n(RF.pattern.theta3db_h_deg,4)+
+      '°），首旁瓣 '+n(RF.pattern.first_sidelobe_dbr,1)+'dBr。偏置面两切面不等宽是其特征。与 Word 报告反射面节同源。</div></div>';
+  }
   const note=B.note?'<div class="note small"><b>计算说明：</b>'+h(B.note)+(B.grasp_error?"<br><span class='muted'>GRASP 信息："+h(String(B.grasp_error).slice(0,160))+"</span>":"")+'</div>':"";
   return '<div class="chips">'+srcTag+'<span class="tag info">D='+n(D,2)+' m @ '+n(f,3)+' GHz（'+h(RES.cfg.band)+' 下行）</span>'+
     '<span class="tag mut">偏置抛物面 PO / η='+n(toF(CFG["η_ill"],65),0)+'%</span></div>'+kpis+
     (p2?('<div class="beamgrid3"><div class="plotbox"><h4>一维远场方向图（主瓣切面 · 相对增益 dBr）</h4>'+p+'</div>'+p2head+
       '<div class="plotbox"><h4>星地覆盖足迹剖面（几何示意）</h4>'+q+'</div></div>')
      :('<div class="beamgrid"><div class="plotbox"><h4>远场方向图（主瓣切面 · 相对增益 dBr）</h4>'+p+'</div>'+
-      '<div class="plotbox"><h4>星地覆盖足迹剖面（几何示意）</h4>'+q+'</div></div>'))+note+
+      '<div class="plotbox"><h4>星地覆盖足迹剖面（几何示意）</h4>'+q+'</div></div>'))+
+    reflPat+note+
     '<div class="note small">一维方向图来自 TICRA GRASP（物理光学法，偏置抛物面 F/D=1.31 + 高斯馈源 −12dB 边缘照射）实时求解；'+
     'GRASP 不可用时自动降级为口径 Airy 解析方向图 G(θ)=G0·[2J1(u)/u]²。'+
+    (reflPat?'反射面族天线另附 reflector_engine 口径积分远场（上方，真实照射分布，比一维近似更严格）。':'')+
     '二维方向图为 θx–θy 平面相对增益热力图（口径 Airy 旋转对称'+(scanDeg?'，相控阵扫描按 cos^1.5(θ) 单元因子修正':'')+'），'+
     '白色虚线为 −3dB 等值圈。地面足迹 r=R_e·θ/2（小角近似），'+
     '与「② 方案总览」几何推导（波束地心张角 '+n(RES.geo["θ_beam_deg"],2)+'°）同源自洽。多波束整星覆盖见总览页覆盖示意图。</div>';
@@ -3690,6 +4196,22 @@ function orbitPayload(withStk){
     t_offset_min:_orbState.tOff,dur_h:24,
     tag:_safeTag("轨道_"+RES.cfg.orbit)};
   if(isGeo) p.geo_lon=sa.lon;
+  // v4.1：波束照射足迹（覆盖区=天线实际照射区，非可见性覆盖帽）
+  //   半锥角 θ_c：天线 θ3dB 之半——优先取反射面口径积分实测值（R.reflector），
+  //   其次链路推导值（_derived.θ_3dB_est），再退回用户波束宽度指标 beam_deg。
+  const der=(RES.params&&RES.params._derived)||{};
+  const th3=toF((RES.reflector&&RES.reflector.ok&&(RES.reflector.perf||{}).theta3db_deg)
+      ||der["θ_3dB_est"]||CFG.beam_deg||0,0);
+  if(th3>0){
+    p.beam_half_cone_deg=th3/2.0;
+    p.beam_mode=isGeo?"target":"nadir";
+    if(isGeo){
+      // GEO：指向波束中心（country_coupling 的指向点；缺省取服务区中心）
+      const cc=(RES.country_coupling&&RES.country_coupling.ok)?RES.country_coupling.center:null;
+      p.beam_target={lat:toF(cc?cc.lat:cov.lat,sa.lat),
+                     lon:toF(cc?cc.lon:(cov.lon!==undefined?cov.lon:sa.lon),sa.lon)};
+    }
+  }
   if(withStk) p.export_stk=true;
   return p;
 }
@@ -3764,9 +4286,12 @@ function orbitTrackSvg(O){
       s+='<path d="'+d+'" fill="none" stroke="#0b5cad" stroke-width="1.6" opacity="'+(0.45+0.55*si/Math.max(seg.length-1,1)).toFixed(2)+'"/>';
     });
   }
-  // 快照时刻：覆盖圈（填充）+ 星下点
+  // 快照时刻：波束照射足迹（主覆盖区，红）+ 可见性覆盖帽（参考，蓝细虚线）+ 星下点
+  //   科学口径：覆盖区=天线波束锥与地球的实际交线（照射区，射线-球面严格求交）；
+  //   覆盖帽（仰角≥门限）只是可见区参考——两者物理量不同，主图以照射足迹为准。
   const sn=O.snapshot||{};
   const cir=sn.circle||[];
+  const bf=sn.beam_footprint||null;
   if(cir.length>2){
     let d="",first=true,prevLon=null;
     for(let i=0;i<cir.length;i++){
@@ -3776,7 +4301,43 @@ function orbitTrackSvg(O){
       if(first){ d+="M"+X(lo).toFixed(1)+","+Y(la).toFixed(1); first=false; }
       else d+="L"+X(lo).toFixed(1)+","+Y(la).toFixed(1);
     }
-    if(d) s+='<path d="'+d+'" fill="#0b5cad" fill-opacity=".13" stroke="#0b5cad" stroke-width="1.8" stroke-dasharray="7 4"/>';
+    if(d) s+='<path d="'+d+'" fill="#7ea3d0" fill-opacity=".05" stroke="#7ea3d0" stroke-width="1.1" stroke-dasharray="5 5"/>';
+  }
+  if(bf&&bf.ok&&bf.points&&bf.points.length>2){
+    // 足迹多边形（经度相对首点展开，防跨日界线飞线）
+    const pts=bf.points.map(p=>[p[0],((p[1]+180)%360)-180]);
+    const lo0=pts[0][1];
+    pts.forEach(p=>{ while(p[1]-lo0>180) p[1]-=360; while(p[1]-lo0<-180) p[1]+=360; });
+    // 像素空间质心与半径（判最小可视尺寸）
+    let cxp=0,cyp=0;
+    pts.forEach(p=>{ cxp+=PL+(p[1]+180)/360*MW; cyp+=Y(p[0]); });
+    cxp/=pts.length; cyp/=pts.length;
+    let rpix=0;
+    pts.forEach(p=>{ const dx=PL+(p[1]+180)/360*MW-cxp, dy=Y(p[0])-cyp; rpix=Math.max(rpix,Math.sqrt(dx*dx+dy*dy)); });
+    const MINR=6.0, tiny=rpix<MINR;
+    if(tiny){
+      // 足迹小于像素分辨率 → 最小可视圆示意（标注真实直径，不伪造比例）
+      s+='<circle cx="'+cxp.toFixed(1)+'" cy="'+cyp.toFixed(1)+'" r="'+MINR+'" fill="#c0392b" fill-opacity=".28" stroke="#c0392b" stroke-width="1.8"/>';
+      s+='<text x="'+(cxp+MINR+5).toFixed(1)+'" y="'+(cyp-4).toFixed(1)+'" font-size="10" fill="#c0392b" font-weight="700">波束足迹 Ø'+n(bf.diameter_km,0)+'km（图示放大）</text>';
+    }else{
+      let d="";
+      pts.forEach((p,i)=>{ d+=(i===0?"M":"L")+(PL+(p[1]+180)/360*MW).toFixed(1)+","+Y(p[0]).toFixed(1); });
+      d+="Z";
+      s+='<path d="'+d+'" fill="#c0392b" fill-opacity=".22" stroke="#c0392b" stroke-width="1.8"/>';
+      s+='<text x="'+(cxp+rpix+5).toFixed(1)+'" y="'+(cyp-rpix*0.4).toFixed(1)+'" font-size="10" fill="#c0392b" font-weight="700">波束照射区 Ø'+n(bf.diameter_km,0)+'km</text>';
+    }
+    // 波束指向中心（GEO 电扫时 ≠ 星下点）
+    if(bf.center_lat!==null&&bf.center_lat!==undefined){
+      const bx=PL+((bf.center_lon+180)%360)/360*MW, by=Y(bf.center_lat);
+      s+='<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="3" fill="#c0392b" stroke="#fff" stroke-width="1"/>';
+      if(sn.sub_lat!==undefined){
+        const sx=X(sn.sub_lon), sy=Y(sn.sub_lat);
+        s+='<line x1="'+sx.toFixed(1)+'" y1="'+sy.toFixed(1)+'" x2="'+bx.toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="4 3" opacity=".8"/>';
+        s+='<text x="'+bx.toFixed(1)+'" y="'+(by+14).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="#c0392b">波束指向'+((bf.boresight&&bf.boresight.off_nadir_deg)?('（离轴 '+n(bf.boresight.off_nadir_deg,2)+'°）'):'')+'</text>';
+      }
+    }
+    if(bf.miss_frac>0.01)
+      s+='<text x="'+(PL+8)+'" y="'+(PT+14)+'" font-size="10" fill="#b07514">⚠ 波束锥 '+n(bf.miss_frac*100,0)+'% 方位越出地球（射向太空，如实标注）</text>';
   }
   if(sn.sub_lat!==undefined){
     const sx=X(sn.sub_lon), sy=Y(sn.sub_lat);
@@ -3792,7 +4353,7 @@ function orbitTrackSvg(O){
        '<text x="'+(tx+7)+'" y="'+(ty+4)+'" font-size="10" fill="#5a3d00" font-weight="700">'+h(t.name)+' el='+n(t.el_deg,1)+'°'+(t.visible?"":"（不可见）")+'</text></g>';
   });
   for(let lo=-180;lo<=180;lo+=30) s+='<text x="'+X(lo)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="9.5" fill="#5f7183">'+lo+'°</text>';
-  s+='<text x="'+(PL+MW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10.5" fill="#5f7183">经度 (°) —— 蓝线=24h 星下点轨迹（渐深=时间先后） · 蓝虚线圈=快照时刻覆盖圈（仰角≥'+n(O.el_min_deg,0)+'°） · 仅海岸线无政治边界</text>';
+  s+='<text x="'+(PL+MW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10.5" fill="#5f7183">经度 (°) —— 蓝线=24h 星下点轨迹（渐深=时间先后） · <tspan fill="#c0392b" font-weight="700">红色实线=波束照射区（天线波束锥∩地球，即实际覆盖区）</tspan> · 蓝细虚线=可见性覆盖帽（仰角≥'+n(O.el_min_deg,0)+'°，参考） · 仅海岸线无政治边界</text>';
   s+='</svg>';
   return s;
 }
@@ -3813,14 +4374,24 @@ function orbitHTML(O){
     '<span class="glabel" id="orbTimeLbl">'+n(sn.t_offset_min||0,0)+' min</span>'+
     '<span class="glabel">'+h(sn.t_utc||"")+'</span></div>';
   // 快照 KPI
+  const bf=sn.beam_footprint||null;
   html+='<div class="kpis">'+
     kpi("星下点","("+n(sn.sub_lat,2)+", "+n(sn.sub_lon,2)+")","°N, °E")+
     kpi("轨道高度",sn.alt_km,"km")+
-    kpi("覆盖帽 σ",sn.sigma_deg,"°（仰角≥"+n(O.el_min_deg,0)+"°）")+
-    kpi("覆盖半径",sn.cov_radius_km,"km")+
+    (bf&&bf.ok?kpi("波束照射区直径",bf.diameter_km,"km"):"")+
+    (bf&&bf.ok?kpi("照射区面积",bf.area_km2,"km²"):"")+
+    (bf&&bf.ok&&bf.boresight&&bf.boresight.off_nadir_deg?kpi("波束指向离轴角",bf.boresight.off_nadir_deg,"°"):"")+
+    kpi("可见性覆盖帽 σ",sn.sigma_deg,"°（仰角≥"+n(O.el_min_deg,0)+"°，参考）")+
     kpi("卫星速度",sn.vel_kms,"km/s")+
   '</div>';
-  html+='<div class="plotbox"><h4>星下点轨迹 + 快照时刻覆盖（某一时刻覆盖情况）</h4>'+orbitTrackSvg(O)+'</div>';
+  html+='<div class="plotbox"><h4>星下点轨迹 + 快照时刻波束照射区（覆盖区=天线实际照射的地面区域）</h4>'+orbitTrackSvg(O)+'</div>';
+  if(bf&&bf.ok){
+    html+='<div class="note small"><b>照射区科学口径：</b>波束锥（半锥角 θ_c='+n(bf.half_cone_deg,3)+'°=θ3dB/2）与地球球面严格求交'
+      +'（射线-球面 |S+t·d|²=R² 取近交点）；照射区地心半角 σ='+n(bf.sigma_deg_mean,3)+'°（近端 '+n(bf.sigma_deg_min,3)+'°/远端 '+n(bf.sigma_deg_max,3)+'°，斜视时非圆）。'
+      +(bf.boresight&&bf.boresight.mode==="target"?('GEO 电扫指向 ('+n(bf.center_lat,2)+', '+n(bf.center_lon,2)+')，离轴角 '+n(bf.boresight.off_nadir_deg,2)+'°。'):'')
+      +(bf.miss_frac>0.01?('⚠ '+n(bf.miss_frac*100,0)+'% 方位波束越出地球（射向太空）。'):'')
+      +'蓝细虚线圈为可见性覆盖帽（仰角≥'+n(O.el_min_deg,0)+'°）——是「可见区」参考，非天线照射区，两者物理量不同。</div>';
+  }
   // 目标可见性（快照时刻）
   if(sn.targets&&sn.targets.length){
     html+='<h4>快照时刻目标可见性</h4><table><tr><th>目标</th><th class="num">纬度 (°)</th><th class="num">经度 (°)</th><th class="num">仰角 (°)</th><th class="num">斜距 (km)</th><th>可见（≥'+n(O.el_min_deg,0)+'°）</th></tr>';

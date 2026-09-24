@@ -173,6 +173,149 @@ def elevation_from(lat_g, lon_g, p_ecef):
 
 
 # ================================================================
+# 波束照射足迹（v4.1：天线波束锥 ∩ 地球，严格射线-球面求交，非覆盖帽）
+# ================================================================
+# 物理口径（可追溯，不随意创造）：
+#   波束照射区 = 以馈源相位中心（≈卫星质心）为顶点、半锥角 θ_c（=θ3dB/2，
+#   或用户给定波束角）沿指向轴 b̂ 的圆锥与地球球面 |P|=R 的交线。
+#   锥面射线 d(φ) = cosθ_c·b̂ + sinθ_c·(cosφ·ê₁ + sinφ·ê₂)，ê₁⊥ê₂⊥b̂。
+#   射线-球面求交：|S + t·d|² = R² → t² + 2(S·d)t + (|S|²−R²) = 0（|d|=1），
+#   取较小正根（近交点）。判别式 <0 → 该方位射线不与地球相交（波束越出地平）。
+#   交点 P → 大地 lat/lon → 足迹多边形。
+#   指向轴：GEO 电扫指向目标点（大圆方位）；LEO/MEO/SSO 默认对地（天底），
+#   可选沿迹/交迹偏摆（off-nadir roll/pitch，圆锥扫描的简化包络）。
+#   与覆盖帽（el≥el_min 的可见区）的区别：足迹只含**波束照到**的地面，
+#   是照射区（illuminated footprint）；覆盖帽是可见区（access region）。
+#   二者仅当波束半锥角 ≥ 覆盖帽半角时重合（全向天线极限）。
+
+
+def _ortho_basis(b):
+    """与单位向量 b 正交的单位正交基 (e1,e2)（数值稳健：选 |b| 最小分量轴叉乘）。"""
+    ax, ay, az = abs(b[0]), abs(b[1]), abs(b[2])
+    if ax <= ay and ax <= az:
+        t = (1.0, 0.0, 0.0)
+    elif ay <= az:
+        t = (0.0, 1.0, 0.0)
+    else:
+        t = (0.0, 0.0, 1.0)
+    e1 = (b[1] * t[2] - b[2] * t[1], b[2] * t[0] - b[0] * t[2],
+          b[0] * t[1] - b[1] * t[0])
+    n1 = math.sqrt(e1[0] ** 2 + e1[1] ** 2 + e1[2] ** 2) or 1.0
+    e1 = (e1[0] / n1, e1[1] / n1, e1[2] / n1)
+    e2 = (b[1] * e1[2] - b[2] * e1[1], b[2] * e1[0] - b[0] * e1[2],
+          b[0] * e1[1] - b[1] * e1[0])
+    return e1, e2
+
+
+def boresight_axis(p_ecef, target_lat=None, target_lon=None, mode="target"):
+    """波束指向单位轴 b̂（ECEF）。
+
+    mode="target"：指向目标点（GEO 电扫；大圆切向，严格向量差归一）。
+    mode="nadir"：对地天底（LEO/MEO/SSO 默认）。
+    目标不可见（与天底夹角>90°）时回退天底并标记。
+    """
+    S = p_ecef
+    rS = math.sqrt(S[0] ** 2 + S[1] ** 2 + S[2] ** 2) or 1.0
+    nadir = (-S[0] / rS, -S[1] / rS, -S[2] / rS)
+    if mode != "target" or target_lat is None or target_lon is None:
+        return nadir, dict(mode="nadir", lat=None, lon=None)
+    la, lo = float(target_lat) * DEG, float(target_lon) * DEG
+    T = (R_EARTH * math.cos(la) * math.cos(lo),
+         R_EARTH * math.cos(la) * math.sin(lo), R_EARTH * math.sin(la))
+    b = (T[0] - S[0], T[1] - S[1], T[2] - S[2])
+    nb = math.sqrt(b[0] ** 2 + b[1] ** 2 + b[2] ** 2)
+    if nb < 1e-9:
+        return nadir, dict(mode="nadir", lat=target_lat, lon=target_lon)
+    b = (b[0] / nb, b[1] / nb, b[2] / nb)
+    # 指向轴与天底夹角（>90° 表示目标在卫星背后，不可见）
+    cos_z = b[0] * nadir[0] + b[1] * nadir[1] + b[2] * nadir[2]
+    off_nadir = math.degrees(math.acos(max(min(cos_z, 1.0), -1.0)))
+    if cos_z < 0:
+        return nadir, dict(mode="nadir_fallback", lat=target_lat, lon=target_lon,
+                           off_nadir_deg=round(off_nadir, 3),
+                           note="目标不在可见半球（视线与天底夹角>90°）→ 回退天底指向")
+    return b, dict(mode="target", lat=float(target_lat), lon=float(target_lon),
+                   off_nadir_deg=round(off_nadir, 3))
+
+
+def beam_footprint(p_ecef, half_cone_deg, target_lat=None, target_lon=None,
+                   mode="target", n=73):
+    """波束锥 ∩ 地球 → 照射足迹多边形 [(lat,lon),...] + 度量。
+
+    严格射线-球面求交（见节头注释）：逐锥面方位 φ 解 t²+2(S·d)t+(|S|²−R²)=0
+    取近交点；不相交（判别式<0）记为越界（波束部分能量射向太空）。
+    同时给出：足迹地心半角（boresight 轴与交点的角距，逐方位）、足迹半径 km、
+    中心点（boresight 地面交点，即目标点或天底点）、越界比例。
+    """
+    hc = float(half_cone_deg) * DEG
+    S = p_ecef
+    rS = math.sqrt(S[0] ** 2 + S[1] ** 2 + S[2] ** 2)
+    b, binfo = boresight_axis(S, target_lat, target_lon, mode)
+    e1, e2 = _ortho_basis(b)
+    c0 = rS * rS - R_EARTH * R_EARTH
+    # boresight 地面交点单位向量 Ĉ（足迹地心半角的参考轴）：
+    #   先解 boresight 射线与地球交点 C=S+tb·b，Ĉ=C/R。天底时 Ĉ=−b（巧合），
+    #   电扫时 Ĉ≠−b —— 必须用真实地面交点，否则斜视足迹 σ 严重偏大。
+    Sd_b = S[0] * b[0] + S[1] * b[1] + S[2] * b[2]
+    disc_b = Sd_b * Sd_b - c0
+    c_hat = None
+    c_lat = c_lon = None
+    if disc_b >= 0:
+        tb = -Sd_b - math.sqrt(disc_b)
+        if tb > 0:
+            Pb = (S[0] + tb * b[0], S[1] + tb * b[1], S[2] + tb * b[2])
+            c_hat = (Pb[0] / R_EARTH, Pb[1] / R_EARTH, Pb[2] / R_EARTH)
+            c_lat = math.degrees(math.asin(max(min(Pb[2] / R_EARTH, 1.0), -1.0)))
+            c_lon = math.degrees(math.atan2(Pb[1], Pb[0])) % 360.0
+            if c_lon > 180.0:
+                c_lon -= 360.0
+    if c_hat is None:                      # 波束指向太空（无地面交点）→ 用 −b 兜底
+        c_hat = (-b[0], -b[1], -b[2])
+    pts = []
+    sigmas = []
+    n_miss = 0
+    for k in range(int(n)):
+        phi = 2.0 * math.pi * k / int(n)
+        cp, sp = math.cos(phi), math.sin(phi)
+        ct, st = math.cos(hc), math.sin(hc)
+        d = (ct * b[0] + st * (cp * e1[0] + sp * e2[0]),
+             ct * b[1] + st * (cp * e1[1] + sp * e2[1]),
+             ct * b[2] + st * (cp * e1[2] + sp * e2[2]))
+        Sd = S[0] * d[0] + S[1] * d[1] + S[2] * d[2]
+        disc = Sd * Sd - c0                      # |d|=1 → 判别式/4
+        if disc < 0:
+            n_miss += 1
+            continue
+        t = -Sd - math.sqrt(disc)                # 近交点（t>0 当 S 在球外）
+        if t <= 0:
+            n_miss += 1
+            continue
+        P = (S[0] + t * d[0], S[1] + t * d[1], S[2] + t * d[2])
+        lat = math.degrees(math.asin(max(min(P[2] / R_EARTH, 1.0), -1.0)))
+        lon = math.degrees(math.atan2(P[1], P[0])) % 360.0
+        pts.append((round(lat, 3), round(lon, 3)))
+        # 足迹地心半角：boresight 地面交点 Ĉ 与交点 P̂ 的球面角距（严格）
+        cos_s = c_hat[0] * P[0] + c_hat[1] * P[1] + c_hat[2] * P[2]
+        sigmas.append(math.degrees(math.acos(max(min(cos_s / R_EARTH, 1.0), -1.0))))
+    sig_mean = sum(sigmas) / len(sigmas) if sigmas else 0.0
+    return dict(ok=len(pts) >= 3, points=pts, n_points=len(pts),
+                n_miss=n_miss, miss_frac=round(n_miss / max(int(n), 1), 3),
+                center_lat=(round(c_lat, 3) if c_lat is not None else None),
+                center_lon=(round(c_lon, 3) if c_lon is not None else None),
+                sigma_deg_mean=round(sig_mean, 3),
+                sigma_deg_max=(round(max(sigmas), 3) if sigmas else None),
+                sigma_deg_min=(round(min(sigmas), 3) if sigmas else None),
+                radius_km=round(sig_mean * DEG * R_EARTH, 1),
+                diameter_km=round(2.0 * sig_mean * DEG * R_EARTH, 1),
+                area_km2=round(math.pi * (sig_mean * DEG * R_EARTH) ** 2, 0),
+                half_cone_deg=round(float(half_cone_deg), 4),
+                boresight=binfo,
+                formula=("波束锥∩地球：射线-球面 |S+t·d|²=R² 取近交点；"
+                         "半锥角 θ_c=%s°，指向 %s" % (round(float(half_cone_deg), 3),
+                                                      binfo.get("mode"))))
+
+
+# ================================================================
 # 可见性窗口（「轨道覆盖是否合理」核心判据）
 # ================================================================
 def access_windows(el, lat_g, lon_g, t_start, dur_h=24.0, el_min_deg=10.0,
@@ -222,8 +365,14 @@ def ground_track(el, t_start, dur_h=24.0, n_pts=289):
 # ================================================================
 # 某一时刻覆盖快照
 # ================================================================
-def snapshot(t_unix, el, targets=None, el_min_deg=10.0, circle_n=73):
-    """指定时刻覆盖情况：星下点/高度/速度、覆盖帽 σ 与覆盖圈、各目标点仰角与可见性。"""
+def snapshot(t_unix, el, targets=None, el_min_deg=10.0, circle_n=73,
+             beam_half_cone_deg=None, beam_target=None, beam_mode="target"):
+    """指定时刻覆盖情况：星下点/高度/速度、覆盖帽 σ 与覆盖圈、各目标点仰角与可见性。
+
+    v4.1：beam_half_cone_deg 给定时附加**波束照射足迹**（波束锥∩地球，
+    严格射线-球面求交）——覆盖帽是可见区（el≥门限），足迹是照射区（波束照到），
+    两个不同物理量；beam_target={lat,lon} 为 GEO 电扫指向点（缺省对地天底）。
+    """
     p_eci = propagate_eci(el, t_unix)
     p_e = eci_to_ecef(p_eci[:3], t_unix)
     lat, lon, alt = sub_satellite(t_unix, el)
@@ -241,6 +390,15 @@ def snapshot(t_unix, el, targets=None, el_min_deg=10.0, circle_n=73):
                                    lat=tg["lat"], lon=tg["lon"],
                                    el_deg=round(e, 2), slant_km=round(d, 1),
                                    visible=bool(e >= el_min_deg)))
+    # ---- v4.1：波束照射足迹（与覆盖帽并列输出，物理量不同）----
+    if beam_half_cone_deg is not None and float(beam_half_cone_deg) > 0:
+        bt = beam_target or {}
+        fp = beam_footprint(p_e, float(beam_half_cone_deg),
+                            target_lat=bt.get("lat"), target_lon=bt.get("lon"),
+                            mode=("target" if bt.get("lat") is not None
+                                  else beam_mode),
+                            n=circle_n)
+        out["beam_footprint"] = fp
     return out
 
 
@@ -700,6 +858,90 @@ if __name__ == "__main__":
     print("[snapshot] sub=(%.2f,%.2f) σ=%.2f° R_cov=%.0fkm tgt_el=%.1f°" %
           (sn["sub_lat"], sn["sub_lon"], sn["sigma_deg"], sn["cov_radius_km"],
            sn["targets"][0]["el_deg"]))
+
+    # 4b) 波束照射足迹（v4.1：波束锥∩地球，严格射线-球面求交）
+    #   物理校验①：天底指向、小锥角 → 足迹地心半角 σ_fp 应满足平面近似
+    #     tanθ_c ≈ R·sinσ/(r−R·cosσ)（与 coverage_cap 同一套球面三角，方向相反：
+    #     覆盖帽由 el 定 σ，足迹由锥角定 σ）。数值核对解析解。
+    h_leo, th_c = 550.0, 1.0                      # LEO 1° 半锥角
+    r_orb = R_EARTH + h_leo
+    # 解析：sin(σ+θ_c)/sinθ_c = r/R（射线-球面正弦定理）→ σ = asin(sinθ_c·r/R) − θ_c
+    sig_fp_ref = math.degrees(math.asin(math.sin(th_c * DEG) * r_orb / R_EARTH)) - th_c
+    p_leo = (0.0, 0.0, r_orb)                      # 赤道上方（ECEF 简化位）
+    fp = beam_footprint(p_leo, th_c, mode="nadir", n=37)
+    assert fp["ok"] and fp["n_miss"] == 0, "天底小锥角足迹应全相交"
+    assert abs(fp["sigma_deg_mean"] - sig_fp_ref) < 0.02, \
+        "足迹半角应=%.4f°（解析），实得 %.4f°" % (sig_fp_ref, fp["sigma_deg_mean"])
+    print("[footprint LEO 1°] σ_fp=%.4f°(解析%.4f°) R=%.0fkm D=%.0fkm 面积=%.0fkm²" %
+          (fp["sigma_deg_mean"], sig_fp_ref, fp["radius_km"], fp["diameter_km"],
+           fp["area_km2"]))
+    #   物理校验②：GEO 0.3° 波束（θ3dB=0.3°→半锥 0.15°）→ 足迹**半径**≈94km、
+    #     直径≈187km（天底指向斜距=h=35786；与 design_engine footprint_diam≈196km@
+    #     覆盖边缘斜距 37341 同量级，差异源于指向点斜距不同）。严格球面 vs 平面近似核对。
+    r_geo = R_EARTH + 35786.0
+    sig_g_ref = math.degrees(math.asin(math.sin(0.15 * DEG) * r_geo / R_EARTH)) - 0.15
+    fp_g = beam_footprint((0.0, 0.0, r_geo), 0.15, mode="nadir", n=37)
+    assert abs(fp_g["sigma_deg_mean"] - sig_g_ref) < 0.01, \
+        "GEO 足迹半角应=%.4f°，实得 %.4f°" % (sig_g_ref, fp_g["sigma_deg_mean"])
+    assert 85.0 < fp_g["radius_km"] < 100.0, \
+        "GEO 0.3°波束足迹半径应≈94km，实得 %.0fkm" % fp_g["radius_km"]
+    assert 170.0 < fp_g["diameter_km"] < 200.0, \
+        "GEO 0.3°波束足迹直径应≈187km，实得 %.0fkm" % fp_g["diameter_km"]
+    # 平面近似核对：半径 ≈ h·sin(半锥角) = 35786×sin(0.15°)
+    r_flat = 35786.0 * math.sin(0.15 * DEG)
+    assert abs(fp_g["radius_km"] - r_flat) < 1.0, \
+        "足迹半径应≈平面近似 h·sinθ=%.1fkm，实得 %.1fkm" % (r_flat, fp_g["radius_km"])
+    print("[footprint GEO 0.15°] σ=%.4f° R=%.0fkm D=%.0fkm（θ3dB=0.3°，平面近似 R=%.0fkm）" %
+          (fp_g["sigma_deg_mean"], fp_g["radius_km"], fp_g["diameter_km"], r_flat))
+    #   物理校验③：足迹 ≪ 覆盖帽（照射区 vs 可见区是两个物理量）
+    sig_cap = coverage_cap_deg(h_leo, 10.0)
+    assert fp["sigma_deg_mean"] < sig_cap, "照射足迹应小于可见覆盖帽"
+    print("[footprint vs cap] 足迹 σ=%.2f° < 覆盖帽 σ=%.2f°（el≥10°）✓" %
+          (fp["sigma_deg_mean"], sig_cap))
+    #   物理校验④：锥角超过**地球视半径** ρ_E=asin(R/r)（LEO 550km→67.0°，
+    #     即卫星看地球盘的半角；勿与切点地心角 acos(R/r)=23° 混淆）→ 部分射线
+    #     射向太空（miss），如实报告不伪造闭合多边形
+    rho_E = math.degrees(math.asin(R_EARTH / r_orb))
+    assert 60.0 < rho_E < 75.0, "LEO 地球视半径应≈67°，实得 %.1f°" % rho_E
+    fp_ok = beam_footprint(p_leo, rho_E * 0.9, mode="nadir", n=73)   # 锥内→全交
+    assert fp_ok["n_miss"] == 0, "半锥角 %.1f°<ρ_E=%.1f° 应全相交" % (rho_E * 0.9, rho_E)
+    fp_big = beam_footprint(p_leo, rho_E + 15.0, mode="nadir", n=73)  # 超视半径→越界
+    assert fp_big["n_miss"] > 0 and fp_big["miss_frac"] > 0.05, \
+        "半锥角 %.1f°>ρ_E=%.1f° 应有越界射线" % (rho_E + 15.0, rho_E)
+    print("[footprint 大锥角] ρ_E=%.1f°：锥内(%.0f°)miss=0 ✓；越界(%.0f°)miss=%d/%d（如实标注）" %
+          (rho_E, rho_E * 0.9, rho_E + 15.0, fp_big["n_miss"],
+           fp_big["n_points"] + fp_big["n_miss"]))
+    #   物理校验⑤：GEO 电扫指向目标 → 足迹中心=目标点，指向离轴角与
+    #     design_engine 角度口径交叉验证。注意：自检 geo 根数 raan=0，星下点
+    #     经度是任意的（非 69.5E）→ 必须用**实际星下点**构造目标：同经度向北
+    #     30.5° 地心角 → 指向离轴角应 = geocentric_to_offaxis(30.5°, h) ≈ 5.04°
+    #     （tanθ = R·sinα/(R+h−R·cosα)，与 design_engine 严格球面三角同源）。
+    t_snap2 = t0 + 3600.0
+    sn_base = snapshot(t_snap2, geo, el_min_deg=10.0)
+    tgt_lat = sn_base["sub_lat"] + 30.5
+    tgt_lon = sn_base["sub_lon"]
+    sn2 = snapshot(t_snap2, geo, el_min_deg=10.0, beam_half_cone_deg=0.15,
+                   beam_target=dict(lat=tgt_lat, lon=tgt_lon))
+    bf = sn2.get("beam_footprint") or {}
+    assert bf.get("ok"), "GEO 电扫足迹应生成"
+    assert abs(bf["center_lat"] - tgt_lat) < 0.6 and \
+        abs((bf["center_lon"] - tgt_lon + 180.0) % 360.0 - 180.0) < 0.6, \
+        "足迹中心应=指向目标(%.2f,%.2f)，实得(%.2f,%.2f)" % (
+            tgt_lat, tgt_lon, bf["center_lat"], bf["center_lon"])
+    # 解析交叉验证：地心角 α=30.5° → 离轴角 θ=atan(R·sinα/(r−R·cosα))
+    alpha = 30.5 * DEG
+    off_ref = math.degrees(math.atan(
+        R_EARTH * math.sin(alpha) / (r_geo - R_EARTH * math.cos(alpha))))
+    assert abs(bf["boresight"]["off_nadir_deg"] - off_ref) < 0.1, \
+        "GEO 指向 30.5° 地心角的电扫角应=%.2f°（解析），实得 %.2f°" % (
+            off_ref, bf["boresight"]["off_nadir_deg"])
+    print("[footprint GEO 电扫] 中心=(%.2f,%.2f) 指向离轴=%.2f°(解析%.2f°) σ=%.3f° D=%.0fkm" %
+          (bf["center_lat"], bf["center_lon"], bf["boresight"]["off_nadir_deg"],
+           off_ref, bf["sigma_deg_mean"], bf["diameter_km"]))
+    #   物理校验⑥：斜视足迹非圆（σ_max≠σ_min，锥-球交线的真实几何）
+    assert bf["sigma_deg_max"] > bf["sigma_deg_min"], "斜视足迹地心半角应随方位变化"
+    print("[footprint 斜视非圆] σ_min=%.3f° σ_max=%.3f°（近端压缩/远端拉伸）" %
+          (bf["sigma_deg_min"], bf["sigma_deg_max"]))
 
     # 5) STK .e 导出
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")

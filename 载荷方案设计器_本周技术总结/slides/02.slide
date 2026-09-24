@@ -1,0 +1,136 @@
+<Slide style={{
+  width: 1280, height: 720, padding: 0,
+  background: 'linear-gradient(135deg, #0B1B33 0%, #132C52 55%, #0B1B33 100%)',
+  flexDirection: 'column', overflow: 'hidden', position: 'relative',
+}}>
+  {/* ============ A 标题块 0-120 ============ */}
+  <Box style={{ height: 120, padding: '32px 70px 0 70px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      <Box style={{ width: 5, height: 40, borderRadius: 3, background: 'linear-gradient(180deg, #3B82F6, #22D3EE)' }} />
+      <Box>
+        <Text style={{ fontSize: 34, fontWeight: 'bold', color: '#E8EEF7', letterSpacing: 1, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+          五引擎物理内核 + 双通道架构
+        </Text>
+        <Text style={{ fontSize: 14, color: '#5A6B84', marginTop: 4, letterSpacing: 2, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>
+          FIVE PHYSICS ENGINES · PURE PYTHON ZERO-DEPENDENCY
+        </Text>
+      </Box>
+    </Box>
+    <Box style={{ padding: '6px 16px', borderRadius: 16, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>
+      <Text style={{ fontSize: 14, color: '#F59E0B', fontWeight: 600, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>0 第三方依赖</Text>
+    </Box>
+  </Box>
+
+  {/* ============ B 内容区 120-660：非对称双栏 38:62 ============ */}
+  <Box style={{ flex: 1, flexDirection: 'row', gap: 26, padding: '0 70px', minHeight: 0 }}>
+
+    {/* ---- 左栏 38%：五引擎清单 ---- */}
+    <Box style={{ width: 400, flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+      {[
+        { n: '01', t: '方向图引擎', d: '相控阵 cos^1.5×阵因子 / 反射面 Hankel 口径积分，栅瓣双路核查，导出 GRASP .grd', c: '#3B82F6' },
+        { n: '02', t: '覆盖引擎', d: 'SATSOFT 等效：逐格地面 EIRP + marching squares 等值线 + 波束角域环地面投影', c: '#22D3EE' },
+        { n: '03', t: '轨道引擎', d: 'STK 等效：Kepler+J2+GMST，定点标定、可见窗、Walker 星座、星蚀与位保 ΔV', c: '#3B82F6' },
+        { n: '04', t: '分析引擎', d: '蒙特卡洛灵敏度 / 邻星 C-I（ITU-R S.465-6）/ 可靠性三 R 与冗余二分反解', c: '#22D3EE' },
+        { n: '05', t: '传播引擎', d: 'ITU-R P.618 雨衰空间分布与雨致交叉极化鉴别率（XPD）', c: '#3B82F6' },
+      ].map((e, i) => (
+        <Box key={i} style={{
+          flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+          padding: '11px 14px', borderRadius: 10,
+          background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(147,165,190,0.18)',
+        }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: e.c, fontFamily: "'Space Grotesk','Consolas',sans-serif", width: 28, lineHeight: 1.3 }}>{e.n}</Text>
+          <Box style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>{e.t}</Text>
+            <Text style={{ fontSize: 12.5, color: '#93A5BE', lineHeight: 1.45, marginTop: 2, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>{e.d}</Text>
+          </Box>
+        </Box>
+      ))}
+    </Box>
+
+    {/* ---- 右栏 62%：架构流向 SVG ---- */}
+    <Box style={{ flex: 1, flexDirection: 'column', justifyContent: 'center', minHeight: 0 }}>
+      <Box style={{
+        borderRadius: 14, padding: 14,
+        background: 'rgba(11,27,51,0.6)', border: '1px solid rgba(59,130,246,0.25)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+      }}>
+        <svg width={700} height={480} viewBox='0 0 700 480'>
+          <defs>
+            <marker id='ar2' markerWidth='8' markerHeight='8' refX='7' refY='4' orient='auto'>
+              <path d='M0,0 L8,4 L0,8 Z' fill='#22D3EE' />
+            </marker>
+            <marker id='ar2o' markerWidth='8' markerHeight='8' refX='7' refY='4' orient='auto'>
+              <path d='M0,0 L8,4 L0,8 Z' fill='#F59E0B' />
+            </marker>
+          </defs>
+
+          {/* 顶层：一句话需求 */}
+          <rect x='200' y='10' width='300' height='44' rx='22' fill='rgba(245,158,11,0.14)' stroke='#F59E0B' strokeWidth='1.2' />
+          <text x='350' y='38' textAnchor='middle' fontSize='16' fontWeight='bold' fill='#F59E0B' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>一句自然语言需求</text>
+          <line x1='350' y1='54' x2='350' y2='76' stroke='#22D3EE' strokeWidth='1.4' markerEnd='url(#ar2)' />
+
+          {/* 双通道层 */}
+          <rect x='70' y='80' width='560' height='58' rx='10' fill='rgba(59,130,246,0.1)' stroke='#3B82F6' strokeWidth='1.2' />
+          <text x='350' y='100' textAnchor='middle' fontSize='13' fill='#93A5BE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>前后端双通道（JS 桥同名路由 · fetch 优先 / pywebview 回退）</text>
+          <rect x='96' y='108' width='230' height='22' rx='11' fill='rgba(34,211,238,0.12)' stroke='#22D3EE' strokeWidth='0.8' />
+          <text x='211' y='123' textAnchor='middle' fontSize='12' fill='#22D3EE' fontFamily='Space Grotesk,Consolas,sans-serif'>pywebview + WebView2 桌面壳</text>
+          <rect x='374' y='108' width='230' height='22' rx='11' fill='rgba(34,211,238,0.12)' stroke='#22D3EE' strokeWidth='0.8' />
+          <text x='489' y='123' textAnchor='middle' fontSize='12' fill='#22D3EE' fontFamily='Space Grotesk,Consolas,sans-serif'>HTTP /api/* 13 路由</text>
+          <line x1='350' y1='138' x2='350' y2='158' stroke='#22D3EE' strokeWidth='1.4' markerEnd='url(#ar2)' />
+
+          {/* 设计引擎主链 */}
+          <rect x='70' y='162' width='560' height='52' rx='10' fill='rgba(59,130,246,0.16)' stroke='#3B82F6' strokeWidth='1.4' />
+          <text x='350' y='184' textAnchor='middle' fontSize='14' fontWeight='bold' fill='#E8EEF7' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>design_engine 主链：意图→澄清→检索→选型→预算→评价</text>
+          <text x='350' y='203' textAnchor='middle' fontSize='12' fill='#93A5BE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>E1-E10 十项准则 → A/B/C/D 评级 · suggest_closed_loop ≤3 轮 · D 级三级救援阶梯</text>
+          <line x1='350' y1='214' x2='350' y2='234' stroke='#22D3EE' strokeWidth='1.4' markerEnd='url(#ar2)' />
+
+          {/* 五引擎矩阵 */}
+          <rect x='70' y='238' width='560' height='106' rx='10' fill='rgba(11,27,51,0.5)' stroke='rgba(147,165,190,0.3)' strokeWidth='1' />
+          <text x='350' y='258' textAnchor='middle' fontSize='12' fill='#5A6B84' letterSpacing='2' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>物理引擎矩阵（被主链按需调用）</text>
+          {[
+            { x: 84, t: '方向图', s: 'pattern' },
+            { x: 196, t: '覆盖', s: 'coverage' },
+            { x: 308, t: '轨道', s: 'orbit' },
+            { x: 420, t: '分析', s: 'analysis' },
+            { x: 532, t: '传播', s: 'propagation' },
+          ].map((b, i) => (
+            <g key={i}>
+              <rect x={b.x} y={270} width={98} height={58} rx={8} fill='rgba(59,130,246,0.12)' stroke={i % 2 ? '#22D3EE' : '#3B82F6'} strokeWidth='1' />
+              <text x={b.x + 49} y={296} textAnchor='middle' fontSize='15' fontWeight='bold' fill='#E8EEF7' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>{b.t}</text>
+              <text x={b.x + 49} y={315} textAnchor='middle' fontSize='10' fill='#5A6B84' fontFamily='Space Grotesk,Consolas,sans-serif'>{b.s}</text>
+            </g>
+          ))}
+          <line x1='350' y1='344' x2='350' y2='364' stroke='#22D3EE' strokeWidth='1.4' markerEnd='url(#ar2)' />
+
+          {/* 输出层 */}
+          <rect x='70' y='368' width='270' height='56' rx='10' fill='rgba(34,211,238,0.1)' stroke='#22D3EE' strokeWidth='1.2' />
+          <text x='205' y='392' textAnchor='middle' fontSize='14' fontWeight='bold' fill='#22D3EE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>13 页签交互前端</text>
+          <text x='205' y='412' textAnchor='middle' fontSize='11.5' fill='#93A5BE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>需求→总览→框图→方向图→…→稳健性</text>
+
+          <rect x='360' y='368' width='270' height='56' rx='10' fill='rgba(245,158,11,0.1)' stroke='#F59E0B' strokeWidth='1.2' />
+          <text x='495' y='392' textAnchor='middle' fontSize='14' fontWeight='bold' fill='#F59E0B' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>Word 论证报告 14 章</text>
+          <text x='495' y='412' textAnchor='middle' fontSize='11.5' fill='#93A5BE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>SVG→Edge 无头光栅化 18 张 PNG 内嵌</text>
+
+          {/* 底部判断句 */}
+          <rect x='70' y='440' width='560' height='32' rx='8' fill='rgba(59,130,246,0.06)' />
+          <text x='350' y='461' textAnchor='middle' fontSize='13' fill='#93A5BE' fontFamily='Source Han Sans SC,Microsoft YaHei,sans-serif'>
+            <tspan fill='#E8EEF7' fontWeight='bold'>判断：</tspan>零依赖 = 任意 Windows 离线单 exe 交付，无环境地狱，工程可移植性是底线约束
+          </text>
+        </svg>
+      </Box>
+    </Box>
+  </Box>
+
+  {/* ============ C 页脚条 660-720 ============ */}
+  <Box style={{ height: 60, padding: '0 70px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <svg width={22} height={22} viewBox='0 0 24 24'>
+        <circle cx='12' cy='12' r='5' fill='none' stroke='#3B82F6' strokeWidth='1.4' />
+        <ellipse cx='12' cy='12' rx='10.5' ry='4' fill='none' stroke='#22D3EE' strokeWidth='0.9' opacity='0.7' transform='rotate(-20 12 12)' />
+        <circle cx='21' cy='8.6' r='1.6' fill='#F59E0B' />
+      </svg>
+      <Text style={{ fontSize: 14, color: '#5A6B84', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>文生载荷 · 载荷方案设计器</Text>
+    </Box>
+    <Text style={{ fontSize: 14, color: '#5A6B84', fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>02 / 05</Text>
+  </Box>
+</Slide>

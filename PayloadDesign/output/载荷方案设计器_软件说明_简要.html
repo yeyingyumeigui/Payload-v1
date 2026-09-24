@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>载荷方案设计器 · 软件说明（简要版）</title>
+<style>
+:root{--ink:#1a2332;--mut:#5a6b82;--acc:#1450a0;--line:#d8e0ea;--bg:#f4f7fb;--card:#ffffff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:15px}
+.toolbar{position:sticky;top:0;z-index:9;background:#0e2a52;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toolbar .ttl{font-weight:700;margin-right:auto;font-size:15px}
+.toolbar button{background:#1d4f91;color:#fff;border:1px solid #3a6db5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px}
+.toolbar button:hover{background:#2a63b0}
+.wrap{max-width:980px;margin:24px auto;padding:40px 52px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 14px rgba(20,40,80,.06)}
+h1{font-size:26px;color:var(--acc);border-bottom:3px solid var(--acc);padding-bottom:12px;margin:6px 0 18px}
+h2{font-size:20px;color:var(--acc);margin:30px 0 12px;padding-left:10px;border-left:5px solid var(--acc)}
+h3{font-size:16.5px;margin:20px 0 8px;color:#0e2a52}
+h4{font-size:15px;margin:14px 0 6px}
+p{margin:8px 0}
+hr{border:none;border-top:1px dashed var(--line);margin:22px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th{background:#eaf1fa;color:#0e2a52;font-weight:700;text-align:left;padding:8px 10px;border:1px solid var(--line)}
+td{padding:7px 10px;border:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#f8fafd}
+code{background:#eef2f7;color:#b03060;border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px}
+pre{background:#0f1c2e;color:#d8e4f2;border-radius:8px;padding:14px 18px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.6;margin:12px 0}
+pre code{background:none;color:inherit;padding:0}
+blockquote{background:#fff8e6;border-left:4px solid #e6a817;border-radius:0 8px 8px 0;padding:10px 16px;margin:12px 0;color:#6b5312;font-size:14px}
+ul,ol{margin:8px 0 8px 26px}
+li{margin:4px 0}
+strong{color:#0e2a52}
+@media print{.toolbar{display:none}.wrap{border:none;box-shadow:none;max-width:none;margin:0;padding:0}body{background:#fff}h2{page-break-after:avoid}table,pre,blockquote{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="toolbar"><span class="ttl">载荷方案设计器 · 软件说明（简要版）v4.1</span><button onclick="doDownloadDoc()">⬇ 下载 Word（.doc）</button><button onclick="doPrint()">🖨 打印 / PDF</button></div>
+<div class="wrap"><div id="doc">
+<h1>载荷方案设计器 · 软件说明（简要版）</h1>
+<p><strong>版本</strong>：v4.1（2026-09-24）　<strong>形态</strong>：单机离线 Windows 桌面工具（单文件 exe，约 15MB）<br/><strong>定位</strong>：通信卫星有效载荷方案<strong>快速设计与可行性校核</strong>工具——输入任务需求，数秒内输出可汇报的完整载荷方案与 Word 论证报告，用于方案论证阶段的设计与比选。</p>
+<hr/>
+<h2>一、软件做什么</h2>
+<p>用户给定一组任务需求（业务类型 / 轨道 / 覆盖区 / 频段 / 转发体制 / 天线类型），软件自动完成：</p>
+<table><thead><tr><th>环节</th><th>内容</th></tr></thead><tbody><tr><td>需求解析</td><td>覆盖几何推导（斜距 / 覆盖角 / 波束数），EIRP、G/T 指标反推</td></tr><tr><td>天线与转发器</td><td>五维天线选型（EIRP/G/T/质量/功耗/模式）、功放功率反推与 HPA 选型</td></tr><tr><td>单机与平台</td><td>货架单机清单（三线编号）、平台承载/供电匹配、运载火箭包络校核</td></tr><tr><td>链路校核</td><td>上/下行预算、25 条工程约束全检、雨衰按可用性折算、MODCOD 由 C/N 反推</td></tr><tr><td>评价输出</td><td>十项准则评级 A/B/C/D、六维评分、13 页签可视化、一键导出 14 章 Word 报告（19 张矢量图）</td></tr></tbody></table>
+<h2>二、核心特色（v4 / v4.1）</h2>
+<ul><li><strong>四指标耦合校核与一键修复</strong>：覆盖区域、波束大小、波束数量、容量四项性能指标构成闭合约束链（覆盖角÷波束宽度→密铺波束数；波束宽度→天线口径 θ3dB≈70λ/D；波束数×带宽→容量与频谱）。任一指标改动，软件逐项校核 S1~S5 并<strong>联立求解</strong>给出修复值（如 N=113、B=111MHz、k=6 色），点击「⚡一键修复」自动回填重算；不可闭合时如实提示须换频段，不假装达标。</li><li><strong>角度口径严格换算</strong>：覆盖角支持三种口径（天线离轴角 / 地心角 / 地面足迹角），按严格球面三角互转——GEO 下 ±1.5° 离轴角 ≈ 8.47° 地心角 ≈ 942km 地面半径（相差 5.6 倍），避免口径混用导致的设计失真。</li><li><strong>覆盖区 ↔ 国家双向判定</strong>：正向给出算得覆盖区对全球 52 个国家/地区的覆盖率（全覆盖/部分/未覆盖）与国土边角仰角；反向由目标国推所需覆盖半径、波束电扫角与波束数。GEO 星下点（赤道）与波束指向中心（电扫）严格分离。</li><li><strong>偏置反射面天线设计引擎</strong>：以反射器口径 D_r、焦距 f、发射器中心偏置 h、馈源口径 d_feed 四项几何参数为输入（全部可配置），按物理光学严格二维数值积分计算照射/溢散效率、增益、口径积分远场方向图（E/H 双切面），并校核 F/D 区间、偏置间隙、边缘锥削等 7 项工程约束；仅反射面族天线（固面/伞状/大容量多波束/混合多波束）启用。</li><li><strong>波束照射区轨道仿真</strong>：轨道页覆盖区为<strong>天线波束锥与地球的实际交线</strong>（严格射线-球面求交），区别于可见性覆盖帽（仰角门限参考圈）；GEO 电扫指向、LEO 天底/过境均支持，导出 STK Ephemeris 复核。</li><li><strong>全流程可追溯</strong>：每条计算对齐知识图谱判据编号（c-1~c-25），异常分级 L1/L2/L3，回环留痕；GRASP/SATSOFT/STK 等效内置计算 + 标准格式文件导出双通道。</li></ul>
+<h2>三、运行方式</h2>
+<table><thead><tr><th>形态</th><th>用法</th><th>说明</th></tr></thead><tbody><tr><td>桌面 exe</td><td>双击 <code>载荷方案设计器.exe</code></td><td>实时计算；需 Edge WebView2 Runtime（Win11 自带）</td></tr><tr><td>网页版</td><td><code>python design_app.py --web</code></td><td>自动开浏览器，实时计算</td></tr><tr><td>预览版</td><td>打开 <code>载荷方案设计器_预览版.html</code></td><td>8 典型场景预计算快照，任意浏览器可看，无需 Python</td></tr></tbody></table>
+<p>零外部服务依赖，断网可用；纯 Python 标准库计算引擎，无 numpy/scipy。</p>
+<h2>四、使用流程（五步）</h2>
+<ol><li><strong>选场景</strong>：8 个典型场景一键载入（GEO 高通量 / LEO 宽带 / D2D 直连等），或空白起步；</li><li><strong>配指标</strong>：需求与轨道面板填覆盖角度（方案选项）；性能约束面板填波束大小/数量/容量；天线面板填口径或反射面几何（留空自动）；</li><li><strong>开始设计</strong>：全流程计算 + 体制/天线替代方案对比（至多 6 案六维评分）；</li><li><strong>看结果</strong>：②总览页查评级、四指标耦合校核（冲突可一键修复）、国家覆盖判定、反射面设计；④天线页查方向图；⑫轨道页查波束照射区；</li><li><strong>出报告</strong>：一键导出 Word（14 章，含框图/信息流/方向图/覆盖图/雷达图，图片已栅格化嵌入，WPS/Word 直接打开）。</li></ol>
+<h2>五、可信度与验证</h2>
+<ul><li><strong>独立物理验证</strong>：<code>_verify_physics.py</code> 不复用引擎代码，第一性原理交叉核对 15 类物理量 × 10 场景，0 失败；</li><li><strong>引擎自检</strong>：反射面引擎 41 项自检（含解析对照 ∫|F|²dΩ=2π/(2q+1) 偏差 0.00%、网格收敛性）、轨道引擎含波束足迹 6 项解析校验；</li><li><strong>全套回归</strong>：24 项一键回归 + DOM 端到端 94 项 + 父项目 102 用例全绿；</li><li><strong>冻结验证</strong>：打包 exe 自检 8/8 场景（评级/导出/图栅格化）+ GUI 依赖检查通过。</li></ul>
+<h2>六、使用边界</h2>
+<p>本软件面向<strong>方案论证阶段</strong>的快速设计与比选，输出为工程估算口径（经验系数均标注来源）；不替代详细设计阶段的 GRASP/STK 等专业工具精确仿真（软件提供标准格式导出接口供其交叉复核）。货架单机与平台参数为公开资料整理，实际选型以厂商最新数据为准。</p>
+<hr/>
+<p><em>详细功能与算法说明见《载荷方案设计器_软件说明》（详版）。</em></p>
+</div></div>
+<script>
+function doPrint(){window.print();}
+function doDownloadDoc(){
+  var body=document.getElementById('doc').innerHTML;
+  var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    +'<head><meta charset="utf-8"><title>载荷方案设计器软件说明</title>'
+    +'<style>body{font-family:"Microsoft YaHei",sans-serif;font-size:12pt;line-height:1.7}'
+    +'h1{font-size:20pt;color:#1450a0}h2{font-size:16pt;color:#1450a0}h3{font-size:13pt}'
+    +'table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 8px;font-size:10.5pt}'
+    +'th{background:#eaf1fa}pre{background:#f2f2f2;padding:10px;font-family:Consolas,monospace;font-size:10pt}'
+    +'blockquote{background:#fff8e6;border-left:4px solid #e6a817;padding:8px 12px;margin:8px 0}</style></head>'
+    +'<body>'+body+'</body></html>';
+  var blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='载荷方案设计器_软件说明.doc';a.click();URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

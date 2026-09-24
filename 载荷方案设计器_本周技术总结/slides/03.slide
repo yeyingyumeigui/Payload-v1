@@ -1,0 +1,70 @@
+<Slide style={{
+  width: 1280, height: 720, padding: 0,
+  background: 'linear-gradient(135deg, #0B1B33 0%, #132C52 55%, #0B1B33 100%)',
+  flexDirection: 'row', overflow: 'hidden', position: 'relative',
+}}>
+  {/* ---- 左 30% 竖排标题色块 ---- */}
+  <Box style={{
+    width: 340, height: 720, flexDirection: 'column', justifyContent: 'center', gap: 22,
+    padding: '0 36px',
+    background: 'linear-gradient(160deg, rgba(59,130,246,0.22) 0%, rgba(11,27,51,0.1) 100%)',
+    borderRight: '1px solid rgba(59,130,246,0.35)',
+  }}>
+    <Text style={{ fontSize: 15, color: '#22D3EE', letterSpacing: 3, fontWeight: 600, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>
+      V2 UPGRADE · 6 ITEMS
+    </Text>
+    <Box style={{ width: 52, height: 4, borderRadius: 2, background: 'linear-gradient(90deg, #3B82F6, #22D3EE)' }} />
+    <Text style={{ fontSize: 42, fontWeight: 'bold', color: '#E8EEF7', lineHeight: 1.25, letterSpacing: 2, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+      v2 整改<br />六项闭环增强
+    </Text>
+    <Text style={{ fontSize: 15, color: '#93A5BE', lineHeight: 1.7, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+      核心是把评级 D 从"死胡同"变成<span style={{ color: '#F59E0B', fontWeight: 'bold' }}>可执行的参数修复路径</span>——建议、验证、一键带入全闭环。
+    </Text>
+    <Box style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+      <Box style={{ padding: '6px 14px', borderRadius: 14, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.35)' }}>
+        <Text style={{ fontSize: 13, color: '#22D3EE', fontWeight: 600, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>63 项专项断言</Text>
+      </Box>
+      <Box style={{ padding: '6px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>
+        <Text style={{ fontSize: 13, color: '#F59E0B', fontWeight: 600, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>全部通过</Text>
+      </Box>
+    </Box>
+  </Box>
+
+  {/* ---- 右 70% 六项条目 ---- */}
+  <Box style={{ flex: 1, height: 720, flexDirection: 'column', justifyContent: 'center', gap: 13, padding: '0 56px 0 44px' }}>
+    {[
+      { n: '83', icon: 'M12 2c1 3-1 5-3 7 3 0 5 2 5 5 1-2 3-3 5-3-2-2-3-5-2-8-2 1-4 0-5-1zm-4 13c-2 1-3 3-3 5 2 0 4-1 5-3l-2-2zm9 0l-2 2c1 2 3 3 5 3 0-2-1-4-3-5z', t: 'D 级三级救援阶梯 · 一键带入', d: '温和→中等→激进累积阶梯逐级复跑 design_all，按过硬准则数择优；只动设计变量（平台/天线/体制），不动用户需求字段', c: '#F59E0B' },
+      { n: '86', icon: 'M4 6h10M4 12h16M4 18h10M18 3l3 3-3 3M18 15l3 3-3 3', t: '信息流方向修正 + L1-L8 细化', d: 'stages 保序禁按层号排序（修复供能流 L8→L6 反转），hops 逐跳 fwd/bid 方向标记，正向实线、反向虚线回线，前后端同源', c: '#22D3EE' },
+      { n: '85', icon: 'M12 2L3 7v10l9 5 9-5V7l-9-5zm0 4.5L16.5 9 12 11.5 7.5 9 12 6.5zM5 9.8l6 3.4v5.9l-6-3.3V9.8zm14 0v6l-6 3.3v-5.9l6-3.4z', t: '组成框图细化：馈电网络节点', d: '相控阵增 BFN 波束成形网络、反射面增 FEED 多馈源馈电网络；T_sys 按天线族取值，上下行边完整接入', c: '#3B82F6' },
+      { n: '88', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zm0 4a5 5 0 100 10 5 5 0 000-10zm0 3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z', t: '覆盖区波束角域环 ±θ 分色', d: '离轴角锥面按 GEO 解析式投影地面成环：−3dB 红 / −10dB 橙 / 首零陷紫，覆盖图直接读出正负多少度', c: '#22D3EE' },
+      { n: '89', icon: 'M4 5h16M4 9h11M4 13h16M4 17h11M4 21h16', t: 'Word 报告正文左对齐', d: '5 处 justify→left（正文/摘要/小注），中文排版不再出现字距拉伸的"稀疏行"', c: '#3B82F6' },
+      { n: '90', icon: 'M20 6L9 17l-5-5', t: 'v1 备份 + v2 冻结打包', d: 'PyInstaller 单文件 exe（netfx 运行时），冻结态自检 8/8 场景 grade=A、报告 18 图光栅化、GUI 依赖链完整', c: '#F59E0B' },
+    ].map((e, i) => (
+      <Box key={i} style={{
+        flexDirection: 'row', alignItems: 'center', gap: 16,
+        padding: '10px 18px', borderRadius: 12,
+        background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(147,165,190,0.16)',
+      }}>
+        {/* 编号 */}
+        <Text style={{ fontSize: 21, fontWeight: 'bold', color: e.c, width: 34, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>#{e.n}</Text>
+        {/* 图标 */}
+        <Box style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(11,27,51,0.7)', border: '1px solid rgba(147,165,190,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width={22} height={22} viewBox='0 0 24 24'>
+            <path d={e.icon} fill='none' stroke={e.c} strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round' />
+          </svg>
+        </Box>
+        {/* 文字 */}
+        <Box style={{ flex: 1 }}>
+          <Text style={{ fontSize: 16.5, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>{e.t}</Text>
+          <Text style={{ fontSize: 12.5, color: '#93A5BE', lineHeight: 1.4, marginTop: 2, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>{e.d}</Text>
+        </Box>
+      </Box>
+    ))}
+  </Box>
+
+  {/* ---- 页脚 ---- */}
+  <Box style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 44, padding: '0 40px 0 384px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 3 }}>
+    <Text style={{ fontSize: 13, color: '#5A6B84', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>文生载荷 · 载荷方案设计器</Text>
+    <Text style={{ fontSize: 13, color: '#5A6B84', fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>03 / 05</Text>
+  </Box>
+</Slide>

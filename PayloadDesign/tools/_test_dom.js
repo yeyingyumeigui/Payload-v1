@@ -213,7 +213,8 @@ function dumpFatal(kind, e) {
     push('轨道页-已渲染', ob.includes('轨道覆盖仿真') && ob.includes('覆盖帽 σ'), 'len=' + ob.length);
     push('轨道页-轨迹SVG', ob.includes('星下点轨迹') && (ob.match(/<path d="M/g) || []).length > 5);
     push('轨道页-快照时刻控制', ob.includes('orbTimeSlider') && ob.includes('仿真时刻'));
-    push('轨道页-覆盖圈', ob.includes('覆盖圈') && ob.includes('σ'));
+    push('轨道页-波束照射区(v4.1)或覆盖圈', (ob.includes('波束照射区') || ob.includes('覆盖圈')) && ob.includes('σ'));
+    push('轨道页-照射区科学口径说明', !ob.includes('波束照射区') || ob.includes('射线-球面'));
     push('轨道页-可见窗表', ob.includes('AOS') && ob.includes('LOS') && ob.includes('覆盖率'));
     push('轨道页-合理性判定', ob.includes('轨道覆盖合理性判定'));
     push('轨道页-STK导出按钮', ob.includes('orbExportStk') && ob.includes('STK Ephemeris'));
@@ -276,6 +277,19 @@ function dumpFatal(kind, e) {
     push('KPI数字滚动标记', ov.includes('rollv'));
     push('方案总览-评价标准面板', ov.includes('方案评价标准') && ov.includes('十项准则'));
     push('方案总览-评级徽章', /[ABCD]<\/div>/.test(ov) && (ov.includes('合理可行') || ov.includes('基本可行') || ov.includes('有条件可行') || ov.includes('不可行')));
+
+    // 5b. v4：四指标耦合 / 国家判定 / 偏置反射面（总览面板按条件渲染 + 前端函数静态检查）
+    push('v4-四指标耦合面板（配置了指标时渲染）',
+      !ov.includes('四指标耦合校核') || (ov.includes('S1') && ov.includes('S3')),
+      ov.includes('四指标耦合校核') ? '已渲染' : '未配置角度指标（默认场景）');
+    push('v4-国家耦合面板（有数据时渲染）',
+      !ov.includes('双向耦合判定') || (ov.includes('波束指向') && ov.includes('覆盖半径')),
+      ov.includes('双向耦合判定') ? '已渲染' : '默认场景无');
+    push('v4-反射面面板（固面场景渲染）',
+      !ov.includes('偏置反射面天线设计') || (ov.includes('馈源') && ov.includes('口径效率')),
+      ov.includes('偏置反射面天线设计') ? '已渲染' : '相控阵场景不渲染（正确）');
+    push('v4-reflPatternSVG 函数存在', src.includes('function reflPatternSVG'));
+    push('v4-角度口径换算函数存在', src.includes('angle_basis') && src.includes('离天底角'));
 
     // 6. 工作模式下拉（cfgui）
     const cfg = H('cfgui');

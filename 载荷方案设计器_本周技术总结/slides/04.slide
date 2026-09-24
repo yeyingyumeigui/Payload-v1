@@ -1,0 +1,116 @@
+<Slide style={{
+  width: 1280, height: 720, padding: 0,
+  background: 'linear-gradient(135deg, #0B1B33 0%, #132C52 55%, #0B1B33 100%)',
+  flexDirection: 'column', overflow: 'hidden', position: 'relative',
+}}>
+  {/* 背景光晕（hero 页氛围） */}
+  <Box style={{ position: 'absolute', top: -120, right: -80, width: 560, height: 560, borderRadius: 280, background: 'radial-gradient(circle, rgba(245,158,11,0.14) 0%, transparent 65%)', zIndex: 0 }} />
+  <Box style={{ position: 'absolute', bottom: -160, left: -120, width: 520, height: 520, borderRadius: 260, background: 'radial-gradient(circle, rgba(59,130,246,0.16) 0%, transparent 65%)', zIndex: 0 }} />
+
+  {/* ============ A 标题块 ============ */}
+  <Box style={{ height: 118, padding: '32px 70px 0 70px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 1 }}>
+    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      <Box style={{ width: 5, height: 40, borderRadius: 3, background: 'linear-gradient(180deg, #F59E0B, #22D3EE)' }} />
+      <Box>
+        <Text style={{ fontSize: 34, fontWeight: 'bold', color: '#E8EEF7', letterSpacing: 1, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+          全绿验证基线
+        </Text>
+        <Text style={{ fontSize: 14, color: '#5A6B84', marginTop: 4, letterSpacing: 2, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>
+          AUTOMATED VERIFICATION · ALL GREEN
+        </Text>
+      </Box>
+    </Box>
+    <Box style={{ padding: '7px 18px', borderRadius: 17, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.45)' }}>
+      <Text style={{ fontSize: 14, color: '#22D3EE', fontWeight: 'bold', fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>ALL PASS</Text>
+    </Box>
+  </Box>
+
+  {/* ============ B 巨型数字 + 洞察 ============ */}
+  <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 40, padding: '0 70px', zIndex: 1, minHeight: 0 }}>
+
+    {/* 左：巨型锚点数字（≥96px） */}
+    <Box style={{ width: 430, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+        <Text style={{
+          fontSize: 118, fontWeight: 'bold', color: '#F59E0B', lineHeight: 1.0,
+          fontFamily: "'Space Grotesk','Consolas',sans-serif", letterSpacing: -2,
+          textShadow: '0 0 40px rgba(245,158,11,0.35)',
+        }}>245</Text>
+        <Text style={{ fontSize: 64, fontWeight: 'bold', color: '#F59E0B', lineHeight: 1.0, fontFamily: "'Space Grotesk','Consolas',sans-serif", marginBottom: 12 }}>+</Text>
+      </Box>
+      <Text style={{ fontSize: 21, fontWeight: 'bold', color: '#E8EEF7', letterSpacing: 1, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+        项自动化断言 · 全绿
+      </Text>
+      <Box style={{ width: '100%', height: 1, background: 'rgba(147,165,190,0.25)', margin: '10px 0' }} />
+      <Text style={{ fontSize: 14.5, color: '#93A5BE', lineHeight: 1.65, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+        覆盖物理复算、业务冒烟、报告装配、前端 DOM 桩端到端、冻结态自检五条独立证据链——
+        <span style={{ color: '#22D3EE' }}>改一处引擎，全链重跑</span>。
+      </Text>
+    </Box>
+
+    {/* 右：四组锚点数字块（2×2 不等宽错落，非等宽卡片横排） */}
+    <Box style={{ flex: 1, flexDirection: 'column', gap: 16 }}>
+      <Box style={{ flexDirection: 'row', gap: 16 }}>
+        {/* 物理复算 */}
+        <Box style={{ flex: 1.15, flexDirection: 'column', gap: 4, padding: '18px 22px', borderRadius: 14, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.45)' }}>
+          <Box style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ fontSize: 52, fontWeight: 'bold', color: '#F59E0B', lineHeight: 1, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>0</Text>
+            <Text style={{ fontSize: 16, color: '#F59E0B', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>失败</Text>
+          </Box>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>独立第一性原理复算</Text>
+          <Text style={{ fontSize: 12, color: '#93A5BE', lineHeight: 1.45, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>不复用引擎代码，15 类物理量 × 10 场景交叉验证</Text>
+        </Box>
+        {/* 冻结自检 */}
+        <Box style={{ flex: 1, flexDirection: 'column', gap: 4, padding: '18px 22px', borderRadius: 14, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.45)' }}>
+          <Box style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ fontSize: 52, fontWeight: 'bold', color: '#3B82F6', lineHeight: 1, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>8/8</Text>
+          </Box>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>冻结 exe 场景自检</Text>
+          <Text style={{ fontSize: 12, color: '#93A5BE', lineHeight: 1.45, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>GEO/LEO/MEO/HEO 全场景 grade=A，GUI 依赖链完整</Text>
+        </Box>
+      </Box>
+      <Box style={{ flexDirection: 'row', gap: 16 }}>
+        {/* DOM E2E */}
+        <Box style={{ flex: 1, flexDirection: 'column', gap: 4, padding: '18px 22px', borderRadius: 14, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.4)' }}>
+          <Box style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ fontSize: 52, fontWeight: 'bold', color: '#22D3EE', lineHeight: 1, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>88</Text>
+            <Text style={{ fontSize: 16, color: '#22D3EE', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>项</Text>
+          </Box>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>前端 DOM 桩端到端</Text>
+          <Text style={{ fontSize: 12, color: '#93A5BE', lineHeight: 1.45, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>node 加载真实 JS + HTTP API，13 页签全渲染路径</Text>
+        </Box>
+        {/* 报告光栅化 */}
+        <Box style={{ flex: 1.15, flexDirection: 'column', gap: 4, padding: '18px 22px', borderRadius: 14, background: 'rgba(147,165,190,0.08)', border: '1px solid rgba(147,165,190,0.35)' }}>
+          <Box style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ fontSize: 52, fontWeight: 'bold', color: '#E8EEF7', lineHeight: 1, fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>18</Text>
+            <Text style={{ fontSize: 16, color: '#93A5BE', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>图 / 14 章</Text>
+          </Box>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#E8EEF7', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>Word 报告装配</Text>
+          <Text style={{ fontSize: 12, color: '#93A5BE', lineHeight: 1.45, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>SVG 全部经 Edge 无头光栅化内嵌，残留 SVG = 0</Text>
+        </Box>
+      </Box>
+      {/* 洞察句 */}
+      <Box style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12, padding: '12px 20px', borderRadius: 12,
+        background: 'rgba(245,158,11,0.08)', borderLeft: '4px solid #F59E0B',
+      }}>
+        <Text style={{ fontSize: 14.5, color: '#E8EEF7', lineHeight: 1.55, fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>
+          <span style={{ color: '#F59E0B', fontWeight: 'bold' }}>所以：</span>物理正确性与工程质量各有独立证据链互不背书——这是敢把离线单 exe 直接交给总体单位的底气。
+        </Text>
+      </Box>
+    </Box>
+  </Box>
+
+  {/* ============ C 页脚 ============ */}
+  <Box style={{ height: 58, padding: '0 70px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 1 }}>
+    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <svg width={22} height={22} viewBox='0 0 24 24'>
+        <circle cx='12' cy='12' r='5' fill='none' stroke='#3B82F6' strokeWidth='1.4' />
+        <ellipse cx='12' cy='12' rx='10.5' ry='4' fill='none' stroke='#22D3EE' strokeWidth='0.9' opacity='0.7' transform='rotate(-20 12 12)' />
+        <circle cx='21' cy='8.6' r='1.6' fill='#F59E0B' />
+      </svg>
+      <Text style={{ fontSize: 14, color: '#5A6B84', fontFamily: "'Source Han Sans SC','Microsoft YaHei',sans-serif" }}>文生载荷 · 载荷方案设计器</Text>
+    </Box>
+    <Text style={{ fontSize: 14, color: '#5A6B84', fontFamily: "'Space Grotesk','Consolas',sans-serif" }}>04 / 05</Text>
+  </Box>
+</Slide>

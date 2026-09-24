@@ -1,4 +1,4 @@
-SELFTEST OK 8/8 scenarios in 11.75s
+SELFTEST OK 8/8 scenarios in 27.72s
 SELFTEST start py=3.13.14 frozen=False
 meta OK keys=27
 [geo_ka_hts] OK EIRP=61.40 GT=26.52 M_up=20.32 M_dn=3.40 M_e2e=3.38 judge=15/15 fail=[] warn=[] mass=567kg P=5527W plat=GEO-LRG65
@@ -11,4 +11,4 @@ meta OK keys=27
 [leo_iot] OK EIRP=27.59 GT=2.39 M_up=73.97 M_dn=3.20 M_e2e=3.20 judge=15/15 fail=[] warn=[] mass=78kg P=675W plat=SSO-PLAT
 eval OK grade=A feasible=True pass_hard=6/6 pass_soft=4/4
 suggest_closed_loop OK grade=A iters=1 feasible=True adjustments=0
-export OK chars=2717906 png=18 svg_left=0 RASTERIZED
+export OK chars=2828847 png=19 svg_left=0 RASTERIZED

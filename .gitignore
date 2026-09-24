@@ -6,11 +6,17 @@ __pycache__/
 
 # ===== PyInstaller 产物与中间件 =====
 build/
-dist/
 *.manifest
 
-# ===== 可执行文件（体积大，建议用 GitHub Release 分发）=====
+# ===== 可执行文件（体积大，一般用 Release 分发）=====
 *.exe
+
+# dist 目录内容默认忽略；用 **/dist/* 而非 dist/，否则父目录被整体排除后无法 re-include
+**/dist/*
+
+# 交付物例外（必须放在最后，gitignore 后面的规则覆盖前面）：
+# 仅当前交付版 exe 入库；根目录/output/tools/dist 下的历史散落副本不入库
+!PayloadDesign/tools/dist/载荷方案设计器.exe
 
 # ===== 历史备份 =====
 backup_v1_20260921/
@@ -58,6 +64,11 @@ tools/_meta.json
 
 # ===== Agent 内部工作数据（记忆/日志，非项目交付物）=====
 .workbuddy/
+
+# ===== 工具缓存 / 测试产物 =====
+.cache/
+.slidep/
+PayloadDesign/output/_orbit_test.e
 
 # ===== IDE / 系统 =====
 .vscode/

@@ -145,14 +145,22 @@ def rasterize_svgs(html, edge=None, max_workers=4, scale=2):
     if not results:
         return html
 
+    # Word 版心宽 = 595.3pt − 60pt×2 = 475.3pt ≈ 633px@96dpi；留边取 616px 上限，
+    # 图片按原始宽高比等比钳制到版心内（Word HTML 滤镜只认 width/height 属性，
+    # 不认 max-width:100%，故必须在属性层限定，否则 PNG 按原始像素宽超出版心）。
+    MAX_W = 616
+
     def repl(m):
         sv = m.group(0)
         uri = results.get(sv)
         if not uri:
             return sv
         w, h = _svg_size(sv)
+        if w > MAX_W and w > 0:
+            h = max(1, int(round(h * MAX_W / float(w))))
+            w = MAX_W
         return ('<img src="%s" width="%d" height="%d" '
-                'style="max-width:100%%;height:auto" alt="diagram"/>' % (uri, w, h))
+                'style="width:%dpx;height:%dpx" alt="diagram"/>' % (uri, w, h, w, h))
 
     return _SVG_RE.sub(repl, html)
 
@@ -457,6 +465,170 @@ def svg_pattern_1d(B, W=620, H=340):
     s.append('<text x="%d" y="%d" text-anchor="middle" font-size="11" fill="#5f7183">离轴角 θ (°)</text>'
              % (W // 2, H - 6))
     s.append('<text x="14" y="%d" font-size="11" fill="#5f7183">G (dBr)</text>' % (PT - 5))
+    s.append('</svg>')
+    return "".join(s)
+
+
+# ================================================================
+# SVG 4c：偏置反射面几何示意图（v4：口径/焦距/中心偏置/馈源）
+# ================================================================
+def svg_reflector_geom(RF, W=620, H=360):
+    """偏置反射面几何示意图：母抛物面 + 偏置反射面 + 焦点馈源 + 照射锥角。"""
+    if not RF or not RF.get("ok"):
+        return ""
+    gm = RF.get("geom") or {}
+    fd = RF.get("feed") or {}
+    D_r = to_f(gm.get("D_r"), 2.5)
+    f_len = to_f(gm.get("f"), D_r)
+    h_off = to_f(gm.get("h"), 0.0)
+    a = D_r / 2.0
+    # 绘图坐标：x 向右（偏置方向）、z 向下（反射面朝下开口）
+    PL, PR, PT, PB = 46, 130, 34, 46
+    # 世界范围：x∈[-0.3a, h+a+0.5a]，z∈[z_c-f*0.15, f*1.12]
+    x_min, x_max = -0.35 * a, h_off + a + 0.55 * a
+    z_min, z_max = -0.08 * f_len, f_len * 1.10
+    X = lambda x: PL + (x - x_min) / max(x_max - x_min, 1e-9) * (W - PL - PR)      # noqa: E731
+    Z = lambda z: PT + (z - z_min) / max(z_max - z_min, 1e-9) * (H - PT - PB)      # noqa: E731
+    s = ['<svg width="%d" height="%d" viewBox="0 0 %d %d" xmlns="http://www.w3.org/2000/svg" '
+         'font-family="Microsoft YaHei,sans-serif">' % (W, H, W, H)]
+    s.append('<rect x="%d" y="%d" width="%d" height="%d" fill="#fbfdff" stroke="#dde5ee"/>'
+             % (PL, PT, W - PL - PR, H - PT - PB))
+    # 母抛物面（虚线参考，z=ρ²/4f，ρ∈[0, h+a]）
+    pts_mom = []
+    for i in range(61):
+        rho = (h_off + a) * i / 60.0
+        pts_mom.append("%.1f,%.1f" % (X(rho), Z(rho * rho / (4 * f_len))))
+    s.append('<polyline points="%s" fill="none" stroke="#b8c6d6" stroke-width="1.2" '
+             'stroke-dasharray="4 3"/>' % " ".join(pts_mom))
+    s.append('<text x="%.1f" y="%.1f" font-size="10" fill="#98a4b3">母抛物面 z=ρ²/4f</text>'
+             % (X(h_off + a) + 6, Z((h_off + a) ** 2 / (4 * f_len)) - 4))
+    # 偏置反射面（实线粗，ρ∈[h−a, h+a]）
+    rho_n = max(h_off - a, 0.0)
+    pts_ref = []
+    for i in range(49):
+        rho = rho_n + (h_off + a - rho_n) * i / 48.0
+        pts_ref.append("%.1f,%.1f" % (X(rho), Z(rho * rho / (4 * f_len))))
+    s.append('<polyline points="%s" fill="none" stroke="#0b5cad" stroke-width="3.2" '
+             'stroke-linecap="round"/>' % " ".join(pts_ref))
+    # 焦点 F 与馈源轴（F→反射面中心 C）
+    z_c = to_f(gm.get("z_c"), h_off ** 2 / (4 * f_len))
+    Fx, Fz = X(0.0), Z(f_len)
+    Cx, Cz = X(h_off), Z(z_c)
+    s.append('<circle cx="%.1f" cy="%.1f" r="4.6" fill="#c0392b" stroke="#fff" stroke-width="1.4"/>'
+             % (Fx, Fz))
+    s.append('<text x="%.1f" y="%.1f" font-size="11" fill="#c0392b" font-weight="bold">焦点 F (馈源相位中心)</text>'
+             % (Fx + 9, Fz - 6))
+    s.append('<circle cx="%.1f" cy="%.1f" r="3.2" fill="#1a7a2e" stroke="#fff" stroke-width="1.2"/>'
+             % (Cx, Cz))
+    s.append('<text x="%.1f" y="%.1f" font-size="10" fill="#1a7a2e">反射面中心 C</text>'
+             % (Cx + 6, Cz + 14))
+    # 馈源轴 F→C 延长（虚线，标 ψ0）
+    import math as _m
+    dx, dz = Cx - Fx, Cz - Fz
+    L = _m.sqrt(dx * dx + dz * dz) or 1.0
+    ex, ez = Cx + dx / L * 30, Cz + dz / L * 30
+    s.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#1a7a2e" stroke-width="1.3" '
+             'stroke-dasharray="5 3"/>' % (Fx, Fz, ex, ez))
+    # 母轴（z 轴，虚线）
+    s.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#7b8794" stroke-width="1.1" '
+             'stroke-dasharray="3 3"/>' % (X(0.0), Z(z_min), X(0.0), Z(f_len * 1.02)))
+    s.append('<text x="%.1f" y="%.1f" font-size="10" fill="#7b8794" text-anchor="middle">母轴</text>'
+             % (X(0.0), Z(f_len * 1.02) + 13))
+    # 照射锥（F→反射面近边/远边）
+    for rho, col, lab in ((rho_n, "#b07514", "近边 ψ=%.1f°" % to_f(gm.get("psi_near_deg"), 0)),
+                          (h_off + a, "#b07514", "远边 ψ=%.1f°" % to_f(gm.get("psi_far_deg"), 0))):
+        px, pz = X(rho), Z(rho * rho / (4 * f_len))
+        s.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.1" '
+                 'opacity=".75"/>' % (Fx, Fz, px, pz, col))
+    # 口径投影（底部双箭头 D_r）
+    yb = H - PB + 14
+    s.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#0a7ea4" stroke-width="1.4"/>'
+             % (X(h_off - a), yb, X(h_off + a), yb))
+    s.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="10.5" fill="#0a7ea4">'
+             '口径投影 D_r=%s m</text>' % ((X(h_off - a) + X(h_off + a)) / 2, yb + 13, f(D_r, 3)))
+    # 偏置 h（顶部双箭头）
+    yt = PT - 12
+    s.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#7048a8" stroke-width="1.4"/>'
+             % (X(0.0), yt, X(h_off), yt))
+    s.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="10.5" fill="#7048a8">'
+             '中心偏置 h=%s m</text>' % ((X(0.0) + X(h_off)) / 2, yt - 4, f(h_off, 3)))
+    # 焦距 f（右侧竖箭头）
+    xr = W - PR + 22
+    s.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#1d8a4e" stroke-width="1.4"/>'
+             % (xr, Z(0.0), xr, Z(f_len)))
+    s.append('<text x="%.1f" y="%.1f" text-anchor="middle" font-size="10.5" fill="#1d8a4e" '
+             'transform="rotate(-90 %.1f %.1f)">焦距 f=%s m</text>'
+             % (xr + 13, (Z(0.0) + Z(f_len)) / 2, xr + 13, (Z(0.0) + Z(f_len)) / 2, f(f_len, 3)))
+    # 参数表（右下）
+    lines = ["F/D = %s　h/D = %s" % (f(gm.get("f_over_d"), 3), f(gm.get("h_over_d"), 3)),
+             "馈源轴倾斜 ψ₀ = %s°" % f(gm.get("psi0_deg"), 2),
+             "照射角 %s°~%s°（绑定 ψ_span=%s°）" % (f(gm.get("psi_near_deg"), 2),
+                                                    f(gm.get("psi_far_deg"), 2),
+                                                    f(gm.get("psi_span_deg"), 2)),
+             "馈源口径 d_feed = %s mm（θ3dB=%s°）" % (f((fd.get("d_feed_m") or 0) * 1000, 2),
+                                                      f(fd.get("theta3db_deg"), 2)),
+             "焦点-中心距 r_c = %s m" % f(gm.get("r_c"), 3)]
+    for i, ln in enumerate(lines):
+        s.append('<text x="%d" y="%d" font-size="10.5" fill="#33475b">%s</text>'
+                 % (PL + 4, PT + 14 + i * 15, e(ln)))
+    s.append('</svg>')
+    return "".join(s)
+
+
+def svg_reflector_pattern(pat, W=620, H=330):
+    """偏置反射面口径积分方向图：主面 E（实线）/ 正交面 H（虚线）双 cut，−40~0dBr。"""
+    if not pat or not pat.get("ok"):
+        return ""
+    th = pat.get("cut_theta") or []
+    de = pat.get("cut_e_dbr") or []
+    dh = pat.get("cut_h_dbr") or []
+    if not th or not de:
+        return ""
+    span = max(to_f(pat.get("cut_span"), abs(th[-1])), 0.05)
+    PL, PR, PT, PB = 52, 16, 20, 44
+    X = lambda t: PL + (t + span) / (2 * span) * (W - PL - PR)                     # noqa: E731
+    Yq = lambda g: PT + (1 - (min(max(g, -40), 0) + 40) / 40) * (H - PT - PB)       # noqa: E731
+    s = ['<svg width="%d" height="%d" viewBox="0 0 %d %d" xmlns="http://www.w3.org/2000/svg" '
+         'font-family="Microsoft YaHei,sans-serif">' % (W, H, W, H)]
+    s.append('<rect x="%d" y="%d" width="%d" height="%d" fill="#fbfdff" stroke="#dde5ee"/>'
+             % (PL, PT, W - PL - PR, H - PT - PB))
+    g = 0
+    while g >= -40:
+        s.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="%s"/>'
+                 % (PL, Yq(g), W - PR, Yq(g), "#b8c6d6" if g == 0 else "#e8eef5"))
+        s.append('<text x="%d" y="%.1f" text-anchor="end" font-size="10" fill="#5f7183">%d</text>'
+                 % (PL - 6, Yq(g) + 4, g))
+        g -= 10
+    # 横轴刻度（自适应步长，θ3dB 很小时用细步长）
+    tstep = span / 3.0
+    t = -span
+    while t <= span + 1e-9:
+        s.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#eef2f7"/>' % (X(t), PT, X(t), H - PB))
+        s.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="10" fill="#5f7183">%s</text>'
+                 % (X(t), H - PB + 15, f(t, 3 if span < 2 else 1)))
+        t += tstep
+    s.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#c0392b" stroke-dasharray="5 4" '
+             'stroke-width="1.2"/><text x="%d" y="%.1f" text-anchor="end" font-size="10" '
+             'fill="#c0392b">−3dB</text>' % (PL, Yq(-3), W - PR, Yq(-3), W - PR - 4, Yq(-3) - 4))
+
+    def _line(arr, col, dash):
+        # 按 |θ| 升序绘制（偏置面峰值可能不在 θ=0，索引顺序≠角度顺序）
+        idx = sorted(range(min(len(th), len(arr))), key=lambda i: th[i])
+        pts = " ".join("%.1f,%.1f" % (X(th[i]), Yq(arr[i])) for i in idx)
+        s.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="2" %s/>'
+                 % (pts, col, 'stroke-dasharray="5 3"' if dash else ""))
+
+    _line(de, "#0b5cad", False)
+    if dh:
+        _line(dh, "#b07514", True)
+    s.append('<text x="%d" y="%d" text-anchor="middle" font-size="11" fill="#5f7183">离轴角 θ (°)</text>'
+             % (W // 2, H - 6))
+    s.append('<text x="14" y="%d" font-size="11" fill="#5f7183">G (dBr)</text>' % (PT - 6))
+    s.append('<text x="%d" y="%d" font-size="10" fill="#0b5cad">— 主面 E（φ=0，偏置方向）</text>'
+             % (PL + 6, PT + 13))
+    if dh:
+        s.append('<text x="%d" y="%d" font-size="10" fill="#b07514">-- 正交面 H（φ=90°）</text>'
+                 % (PL + 6, PT + 27))
     s.append('</svg>')
     return "".join(s)
 
@@ -864,13 +1036,17 @@ def svg_info_flow(flows, cfg=None):
                          % (LANE_L + 4, ym + 1, col, col, LANE_L + 25, ym + 11, col, e(lv)))
                 s.append('<text x="%d" y="%d" font-size="8" fill="#5f7183">%s</text>'
                          % (LANE_L + 52, ym + 11, e(rt)))
-                # 节点按层落列（同层合并）
-                by_l = {}
+                # 节点按层落列（同层合并；按【路径首现顺序】排列 → 箭头方向=真实流向）
+                by_l, ks_order = {}, []
                 for st in (fl.get("stages") or []):
-                    by_l.setdefault(st.get("layer"), []).append(st.get("node", ""))
+                    lay = st.get("layer")
+                    if lay not in by_l:
+                        by_l[lay] = []
+                        ks_order.append(lay)
+                    by_l[lay].append(st.get("node", ""))
                 pts = []
-                for k in order:
-                    if k not in by_l or k not in layer_idx:
+                for k in ks_order:
+                    if k not in layer_idx:
                         continue
                     x = col_x(layer_idx[k])
                     bw = COLW - 12
@@ -882,14 +1058,26 @@ def svg_info_flow(flows, cfg=None):
                              % (x + bw // 2 + 2, ym - 1, e(txt[:13])))
                     s.append('<text x="%d" y="%d" text-anchor="middle" font-size="7.5" fill="%s" opacity=".85">%s</text>'
                              % (x + bw // 2 + 2, ym + 9, col, e(k)))
-                    pts.append((x, x + bw))
+                    pts.append((x, x + bw, k))
                 if len(pts) >= 2:
-                    d = "M%d,%d" % (pts[0][1], ym)
-                    for px in pts[1:]:
-                        d += " L%d,%d" % (px[0], ym)
-                    s.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.8" opacity=".3"/>' % (d, col))
-                    s.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.8" stroke-dasharray="6 7" '
-                             'marker-end="url(#ifarr)"/>' % (d, col))
+                    # 正向跳（层号不减）=居中实线箭头向右；反向跳（如供能 L8→L6）=下方虚线箭头向左
+                    for i in range(1, len(pts)):
+                        a, b = pts[i - 1], pts[i]
+                        if layer_idx[b[2]] >= layer_idx[a[2]]:
+                            d = "M%d,%d L%d,%d" % (a[1], ym, b[0], ym)
+                            s.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.8" opacity=".3"/>' % (d, col))
+                            s.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.8" stroke-dasharray="6 7" '
+                                     'marker-end="url(#ifarr)"/>' % (d, col))
+                        else:
+                            yy = ym + 10
+                            d = "M%d,%d L%d,%d" % (a[0], yy, b[1], yy)
+                            s.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.5" stroke-dasharray="4 3" '
+                                     'opacity=".55" marker-end="url(#ifarr)"/>' % (d, col))
+                    _pth = str(fl.get("path") or "")
+                    if fl.get("bidir") or "⇄" in _pth or "↔" in _pth:
+                        s.append('<path d="M%d,%d L%d,%d" fill="none" stroke="%s" stroke-width="1.4" '
+                                 'stroke-dasharray="3 4" opacity=".45" marker-end="url(#ifarr)"/>'
+                                 % (pts[-1][0], ym + 20, pts[0][1], ym + 20, col))
                 ry += ROWH
         y += bh + 6
     s.append('</svg>')
@@ -1243,11 +1431,67 @@ def _req_chapter(R):
         ["设计波束数（采用）", f(der.get("N_beam"), 0), "频率复用 k=%s" % f(cfg.get("k_reuse") or geo.get("k_typ"), 0)],
     ]
     t2 = table(["需求推导项", "数值", "说明"], rows2)
+
+    # ---- 1.3 四指标耦合校核（v4：覆盖角×波束×波束数×容量，含角度口径换算）----
+    sec13 = ""
+    sc = R.get("spec_check") or {}
+    aspec = R.get("angle_spec") or {}
+    if sc.get("rows") or aspec.get("cov_table"):
+        ct = aspec.get("cov_table") or {}
+        bt = aspec.get("beam_table") or {}
+        si = sc.get("inputs") or {}
+        basis_cn = {"offaxis": "天线离天底角（离轴/扫描角）", "geocentric": "地心角",
+                    "footprint": "地面足迹角"}.get(aspec.get("angle_basis"), "—")
+        bbasis_cn = {"beamwidth": "天线 3dB 波束宽度", "offaxis": "离轴角",
+                     "geocentric": "地心角"}.get(aspec.get("beam_basis"), "—")
+        ang_rows = []
+        if ct:
+            ang_rows.append(["覆盖区半角", "%s°（%s）" % (f(ct.get("given_deg"), 2), e(basis_cn)),
+                             "地面覆盖半径", "%s km" % f(ct.get("r_km"), 0)])
+            ang_rows.append(["↳ 等价地心角", "%s°" % f(ct.get("geocentric_deg"), 3),
+                             "↳ 等价足迹角", "%s°" % f(ct.get("footprint_deg"), 3)])
+        if bt:
+            ang_rows.append(["波束宽度", "%s°（%s）" % (f(bt.get("given_deg"), 3), e(bbasis_cn)),
+                             "波束足迹直径", "%s km" % f(bt.get("footprint_diam_km"), 0)])
+            ang_rows.append(["↳ 所需天线口径 D", "%s m（θ3dB≈70λ/D）" % f(bt.get("D_req_m"), 3),
+                             "几何密铺波束数", "%s 个" % f(si.get("N_geo"), 0)])
+        sc_rows = []
+        for r in sc.get("rows") or []:
+            verdict = {True: "通过", False: "<b>冲突</b>", None: "未配置"}[r.get("ok")]
+            sc_rows.append(["%s %s" % (e(r.get("id")), e(r.get("name"))), e(r.get("got")),
+                            e(r.get("need")), verdict,
+                            (e(r.get("advice")) if r.get("advice") else "—")])
+        fc = sc.get("feed_capacity") or {}
+        sec13 = ('<h3 class="doc-h3">1.3 四指标耦合校核（覆盖角 × 波束宽度 × 波束数 × 容量）</h3>'
+                 '<p class="doc-p">四项指标不是独立的，构成一条闭合约束链：'
+                 '<b>覆盖角 ÷ 波束宽度 → 几何密铺波束数</b>（N = 1.209·(r_cov/r_beam)²，六边形 −3dB 交叠）；'
+                 '<b>波束宽度 → 单波束口径</b>（D = 70λ/θ3dB）；'
+                 '<b>波束数 × 单波束带宽 × 频谱效率 × 极化 → 系统容量</b>（C_sys = N·B·η·n_pol）；'
+                 '<b>波束数 × 带宽 ≤ 频段总带宽 × 复用色数</b>（频谱闭合）；'
+                 '<b>口径 × 覆盖角 → 焦面可容纳馈源数</b>（多波束物理天花板）。'
+                 '任一项改动都会牵动其余各项。角度指标存在三种口径（GEO 下 ±1.5° 离轴角 ≈ 8.47° 地心角 '
+                 '≈ 942 km 地面半径，相差 5.6 倍），本设计器按所选口径严格球面三角换算：'
+                 'sin(α+θ) = sinθ·(R+h)/R → α = asin[sinθ·(R+h)/R] − θ。</p>'
+                 + (tabcap("1-3", "角度口径换算（严格球面三角，非小角近似）")
+                    + table(["指标", "取值", "指标", "取值"], ang_rows) if ang_rows else "")
+                 + tabcap("1-4", "四指标耦合逐项校核")
+                 + table(["校核项", "当前值", "要求", "判定", "调整建议"], sc_rows)
+                 + (('<p class="doc-p small"><b>焦面馈源容量：</b>F/D=%s、f=%s m、覆盖离轴角 ±%s° → '
+                     '焦面半径 %s mm，馈源间距 0.7λ=%s mm，六边形填充最多可排 <b>%s 个</b>馈源'
+                     '（单反射面多波束的物理天花板；超出须加大口径、提高 F/D、缩小覆盖角或改用相控阵）。</p>'
+                     % (f(fc.get("f_over_d"), 2), f(fc.get("f_m"), 3),
+                        f(fc.get("theta_cov_offaxis_deg"), 2),
+                        f((fc.get("R_focal_m") or 0) * 1000, 1),
+                        f((fc.get("pitch_m") or 0) * 1000, 1), f(fc.get("n_feed_max"), 0)))
+                    if fc else "")
+                 + '<p class="doc-p small">%s</p>' % e(sc.get("verdict") or ""))
+
     return (lead(lead_txt)
             + '<h3 class="doc-h3">1.1 任务需求汇总</h3>'
             + tabcap("1-1", "任务需求基线") + t1
             + '<h3 class="doc-h3">1.2 覆盖几何与指标需求推导（SK-INTENT/SK-RETRIEVE）</h3>'
             + tabcap("1-2", "覆盖几何与指标需求推导") + t2
+            + sec13
             + '<p class="doc-p"><b>需求闭环判据：</b>下行 MODCOD 由 C/N 反推（不预设体制）；'
             '频段为硬约束（无货架产品记缺口 N_gap，不回退错误频段；测控/信标豁免 S 波段）；'
             '链路余量目标 M ≥ %s dB。</p>' % f(cfg.get("M_target"), 1))
@@ -1721,6 +1965,45 @@ def _constellation_chapter(R):
                               f(cs.get("N_sat"), 0))) if cs.get("c_sys_total") else "—"],
                      ])
                      + '<p class="doc-p small">%s</p>' % e(cs.get("note") or ""))
+    rc = R.get("regional_coverage") or {}
+    if rc:
+        is_geo = rc.get("orbit") == "GEO"
+        sec_no = "10.%d" % (len(parts) + 1)
+        rows = []
+        rows.append(["协同服务区", e(rc.get("region")), "协同星数", "%s 颗" % f(rc.get("n_sat"), 0)])
+        rows.append(["协同体制", "GEO 空间分区（星位沿经度展开）" if is_geo
+                     else "%s 时间接力（相位/轨道面错开）" % e(rc.get("orbit")),
+                     "覆盖率", "%s%%" % f(rc.get("cov_pct"), 1)])
+        rows.append(["最小覆盖重数", f(rc.get("min_mult"), 0),
+                     "平均覆盖重数", f(rc.get("mean_mult"), 2)])
+        if is_geo:
+            rows.append(["最差点最佳仰角", "%s°（门限 %s°）" % (f(rc.get("worst_el"), 1), f(rc.get("el_min"), 0)),
+                         "星位展开半宽", "±%s°" % f(rc.get("spread_half_deg"), 2)])
+            rows.append(["达标最小星数", ("%s 颗" % f(rc.get("min_sat_for_el"), 0))
+                         if rc.get("min_sat_for_el") else "不可达（纬度向仰角受限）",
+                         "协同可行", "是" if rc.get("feasible") else "否"])
+        else:
+            rows.append(["轨道倾角", "%s°" % f(rc.get("incl_deg"), 1),
+                         "轨道面数", "%s 面" % f(rc.get("n_plane"), 0)])
+            rows.append(["连续覆盖", "成立" if rc.get("continuous") else "存在间隙",
+                         "协同可行", "是" if rc.get("feasible") else "否"])
+        sat_txt = "、".join("%s°E" % f(s.get("lon"), 2)
+                            for s in (rc.get("sats") or []) if s.get("lon") is not None)
+        parts.append('<h3 class="doc-h3">%s 多星协同覆盖单一服务区</h3>' % sec_no
+                     + '<p class="doc-p">区别于全球纬度带 Walker 组网，本节针对<b>单一服务区</b>'
+                     '计算 N 颗卫星的协同覆盖质量。'
+                     + ('GEO 星位固定于赤道，多星只能沿经度展开做空间分区：对展开半宽扫描寻优，'
+                        '以「服务区每点至少被一颗星以 ≥ 门限仰角覆盖」为判据，反推达标最小星数；'
+                        '受 GEO 几何限制，高纬边缘点仰角无法靠增加星位改善，引擎如实标注该物理极限。'
+                        if is_geo else
+                        '%s 卫星过境为间歇覆盖，多星按相位/轨道面错开做时间接力：'
+                        '轨道面 RAAN 对准服务区经度，对服务区中心+8 方位代表点数值传播统计 24h 覆盖重数，'
+                        '覆盖率取最差代表点。' % e(rc.get("orbit")))
+                     + '</p>'
+                     + tabcap("10-%d" % (len(parts) + 1), "多星协同覆盖单一服务区指标")
+                     + table(["项目", "数值", "项目", "数值"], rows)
+                     + (('<p class="doc-p small">协同星位：%s</p>' % e(sat_txt)) if sat_txt else "")
+                     + '<p class="doc-p small">%s</p>' % e(rc.get("note") or ""))
     if not parts:
         n_sat = to_f(cfg.get("N_sat"), 1)
         parts.append('<p class="doc-p">本方案为<b>单星任务</b>（N_sat = %s）且单覆盖区，'
@@ -1729,6 +2012,50 @@ def _constellation_chapter(R):
                      '引擎将按第 2.1 节覆盖几何公式自动完成 Walker 构型反推、'
                      '全球网格数值覆盖仿真（最小重数 ≥ 1 判连续）与多区最差包络合成，'
                      '激光终端按 2 同轨 + 2 异轨标准拓扑配置。</p>' % f(n_sat, 0))
+    # ---- 在轨同类卫星对标（并入第10章；节号=已编号小节数+1，placeholder 不计）----
+    ob = R.get("orbital_benchmark") or {}
+    if ob.get("ok"):
+        nsec = sum(1 for x in parts if 'class="doc-h3"' in x)
+        sn = nsec + 1                              # 章内小节序号
+        dim_rows = []
+        for d in ob.get("dims") or []:
+            dim_rows.append([e(d.get("name")),
+                             ("%s %s" % (f(d.get("value"), 1), e(d.get("unit") or "")))
+                             if to_f(d.get("value")) > 0 else "—",
+                             ("%s ~ %s" % (f(d.get("ref_min"), 0), f(d.get("ref_max"), 0)))
+                             if d.get("ref_min") is not None else "—",
+                             f(d.get("ref_median"), 0) if d.get("ref_median") is not None else "—",
+                             e(d.get("tag"))])
+        ref_rows = []
+        for s in (ob.get("refs") or []):
+            ref_rows.append([e(s.get("cn")), e(s.get("operator")), e(s.get("band")),
+                             (f(s.get("capacity_gbps"), 0) + " Gbps") if s.get("capacity_gbps") else "未公开",
+                             (f(s.get("mass_kg"), 0) + " kg") if s.get("mass_kg") else "未公开",
+                             (f(s.get("n_beam"), 0)) if s.get("n_beam") else "—",
+                             e(s.get("launch")), e(s.get("feat"))])
+        srcs = "；".join(sorted(set(s.get("src") or "" for s in (ob.get("refs") or [])
+                                    if s.get("src"))))
+        parts.append(
+            '<h3 class="doc-h3">10.%d 在轨同类卫星对标</h3>' % sn
+            + '<p class="doc-p">将设计方案与<b>当前在轨同类卫星</b>（同轨道、同频段，公开参数口径）'
+            '横向对标，用于校准设计基准：容量、波束数与载荷质量是否落在在轨同类区间内，'
+            '方案定位于「保守 / 主流 / 先进」。本方案（%s/%s）整星容量 <b>%s Gbps</b>、'
+            '波束 <b>%s 个</b>、载荷质量 <b>%s kg</b>（平台 %s）；在轨同类 %d 颗，'
+            '容量区间 %s~%s Gbps，综合定位：<b>%s</b>。</p>'
+            % (e(ob.get("orbit")), e(ob.get("band")), f(ob.get("c_sys"), 1),
+               f(ob.get("n_beam"), 0), f(ob.get("m_pay"), 0), e(ob.get("plat_cn")),
+               ob.get("n_refs", 0),
+               f((ob.get("cap_range") or [None])[0], 0),
+               f((ob.get("cap_range") or [None, None])[1], 0), e(ob.get("position")))
+            + tabcap("10-%d" % sn, "设计方案 vs 在轨同类卫星（对标维度）")
+            + table(["对标维度", "本方案", "在轨区间", "在轨中位", "定位"], dim_rows)
+            + '<h3 class="doc-h3">10.%d 在轨同类卫星清单</h3>' % (sn + 1)
+            + tabcap("10-%d" % (sn + 1), "在轨同类卫星参考（公开参数）")
+            + table(["卫星", "运营商/研制", "频段", "容量", "发射质量", "波束数",
+                     "发射时间", "技术特征"], ref_rows)
+            + '<p class="doc-p small">数据来源：%s。在轨对标为公开量级参考，非精确工程值；'
+            '用于设计基准校准与方案定位。</p>' % e(srcs)
+            + '<div class="lead"><b>对标结论：</b>%s</div>' % e(ob.get("verdict")))
     return "".join(parts)
 
 
@@ -2233,7 +2560,199 @@ def _pattern_section(pat_bore, pat_scan, meta, D_m=None):
     return "".join(parts)
 
 
+# ---------- 章节：4.6/4.7 偏置反射面天线设计（v4）----------
+def _reflector_section(R, pat_scan=None):
+    """第 4 章新小节：偏置反射面几何/馈源/效率/增益（reflector_engine 严格数值积分）。
+
+    节号动态：栅瓣节存在（pat_scan）则本节为 4.7，否则 4.6（与 _pattern_section 联动）。
+    仅当方案为反射面类天线（固面/伞状/大容量多波束/混合多波束）且引擎返回 ok 时输出；
+    相控阵方案不输出（其口径仅为阵面等效，偏置面几何不适用）。
+    """
+    RF = R.get("reflector") or {}
+    if not RF.get("ok"):
+        return ""
+    cfg = R.get("cfg") or {}
+    ant_type = str(cfg.get("ant_type") or "")
+    if ant_type == "相控阵":
+        return ""
+    sec = "4.7" if pat_scan else "4.6"
+    gm = RF.get("geom") or {}
+    fd = RF.get("feed") or {}
+    ef = RF.get("eff") or {}
+    pf = RF.get("perf") or {}
+    ig = RF.get("integration") or {}
+    inp = RF.get("inputs") or {}
+    pat = RF.get("pattern") or {}
+
+    geo_rows = [
+        ["反射器口径 D_r", "%s m" % f(gm.get("D_r"), 4), "焦距 f", "%s m（F/D=%s）"
+         % (f(gm.get("f"), 4), f(gm.get("f_over_d"), 3))],
+        ["发射器中心偏置 h", "%s m（h/D=%s）" % (f(gm.get("h"), 4), f(gm.get("h_over_d"), 3)),
+         "近边到母轴间隙", "%s mm" % f((gm.get("h_near_m") or 0) * 1000, 1)],
+        ["馈源轴倾斜 ψ₀", "%s°（=2·atan(h/2f)）" % f(gm.get("psi0_deg"), 3),
+         "焦点-反射面中心距 r_c", "%s m（=f+ρ²/4f）" % f(gm.get("r_c"), 4)],
+        ["照射角范围 ψ", "%s° ~ %s°" % (f(gm.get("psi_near_deg"), 3), f(gm.get("psi_far_deg"), 3)),
+         "绑定半张角 ψ_span", "%s°（近边 %s° / 远边 %s°）"
+         % (f(gm.get("psi_span_deg"), 3), f(gm.get("span_near_deg"), 3),
+            f(gm.get("span_far_deg"), 3))],
+        ["反射面是否跨母轴", ("是（h<D_r/2，馈源遮挡风险）" if gm.get("crosses_axis") else "否（偏置面优势：无口径遮挡）"),
+         "口径投影面积 A", "%s m²" % f(ef.get("A_m2"), 4)],
+    ]
+    feed_rows = [
+        ["馈源方向图模型", {"cosq": "cos^q（余弦幂）", "gaussian": "高斯 exp(−c·sin²ψ)"}.get(fd.get("model"), fd.get("model")),
+         "锥削设计参数", ("q = %s" % f(fd.get("q"), 3)) if fd.get("q") is not None
+         else ("c = %s" % f(fd.get("c_gauss"), 4))],
+        ["馈源口径 d_feed", "%s mm（%s）" % (f((fd.get("d_feed_m") or 0) * 1000, 3), e(fd.get("source") or "")),
+         "推荐口径 d_feed_rec", "%s mm" % f((fd.get("d_feed_rec_m") or 0) * 1000, 3)],
+        ["馈源 θ3dB", "%s°" % f(fd.get("theta3db_deg"), 3),
+         "覆盖需求（绑定 ψ_span）", "%s°" % f(fd.get("psi_span_deg"), 3)],
+        ["实际边缘锥削", "%s dB（rim 最差方位实测）" % f(fd.get("edge_taper_actual_db"), 2),
+         "目标锥削", "%s dB" % f(inp.get("edge_taper_db"), 1)],
+    ]
+    eff_rows = [
+        ["照射效率 η_ill", "%s %%（|∫E dA|²/(A∫|E|²dA)，%s 点口径网格数值积分）"
+         % (f((ef.get("eta_ill") or 0) * 100, 2), f(ef.get("n_points"), 0))],
+        ["溢散效率 η_spill", "%s %%（∫_ref|F|²dΩ/∫_4π|F|²dΩ，dΩ=dA/r²）"
+         % f((ef.get("eta_spill") or 0) * 100, 2)],
+        ["口径效率 η_ap", "<b>%s %%</b>（=η_ill×η_spill；偏置面无副面/馈源遮挡，不计 blockage）"
+         % f((ef.get("eta_ap") or 0) * 100, 2)],
+        ["Ruze 面精度损耗", ("%s dB（σ_ε=%s mm）" % (f(ef.get("ruze_db"), 3), f(inp.get("surface_rms_mm"), 2)))
+         if inp.get("surface_rms_mm") else "未计（未配置面精度）"],
+        ["峰值增益 G", "<b>%s dBi</b>（G=10lg[η_ap·(πD_r/λ)²]%s；λ=%s mm @ %s GHz）"
+         % (f(pf.get("G_dbi"), 2), "−L_Ruze" if ef.get("ruze_db") else "",
+            f((RF.get("lam_m") or 0) * 1000, 2), f(inp.get("freq_ghz"), 1))],
+        ["波束宽度 θ3dB", "%s°（口径积分实测）；经典 70λ/D=%s°"
+         % (f(pf.get("theta3db_deg"), 4), f(pf.get("theta3db_classic_deg"), 4))],
+        ["交叉极化鉴别率 XPD", "≈%s dB（偏置面轴上界 20lg(4f/D_r)）" % f(pf.get("xpd_dB"), 1)],
+    ]
+    chk_rows = []
+    for c in RF.get("checks") or []:
+        chk_rows.append([e(c.get("name")), e(c.get("got")), e(c.get("need")),
+                         ("通过" if c.get("ok") else "<b>不符</b>"), e(c.get("note"))])
+    parts = ['<h3 class="doc-h3">%s 偏置反射面天线设计（口径/焦距/中心偏置/馈源口径）</h3>' % sec,
+             lead("偏置反射面（offset reflector）以<b>反射器口径 D_r、焦距 f、发射器（馈源相位中心）"
+                  "中心偏置 h、馈源口径 d_feed</b> 四项几何参数为设计输入，全部可在配置页修改。"
+                  "母抛物面 z=ρ²/(4f)、焦点 F=(0,0,f)，反射面椭圆 rim 正投影为圆盘 (x−h)²+y²≤(D_r/2)²。"
+                  "由抛物面性质，焦点到母面径向 ρ 处的张角 ψ=2·atan(ρ/2f)，故馈源轴倾斜角 ψ₀=2·atan(h/2f)、"
+                  "焦半径 r_c=f+ρ²/(4f)。口径场按物理光学 E(Q)=F(ψ′)·(f/r)^(3/4)（ψ′ 为离馈源轴角，"
+                  "由向量点积 cosψ′=d̂·â 严格求解），照射/溢散效率均为严格二维数值积分"
+                  "（非经验公式），并做网格收敛性自检。本节由 reflector_engine 计算，"
+                  "口径来源：%s。" % e(ig.get("source") or "—")),
+             tabcap("4-5", "偏置反射面几何参数（可配置项）"),
+             table(["项目", "数值", "项目", "数值"], geo_rows),
+             '<p class="doc-p small">几何关系（母抛物面 z=ρ²/4f、焦点 F、偏置 h）：'
+             '馈源轴倾斜 ψ₀=%s°=2·atan(h/2f)、焦半径 r_c=%s m=f+ρ²/4f、'
+             '照射角 %s°~%s°（近边张角 %s°/远边 %s°，绑定 ψ_span=%s°）。'
+             '偏置面无副面/馈源遮挡，η_ap 不计 blockage。</p>'
+             % (f(gm.get("psi0_deg"), 3), f(gm.get("r_c"), 4),
+                f(gm.get("psi_near_deg"), 3), f(gm.get("psi_far_deg"), 3),
+                f(gm.get("span_near_deg"), 3), f(gm.get("span_far_deg"), 3),
+                f(gm.get("psi_span_deg"), 3)),
+             '<h3 class="doc-h4">%s.1 馈源照射设计</h3>' % sec,
+             tabcap("4-6", "馈源参数（口径 ↔ θ3dB ↔ 边缘锥削）"),
+             table(["项目", "数值", "项目", "数值"], feed_rows),
+             '<p class="doc-p small">馈源口径与波束宽度按 θ3dB≈1.27λ/d_feed 互推（喇叭工程经验系数 1.1~1.5）；'
+             '用户给定馈源口径时，锥削为<b>计算结果</b>而非设计约束（馈源方向图由物理口径唯一确定，'
+             '不反向伪造）。偏置面照射角关于馈源轴<b>不对称</b>（ψ 对 ρ 非线性），'
+             '锥削设计点取绑定半张角 ψ_span=max(ψ₀−ψ_near, ψ_far−ψ₀)，避免近边照射不足。</p>',
+             '<h3 class="doc-h4">%s.2 效率与增益</h3>' % sec,
+             tabcap("4-7", "效率链与增益（严格数值积分）"),
+             table(["项目", "数值与公式"], eff_rows),
+             ]
+    if pat.get("ok") and pat.get("cut_theta"):
+        parts += ['<h3 class="doc-h4">%s.3 口径积分远场方向图</h3>' % sec,
+                  '<p class="doc-p">远场由真实照射分布做口径积分 E_ff(u,v)=∫∫E(x,y)exp(jk(xu+yv))dxdy'
+                  '（非参数化 taper 近似），主面（φ=0，偏置方向）与正交面（φ=90°）双切面 —— '
+                  '偏置面两切面不等宽是其特征。θ3dB=%s°（E面 %s° / H面 %s°），首旁瓣 %s dBr。</p>'
+                  % (f(pat.get("theta3db_deg"), 4), f(pat.get("theta3db_e_deg"), 4),
+                     f(pat.get("theta3db_h_deg"), 4), f(pat.get("first_sidelobe_dbr"), 1)),
+                  svg_reflector_pattern(pat),
+                  figcap("4-2", "偏置反射面口径积分远场方向图（主面 E 实线 / 正交面 H 虚线）")]
+    if chk_rows:
+        parts += ['<h3 class="doc-h4">%s.4 工程约束校核</h3>' % sec,
+                  tabcap("4-8", "偏置反射面约束校核"),
+                  table(["约束项", "当前值", "要求", "判定", "说明"], chk_rows)]
+    adv = RF.get("advice") or []
+    if adv:
+        parts.append('<p class="doc-p"><b>整改建议：</b></p><ul class="doc-ul">'
+                     + "".join("<li>%s</li>" % e(a) for a in adv) + "</ul>")
+    parts.append('<p class="doc-p small"><b>结论：</b>%s</p>' % e(RF.get("verdict") or ""))
+    parts.append('<p class="doc-p small">GRASP 联动：本节几何参数（D_r/f/h、F/D、偏置比、馈源）'
+                 '可直接驱动 grasp_bridge 生成 .tor/.tci/.gxp 模型文件做物理光学精确仿真；'
+                 'GRASP 不可用时本节即为其工程等效（同一套偏置面几何定义）。</p>')
+    return "".join(parts)
+
+
 # ---------- 章节：11 地面 EIRP 覆盖 ----------
+def _country_coupling_section(R):
+    """第 11 章新小节 11.3：覆盖区 ↔ 国家双向耦合判定（v4）。"""
+    CC = R.get("country_coupling") or {}
+    if not CC.get("ok"):
+        return ""
+    cfg = R.get("cfg") or {}
+    ctr = CC.get("center") or {}
+    sub = ctr.get("subpoint") or {}
+    nd = CC.get("need") or {}
+    parts = ['<h3 class="doc-h3">11.3 覆盖区 ↔ 国家双向耦合判定</h3>',
+             lead("得到覆盖区之后，即可判定「能否覆盖某个国家」——两者是双向耦合的："
+                  "<b>正向</b>由算得的覆盖区（波束指向中心 + 覆盖半径）与各国国土外接圆"
+                  "做圆-圆相交面积比，判全覆盖/部分覆盖/未覆盖；<b>反向</b>由目标国推所需"
+                  "覆盖半径、波束电扫角与波束数，与当前配置比对给出缺口。"
+                  "GEO 下星下点恒在赤道（%s°E），波束靠电扫 %s° 离轴指向国土中心"
+                  "（%s）——星下点决定扫描角需求与用户仰角，覆盖中心决定覆盖判定，二者不可混同。"
+                  % (f(sub.get("lon"), 1), f(ctr.get("pointing_offaxis_deg"), 3),
+                     e(ctr.get("source") or "—"))),
+             tabcap("11-2", "覆盖区中心与指向几何"),
+             table(["项目", "数值", "项目", "数值"], [
+                 ["波束指向中心", "%.2f°N / %.2f°E" % (to_f(ctr.get("lat")), to_f(ctr.get("lon"))),
+                  "星下点（GEO 定点）", "%.2f°N / %.2f°E" % (to_f(sub.get("lat")), to_f(sub.get("lon")))],
+                 ["覆盖半径", "%s km" % f(CC.get("r_cov_km"), 0),
+                  "单星视域上限（仰角≥%s°）" % f(CC.get("el_min_deg"), 0),
+                  "%s km" % f(CC.get("r_cap_km"), 0)],
+                 ["指向离轴角 ψ_point", "%s°（地心角 %s°）" % (f(ctr.get("pointing_offaxis_deg"), 3),
+                                                              f(ctr.get("pointing_geocentric_deg"), 3)),
+                  "视域判定", "覆盖半径 ≤ 视域上限（可行）" if CC.get("single_sat_view_ok")
+                  else "<b>覆盖半径超出单星视域 → 需多星协同或降仰角门限</b>"],
+             ]),
+             ]
+    tv = CC.get("target_verdict") or ""
+    if tv:
+        parts.append('<p class="doc-p"><b>目标国判定：</b>%s</p>' % e(tv))
+    if nd:
+        parts += [tabcap("11-3", "反向推导：目标国 → 所需覆盖规格"),
+                  table(["项目", "数值", "项目", "数值"], [
+                      ["所需覆盖半径 r_need", "%s km（国土外接圆 ×1.05 余量）" % f(nd.get("r_need_km"), 0),
+                       "当前覆盖半径", "%s km → %s" % (f(nd.get("r_have_km"), 0),
+                                                        "<b>满足</b>" if nd.get("ok")
+                                                        else "缺口 %s km" % f(nd.get("gap_km"), 0))],
+                      ["所需波束电扫角", "%s°（离轴）" % f(nd.get("pointing_offaxis_need_deg"), 3),
+                       "覆盖外缘总离轴角", "%s°" % f(nd.get("offaxis_total_need_deg"), 3)],
+                      ["所需密铺波束数", "%s 个" % f(nd.get("n_beam_need"), 0),
+                       "国土边角仰角", ("%s°（门限 %s° → %s）"
+                                        % (f(nd.get("el_edge_deg"), 1), f(CC.get("el_min_deg"), 0),
+                                           "达标" if nd.get("el_ok") else "<b>不足</b>"))
+                       if nd.get("el_edge_deg") is not None else "—"],
+                  ])]
+        if nd.get("advice"):
+            parts.append('<p class="doc-p small"><b>反向建议：</b>%s</p>' % e(nd.get("advice")))
+    rows = []
+    for c in (CC.get("countries") or []):
+        if c.get("status") == "none":
+            continue
+        rows.append([e(c.get("cn")), "%.1f%%" % to_f(c.get("cover_pct")),
+                     "%s km" % f(c.get("dist_km"), 0),
+                     ("%s°" % f(c.get("el_edge_deg"), 1)) if c.get("el_edge_deg") is not None else "—",
+                     ("达标" if c.get("el_ok") else ("<b>不足</b>" if c.get("el_ok") is False else "—")),
+                     ("全覆盖" if c.get("status") == "full" else "部分覆盖")])
+    if rows:
+        parts += ['<h3 class="doc-h4">11.3.1 覆盖国家清单（按覆盖率降序）</h3>',
+                  tabcap("11-4", "覆盖判定清单（全覆盖 + 部分覆盖）"),
+                  table(["国家/地区", "覆盖率", "圆心距", "边角仰角", "仰角判定", "覆盖状态"], rows)]
+    parts.append('<p class="doc-p small"><b>判定结论：</b>%s<br>%s</p>'
+                 % (e(CC.get("verdict") or ""), e(CC.get("note") or "")))
+    return "".join(parts)
+
+
 def _coverage_chapter(C, world_land=None):
     parts = ['<h3 class="doc-h3">11.1 地面 EIRP 覆盖投影</h3>',
              lead("地面覆盖由 coverage_engine 内置计算（SATSOFT 等效）：以天线体坐标系"
@@ -2742,10 +3261,10 @@ def build_report(R, icd=None, beam=None, world_land=None, name=None,
 
     # ---- 三引擎补算：次级方向图（boresight/扫描）+ 地面 EIRP 覆盖 + 轨道仿真 ----
     pat_sec_html = cov_html = orb_html = ""
+    pat_scan = None            # try 外初始化：_reflector_section 的节号依赖它
     try:
         pat_bore, pmeta = _compute_pattern(R)
         th_scan = float(cfg.get("θ_scan") or 0)
-        pat_scan = None
         if pmeta["is_arr"] and th_scan > 0.5:
             pat_scan, _ = _compute_pattern(R, scan_theta=th_scan)
         pat_sec_html = _pattern_section(pat_bore, pat_scan, pmeta)
@@ -2766,14 +3285,15 @@ def build_report(R, icd=None, beam=None, world_land=None, name=None,
         ("项目概述与需求分析", _req_chapter(R)),
         ("设计原理与方法论", _principle_chapter(R)),
         ("总体方案", _scheme_chapter(R)),
-        ("天线与波束性能", _ant_chapter(R, beam, beam2d_svg, p2, scan_note) + pat_sec_html),
+        ("天线与波束性能", _ant_chapter(R, beam, beam2d_svg, p2, scan_note) + pat_sec_html
+         + _reflector_section(R, pat_scan)),
         ("链路预算与转发器方案", _link_chapter(R)),
         ("单机选型与货架清单", _equip_chapter(R)),
         ("接口与协议（MOSA 标准化 ICD）", _icd_chapter(icd)),
         ("约束校验与回环", _valid_chapter(R)),
         ("方案评价标准与可行性结论（E1~E10）", _eval_chapter(R)),
-        ("星座组网与多覆盖区", _constellation_chapter(R)),
-        ("地面 EIRP 覆盖分析（SATSOFT 等效）", cov_html),
+        ("星座组网、多覆盖区与在轨对标", _constellation_chapter(R)),
+        ("地面 EIRP 覆盖分析（SATSOFT 等效）", cov_html + _country_coupling_section(R)),
         ("轨道覆盖仿真（STK 等效）", orb_html),
         ("方案级稳健性分析", _robust_chapter(R)),
         ("附录", _appendix(R, shelf_count)),
@@ -2806,7 +3326,7 @@ def build_report(R, icd=None, beam=None, world_land=None, name=None,
     content = "\n".join(body)
 
     css = """
-body{font-family:"仿宋","FangSong","宋体",serif;font-size:12pt;line-height:1.85;color:#000}
+body{font-family:"宋体","SimSun",serif;font-size:12pt;line-height:1.85;color:#000}
 /* ---- 封面 ---- */
 .cover{text-align:center;padding-top:36pt}
 .cover-band{display:inline-block;font-family:"黑体","SimHei",sans-serif;font-size:11pt;
@@ -2823,27 +3343,27 @@ body{font-family:"仿宋","FangSong","宋体",serif;font-size:12pt;line-height:1
 .cover-meta{font-size:10.5pt;color:#444;margin-top:34pt;line-height:2.0}
 /* ---- 摘要 ---- */
 .abs-h{border-bottom:2pt solid #0b5cad}
-.abs-lead{font-size:11.5pt;text-align:justify;text-indent:2em;margin:8pt 0 12pt;line-height:1.95}
+.abs-lead{font-size:11.5pt;text-align:left;text-indent:2em;margin:8pt 0 12pt;line-height:1.95}
 .abs-kpi table{border-collapse:collapse;width:100%;font-size:10pt;margin:6pt 0}
 .abs-kpi th,.abs-kpi td{border:0.75pt solid #9ab;padding:4pt 7pt}
 .abs-kpi th{background:#eef3fa;font-family:"黑体","SimHei",sans-serif;font-weight:normal}
 .abs-concl{font-size:11.5pt;border-left:4pt solid #0b5cad;background:#f6f9fd;
-  padding:8pt 12pt;margin:12pt 0;text-align:justify;line-height:1.8}
-.abs-note{margin-top:10pt;text-align:justify}
-/* ---- 标题层级 ---- */
+  padding:8pt 12pt;margin:12pt 0;text-align:left;line-height:1.8}
+.abs-note{margin-top:10pt;text-align:left}
+/* ---- 标题层级（标题1三号黑体/标题2小三黑体/标题3四号黑体，均黑色） ---- */
 .doc-h2{font-family:"黑体","SimHei",sans-serif;font-size:16pt;margin:0 0 10pt;
-  padding:0 0 5pt;border-bottom:2pt solid #0b5cad;color:#0b3d6e;page-break-after:avoid}
-.toc-h{border-bottom:2pt solid #0b5cad}
-.doc-h3{font-family:"黑体","SimHei",sans-serif;font-size:13pt;margin:16pt 0 6pt;
-  color:#0b3d6e;page-break-after:avoid}
-.doc-h4{font-family:"黑体","SimHei",sans-serif;font-size:11.5pt;margin:11pt 0 4pt;
-  color:#333;page-break-after:avoid}
-/* ---- 正文 ---- */
-.doc-p{font-size:11pt;margin:6pt 0;text-align:justify}
-.doc-ul{font-size:10.5pt;margin:4pt 0 8pt 20pt;line-height:1.8}
-.doc-sec{font-size:11pt}
-.lead{font-size:10.5pt;color:#3a4a5a;background:#f4f7fb;border-left:3.5pt solid #7ea3d0;
-  padding:7pt 12pt;margin:6pt 0 12pt;text-align:justify;line-height:1.8}
+  padding:0 0 5pt;border-bottom:1.5pt solid #000;color:#000;page-break-after:avoid}
+.toc-h{border-bottom:1.5pt solid #000}
+.doc-h3{font-family:"黑体","SimHei",sans-serif;font-size:15pt;margin:16pt 0 6pt;
+  color:#000;page-break-after:avoid}
+.doc-h4{font-family:"黑体","SimHei",sans-serif;font-size:14pt;margin:11pt 0 4pt;
+  color:#000;page-break-after:avoid}
+/* ---- 正文（小四宋体黑色） ---- */
+.doc-p{font-size:12pt;margin:6pt 0;text-align:left;color:#000}
+.doc-ul{font-size:12pt;margin:4pt 0 8pt 20pt;line-height:1.8;color:#000}
+.doc-sec{font-size:12pt;color:#000}
+.lead{font-size:12pt;color:#000;background:#f4f7fb;border-left:3.5pt solid #7ea3d0;
+  padding:7pt 12pt;margin:6pt 0 12pt;text-align:left;line-height:1.8}
 /* ---- 表格 ---- */
 .doc-sec table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:5pt 0 10pt}
 .doc-sec th,.doc-sec td{border:0.75pt solid #9ab;padding:4pt 6pt;text-align:left;vertical-align:top}
@@ -2852,8 +3372,8 @@ body{font-family:"仿宋","FangSong","宋体",serif;font-size:12pt;line-height:1
 /* ---- 图表题注 ---- */
 .figcap{text-align:center;font-size:9.5pt;color:#333;margin:3pt 0 14pt;page-break-before:avoid}
 .tabcap{font-size:9.5pt;color:#0b3d6e;margin:10pt 0 2pt;page-break-after:avoid}
-.doc-sec img{display:block;margin:6pt auto;max-width:100%;height:auto}
-.doc-sec svg{display:block;margin:6pt auto;max-width:100%;height:auto}
+.doc-sec img{display:block;margin:8pt auto;max-width:100%;height:auto}
+.doc-sec svg{display:block;margin:8pt auto;max-width:100%;height:auto}
 /* ---- 目录 / 其它 ---- */
 table.toc{border:none;width:78%;margin-top:8pt}
 table.toc td{border:none;font-size:12pt;padding:3.5pt 6pt}

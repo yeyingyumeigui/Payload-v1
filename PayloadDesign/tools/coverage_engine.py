@@ -452,6 +452,152 @@ def coverage_metrics(cov, levels_dbw=None):
 
 
 # ================================================================
+# 波束角域 → 地面环（覆盖图直接读出"正负多少度"，分色标注）
+# ================================================================
+def _cut_offaxis_for_level(pat, level_dbr):
+    """从 cut 剖面反解增益下穿 −level_dbr 的离轴角（度，相对波束中心）。
+
+    cut 以 scan_theta 为中心 ±span；取正侧首个下穿点。找不到返回 None。
+    """
+    cut = pat.get("cut") or {}
+    ths = cut.get("theta") or []
+    vals = cut.get("gain_dbr") or []
+    ctr = float(cut.get("center", pat.get("scan_theta_deg", 0.0)) or 0.0)
+    prev_th, prev_v = None, None
+    for th, v in zip(ths, vals):
+        if th < ctr - 1e-9:                 # 只看波束中心正侧
+            prev_th, prev_v = th, v
+            continue
+        if prev_v is not None and prev_v >= -level_dbr > v:
+            w = (prev_v + level_dbr) / (prev_v - v) if prev_v > v else 0.0
+            return abs((prev_th + w * (th - prev_th)) - ctr)
+        prev_th, prev_v = th, v
+    return None
+
+
+def _first_null_offaxis(pat):
+    """主瓣后首个深零陷（gain ≤ −20dBr 的局部极小）离轴角（度）；找不到返回 None。"""
+    cut = pat.get("cut") or {}
+    ths = cut.get("theta") or []
+    vals = cut.get("gain_dbr") or []
+    ctr = float(cut.get("center", pat.get("scan_theta_deg", 0.0)) or 0.0)
+    th3 = float(pat.get("beamwidth_3db_deg", 1.0) or 1.0)
+    best = None
+    for i in range(1, len(vals) - 1):
+        if ths[i] < ctr + th3 * 0.5:        # 跳过主瓣内
+            continue
+        if vals[i] <= -20.0 and vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]:
+            best = abs(ths[i] - ctr)
+            break
+    return best
+
+
+def beam_angle_rings(pat, h_km, sat_lat=0.0, sat_lon=0.0, angles_deg=None, n_az=72):
+    """把天线角域（离波束轴 ±θ）锥面投影到地面 → 环（覆盖图直接读出正负多少度）。
+
+    沿波束轴建锥：对每个离轴角 θ、方位 φ∈[0,360)，射线 = axis·cosθ + (u·cosφ+v·sinφ)·sinθ
+    （u,v 为垂直波束轴的正交基），射线-地球球面求交 → 地面 (lat,lon) 环点。
+    angles_deg=None 时自动取 [θ3dB/2(−3dB边缘), θ_−10dB, 首零陷]（存在的项）。
+
+    返回 dict(rings=[{theta_deg,label,color,pts=[[lat,lon],...],radius_km}],
+              scan,beam_center,note)。θ 越大环越靠外，颜色由内(暖)到外(冷)区分。
+    """
+    p_sat = sat_position(sat_lat, sat_lon, h_km)
+    x_ax, y_ax, z_ax = _body_frame(sat_lat, sat_lon)
+    th0 = float(pat.get("scan_theta_deg", 0.0) or 0.0)
+    ph0 = float(pat.get("scan_phi_deg", 0.0) or 0.0)
+    st, ct = math.sin(th0 * DEG), math.cos(th0 * DEG)
+    sp, cp = math.sin(ph0 * DEG), math.cos(ph0 * DEG)
+    axis_body = (st * cp, st * sp, ct)
+    # 垂直波束轴的正交基 u,v（体系坐标）
+    aux = (0.0, 0.0, 1.0) if abs(axis_body[2]) < 0.9 else (1.0, 0.0, 0.0)
+    u = _norm(_cross(aux, axis_body))
+    v = _cross(axis_body, u)
+
+    def body_to_ecef(a, b, c):
+        return (a * x_ax[0] + b * y_ax[0] + c * z_ax[0],
+                a * x_ax[1] + b * y_ax[1] + c * z_ax[1],
+                a * x_ax[2] + b * y_ax[2] + c * z_ax[2])
+
+    axis_e = _norm(body_to_ecef(*axis_body))
+    c_lat, c_lon = _axis_ground_point(p_sat, axis_e)
+
+    # 角度环定义（含默认推导 + 分色：内暖外冷）
+    palette = [("#d6452d", "−3dB 波束边缘"), ("#e08214", "−10dB"),
+               ("#7048a8", "首零陷"), ("#0b5cad", "")]
+    if angles_deg is None:
+        th3 = float(pat.get("beamwidth_3db_deg", 1.0) or 1.0)
+        cand = [(th3 / 2.0, "−3dB 波束边缘", "#d6452d")]
+        a10 = _cut_offaxis_for_level(pat, 10.0)
+        if a10 and a10 > th3 / 2.0 * 1.05:
+            cand.append((a10, "−10dB", "#e08214"))
+        anull = _first_null_offaxis(pat)
+        if anull and anull > (a10 or th3 / 2.0) * 1.05:
+            cand.append((anull, "首零陷", "#7048a8"))
+        angles = cand
+    else:
+        angles = [(float(a), palette[i][1] if i < len(palette) else "",
+                   palette[i][0] if i < len(palette) else "#0b5cad")
+                  for i, a in enumerate(angles_deg)]
+
+    def ray_ground(dir_e):
+        """射线 p_sat + t·dir 与地球球面交点 (lat,lon)；不相交返回 None。"""
+        b = _dot(dir_e, p_sat)
+        c = _dot(p_sat, p_sat) - R_EARTH_KM * R_EARTH_KM
+        disc = b * b - c
+        if disc < 0:
+            return None
+        t = -b - math.sqrt(disc)
+        if t <= 0:
+            return None
+        px = p_sat[0] + t * dir_e[0]
+        py = p_sat[1] + t * dir_e[1]
+        pz = p_sat[2] + t * dir_e[2]
+        r = math.sqrt(px * px + py * py + pz * pz)
+        return (math.degrees(math.asin(max(min(pz / r, 1.0), -1.0))),
+                math.degrees(math.atan2(py, px)))
+
+    rings = []
+    km_deg = R_EARTH_KM * DEG
+    for th, label, color in angles:
+        if th is None or th <= 0 or th >= 90:
+            continue
+        sth, cth = math.sin(th * DEG), math.cos(th * DEG)
+        pts, ok = [], True
+        for k in range(n_az):
+            phi = 360.0 * k / n_az
+            ca, sa = math.cos(phi * DEG), math.sin(phi * DEG)
+            dir_b = (axis_body[0] * cth + (u[0] * ca + v[0] * sa) * sth,
+                     axis_body[1] * cth + (u[1] * ca + v[1] * sa) * sth,
+                     axis_body[2] * cth + (u[2] * ca + v[2] * sa) * sth)
+            g = ray_ground(_norm(body_to_ecef(*dir_b)))
+            if g is None:
+                ok = False
+                break
+            pts.append([round(g[0], 4), round(g[1], 4)])
+        if not ok or len(pts) < 3:
+            continue
+        # 环平均地面半径（km，从波束中心到环点的大圆距离）
+        rs = []
+        for la, lo in pts:
+            dla = (la - c_lat) * km_deg
+            dlo = (lo - c_lon) * km_deg * max(math.cos(c_lat * DEG), 0.05)
+            rs.append(math.sqrt(dla * dla + dlo * dlo))
+        rings.append(dict(theta_deg=round(th, 3), label=label, color=color,
+                          pts=pts, radius_km=round(sum(rs) / len(rs), 1)))
+
+    return dict(ok=True, rings=rings, scan=dict(theta_deg=round(th0, 3), phi_deg=round(ph0, 3)),
+                beam_center=dict(lat=round(c_lat, 4), lon=round(c_lon, 4)),
+                beamwidth_3db_deg=round(float(pat.get("beamwidth_3db_deg", 0.0) or 0.0), 4),
+                peak_gain_dbi=float(pat.get("peak_gain_dbi", 0.0) or 0.0),
+                note=("波束角域投影：θ3dB=%.3f°（±%.3f°）；环=离波束轴等角锥面与地面交线，"
+                      "由内(暖)到外(冷)对应 −3dB/−10dB/首零陷。"
+                      % (float(pat.get("beamwidth_3db_deg", 0) or 0),
+                         float(pat.get("beamwidth_3db_deg", 0) or 0) / 2.0))
+                if pat.get("beamwidth_3db_deg") else "波束角域投影（θ3dB 缺省）")
+
+
+# ================================================================
 # 雨衰空间分布叠加 + 链路可用度地图（ITU-R P.618/P.838-3/P.837/P.839-4）
 # ================================================================
 def rain_atten_grid(cov, freq_ghz, p_pct=0.01, pol="V", normalize_to=None,

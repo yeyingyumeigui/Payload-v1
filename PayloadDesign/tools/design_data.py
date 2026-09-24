@@ -857,3 +857,105 @@ for _c in COUNTRIES:
 # 覆盖区选项：基础类型 + 全部国家/地区（国家排在基础类型之后，便于 UI 分组）
 COVERAGE_KEYS = ["全球", "中国全境", "区域", "省域", "热点小区", "航空航海走廊", "极区", "自定义"] + \
                 [c["key"] for c in COUNTRIES]
+
+
+# ================================================================
+# 十一、在轨卫星参考库（ORBITAL_REFS）
+#   用途：为选型/设计基准提供"真实在轨对标"——设计方案与同类在轨卫星
+#   横向对比（容量/波束/口径/平台/频段），校准货架与平台库的合理性。
+#   数据口径：均为公开发布参数（官方新闻稿/运营商资料/公开追踪库），
+#   标 src 字段注明量级来源，供追溯；非精确工程值，仅作对标参考。
+#   字段：id/cn/operator/orbit/band/capacity_gbps/mass_kg/platform/
+#         n_beam/ant_d_m/launch/life_yr/feat/note/src
+# ================================================================
+ORBITAL_REFS = [
+    # ---- GEO 高通量（Ka）----
+    dict(id="ChinaSat-26", cn="中星26号", operator="中国卫通/航天五院", orbit="GEO",
+         band="Ka", capacity_gbps=100, mass_kg=5400, platform="东方红四号增强型",
+         n_beam=105, ant_d_m=None, launch="2023-02-23", life_yr=15,
+         feat="全Ka频段·94用户波束+11信关波束·50路转发器·5副天线·星地一体设计",
+         note="我国首颗超百Gbps容量民商用高通量卫星，覆盖国土及周边；首次全面使用27~30GHz频段",
+         src="新华社/航天科技集团公开发布"),
+    dict(id="ChinaSat-16", cn="中星16号", operator="中国卫通/航天五院", orbit="GEO",
+         band="Ka", capacity_gbps=20, mass_kg=5200, platform="东方红四号",
+         n_beam=26, ant_d_m=None, launch="2017-04-12", life_yr=15,
+         feat="我国首颗Ka频段高通量卫星·机载宽带互联网",
+         note="高通量卫星家族首发星，20Gbps级；与中星19/26组成Ka应用系统网络",
+         src="航天科技集团公开发布"),
+    dict(id="APstar-6D", cn="亚太6D", operator="亚太通信卫星/航天五院", orbit="GEO",
+         band="Ka/Ku", capacity_gbps=50, mass_kg=5550, platform="东方红四号增强型",
+         n_beam=90, ant_d_m=None, launch="2020-07-09", life_yr=15,
+         feat="Ku+Ka双频段·90个Ku用户波束·亚太区域宽带",
+         note="面向亚太的GEO高通量宽带星，50Gbps级；海上/机载宽带",
+         src="运营商公开发布"),
+    dict(id="SJT-13", cn="实践十三号", operator="航天五院", orbit="GEO",
+         band="Ka", capacity_gbps=20, mass_kg=4600, platform="东方红五号（试验）",
+         n_beam=None, ant_d_m=None, launch="2017-04-12", life_yr=15,
+         feat="我国首颗Ka频段高通量试验星·电推进·DFH-5平台验证",
+         note="高通量技术试验验证星，20Gbps级；DFH-5平台与电推进在轨验证",
+         src="航天科技集团公开发布"),
+    dict(id="SES-17", cn="SES-17", operator="SES/泰雷兹阿莱尼亚", orbit="GEO",
+         band="Ka", capacity_gbps=200, mass_kg=6100, platform="Spacebus Neo（全电推进）",
+         n_beam=200, ant_d_m=None, launch="2021-10-23", life_yr=15,
+         feat="全数字透明处理DTP·~200可重构波束·16信关站·载荷功率17kW·ARC软件定义",
+         note="SES首颗纯Ka高通量星，200Gbps级处理能力，单连接最高2Gbps；面向美洲/大西洋航空海事",
+         src="SES官方资料"),
+    dict(id="ViaSat-3-Am", cn="卫讯3号（美洲）", operator="Viasat/波音", orbit="GEO",
+         band="Ka+Q/V", capacity_gbps=1000, mass_kg=6400, platform="Boeing 702X",
+         n_beam=19, ant_d_m=None, launch="2023-05-01", life_yr=15,
+         feat="Ka 200Gbps+Q/V 800Gbps=1Tbps单星·超宽带·三星座覆盖全球",
+         note="单星吞吐量最大的GEO工程之一；Q/V频段8波束×100Gbps（5GHz×20bps/Hz 4096-QAM）",
+         src="Viasat/波音公开发布"),
+    # ---- LEO 宽带巨型星座 ----
+    dict(id="Starlink-V2Mini", cn="星链V2 Mini", operator="SpaceX", orbit="LEO",
+         band="Ka/E", capacity_gbps=96, mass_kg=800, platform="批产小卫星（V2 Mini）",
+         n_beam=None, ant_d_m=None, launch="2023-02-27", life_yr=7,
+         feat="Ku/Ka/E波段相控阵·激光星间链路·氩霍尔推进·550km/53°·AI波束成形",
+         note="单星下行~80~96Gbps（v1.5的4倍）；530~550km、53°倾角；一箭21~23星",
+         src="SpaceX/公开追踪库"),
+    dict(id="Starlink-V1.5", cn="星链V1.5", operator="SpaceX", orbit="LEO",
+         band="Ku/Ka", capacity_gbps=22, mass_kg=306, platform="批产小卫星（V1.5）",
+         n_beam=None, ant_d_m=None, launch="2021-09", life_yr=5,
+         feat="Ku/Ka相控阵·首批激光星间链路·氪霍尔推进·550km/53°",
+         note="单星20~24Gbps；巨型星座主力代际，一箭49~54星",
+         src="SpaceX/公开追踪库"),
+    dict(id="OneWeb", cn="一网（OneWeb）", operator="Eutelsat OneWeb", orbit="LEO",
+         band="Ku/Ka", capacity_gbps=8, mass_kg=150, platform="批产小卫星",
+         n_beam=None, ant_d_m=None, launch="2019-02（批产2020~2023）", life_yr=7,
+         feat="648星Walker星座·1200km·87.9°近极倾角·Ku用户+Ka馈电",
+         note="近极轨道全球覆盖（含极区）；648星一期已组网",
+         src="OneWeb/Eutelsat公开发布"),
+    dict(id="Qianfan-G60", cn="千帆星座（G60星链）", operator="上海垣信卫星", orbit="LEO",
+         band="Ku/Ka", capacity_gbps=48, mass_kg=300, platform="批产平板小卫星",
+         n_beam=None, ant_d_m=None, launch="2024-08-06（首批18星）", life_yr=7,
+         feat="平板堆叠批产·激光星间链路·一箭多星·规划1.4万星",
+         note="我国低轨宽带巨型星座代表；单星48Gbps级，一期千星组网",
+         src="垣信卫星/公开发布"),
+    dict(id="Guowang-GW", cn="国网星座（GW）", operator="中国星网", orbit="LEO",
+         band="Ka/Ku", capacity_gbps=None, mass_kg=None, platform="批产小卫星",
+         n_beam=None, ant_d_m=None, launch="2024-12（首批）", life_yr=None,
+         feat="国家级低轨互联网星座·规划约1.3万星·多轨道面",
+         note="我国卫星互联网国家工程；具体单星参数未完全公开，作规划对标",
+         src="中国星网/公开发布"),
+    # ---- MEO ----
+    dict(id="O3b-mPOWER", cn="O3b mPOWER", operator="SES/波音", orbit="MEO",
+         band="Ka", capacity_gbps=10, mass_kg=900, platform="Boeing 702X（MEO）",
+         n_beam=5000, ant_d_m=None, launch="2022-12-16（首批）", life_yr=10,
+         feat="中轨8000km·全数字载荷·5000+可成形波束·低时延（相对GEO）",
+         note="MEO软件定义星座；单星10Gbps级、时延~120ms（远低于GEO 500ms）",
+         src="SES/波音公开发布"),
+]
+ORBITAL_REF_BY_ID = {s["id"]: s for s in ORBITAL_REFS}
+
+
+def orbital_refs_for(orbit=None, band=None):
+    """按轨道/频段过滤在轨参考星（band 支持 'Ka'→匹配含Ka的星）。"""
+    out = []
+    for s in ORBITAL_REFS:
+        if orbit and s["orbit"] != orbit:
+            continue
+        if band and band.upper().replace("/", "") not in s["band"].upper().replace("/", ""):
+            continue
+        out.append(s)
+    return out
+

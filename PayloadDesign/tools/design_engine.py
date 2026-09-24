@@ -36,6 +36,7 @@ from design_data import (ORBITS, COVERAGE, SERVICES, MODES, ANT_TYPES,
 import analysis_engine as AE
 import orbit_engine as OE
 import propagation as PP
+import reflector_engine as RE
 
 R_EARTH = 6371.0
 NF_BY_BAND = {"L": 0.8, "S": 1.0, "C": 1.2, "X": 1.5, "Ku": 1.2, "Ka": 1.6, "Q/V": 2.5, "UHF": 0.9}
@@ -122,8 +123,27 @@ def derive_geometry(cfg):
 
     cov_r = to_f(cfg.get("cov_r_km"), cov["r_km"])
     beam_r = to_f(cfg.get("beam_r_km"), cov["beam_r_km"])
+
+    # ---- v4：角度口径优先（cov_half_deg / beam_deg 直接驱动全链路）----
+    # 用户给「覆盖区 ±1.5°」「波束 >0.3°」这类角度指标时，按严格球面三角换算为
+    # 地面 km 并**覆盖**库默认 km —— 保证天线口径、波束数、链路预算、覆盖判定
+    # 全部用同一套自洽口径（而不是事后校核出冲突）。
+    ang_basis = str(cfg.get("angle_basis") or "offaxis").lower()
+    if ang_basis not in ANGLE_BASES:
+        ang_basis = "offaxis"
+    bm_basis = str(cfg.get("beam_basis") or "beamwidth").lower()
+    if bm_basis not in BEAM_BASES:
+        bm_basis = "beamwidth"
+    cov_half_deg = to_f(cfg.get("cov_half_deg"), None)
+    beam_deg = to_f(cfg.get("beam_deg"), None)
+    if cov_half_deg and cov_half_deg > 0:
+        cov_r = angle_to_radius_km(cov_half_deg, h, ang_basis, d)
+    if beam_deg and beam_deg > 0:
+        # 天线 3dB 波束宽度 → 地面足迹**直径** = θ×d_slant，半径取半
+        beam_r = (d * math.radians(beam_deg) / 2.0) if bm_basis == "beamwidth" \
+            else angle_to_radius_km(beam_deg, h, bm_basis, d)
     r_eff = min(cov_r, cov_r_cap)
-    n_geo = max(1, math.ceil(1.209 * (r_eff / max(beam_r, 1e-6)) ** 2))
+    n_geo = max(1, math.ceil(HEX_PACK * (r_eff / max(beam_r, 1e-6)) ** 2))
     need_const = cfg.get("orbit") in ("LEO", "SSO", "MEO") or cov_r > cov_r_cap
     th_beam = 2.0 * math.degrees(math.asin(min(1.0, beam_r / R_EARTH)))
 
@@ -139,8 +159,1034 @@ def derive_geometry(cfg):
                 cov_r_km=cov_r, beam_r_km=beam_r, N_beam_geo=n_geo,
                 θ_beam_deg=th_beam, need_constellation=need_const,
                 d_max_km=orb["d_max_km"], orbit_alt_km=h, warns=warns,
+                # v4：角度口径回显（供前端/报告展示「±°」与 km 的双向对应）
+                cov_half_deg=cov_half_deg, beam_deg=beam_deg,
+                angle_basis=ang_basis, beam_basis=bm_basis,
+                cov_from_angle=bool(cov_half_deg and cov_half_deg > 0),
+                beam_from_angle=bool(beam_deg and beam_deg > 0),
+                beam_footprint_diam_km=(2.0 * beam_r),
                 note=f"仰角 {fmt(el,0)}° 最差路径斜距 {fmt(d,0)}km；单星覆盖半径上限 "
                      f"{fmt(cov_r_cap,0)}km；波束地心张角 {fmt(th_beam,2)}°")
+
+
+# ================================================================
+# 2c 角度口径换算 + 四指标耦合校核（v4：覆盖区/波束/波束数/容量 相互耦合）
+# ================================================================
+# 「±1.5°」这类角度指标存在三种互不相同的口径，GEO 下相差可达 6.6 倍，
+# 必须显式声明并互转，否则设计结果整体失真：
+#   offaxis   天线离天底角（离轴/扫描角）—— 天线工程师口径，±1.5° 指波束中心
+#             相对星下点的指向偏移
+#   geocentric 地心角（星下点与覆盖边缘的地心张角）—— 轨道/覆盖工程师口径
+#   footprint 地面足迹角（由斜距折算的地面张角）—— 链路预算口径
+ANGLE_BASES = {
+    "offaxis": dict(cn="天线离天底角（离轴/扫描角）",
+                    note="天线工程师口径：波束中心相对星下点的指向偏移角。"
+                         "小角近似 α_geocentric ≈ (h/R)·θ_offaxis = 5.617θ（GEO），"
+                         "即 ±1.5° 离轴 ≈ 8.47° 地心角 ≈ 942km 地面半径"),
+    "geocentric": dict(cn="地心角（星下点—覆盖边缘地心张角）",
+                       note="轨道/覆盖工程师口径：±1.5° 地心角 ≈ 167km 地面半径"),
+    "footprint": dict(cn="地面足迹角（按斜距折算）",
+                      note="链路预算口径：地面半径 = θ × d_slant（弧度制）"),
+}
+BEAM_BASES = {
+    "beamwidth": dict(cn="天线 3dB 波束宽度",
+                      note="天线口径决定的 −3dB 全宽；地面足迹直径 = θ3dB × d_slant"),
+    "offaxis": dict(cn="离轴角（与覆盖角同口径）",
+                    note="按覆盖角同一换算式折算地面足迹半径"),
+    "geocentric": dict(cn="地心角", note="地面足迹半径 = θ × R_earth（弧度制）"),
+}
+
+
+def offaxis_to_geocentric(theta_deg, h_km):
+    """离天底角 θ → 地心角 α（严格球面三角，非小角近似）。
+
+    推导：卫星 S 距地心 R+h，地面点 P 在星下点方向偏 α。
+        tanθ = R·sinα / (R+h − R·cosα)
+    反解（令 t=tanθ）：t(R+h) = R(sinα + t·cosα) = R·√(1+t²)·sin(α+θ)
+        → sin(α+θ) = sinθ·(R+h)/R
+        → α = asin[ sinθ·(R+h)/R ] − θ
+    校验：GEO θ=8.69°（可见地盘边缘，el=0）→ sinθ·6.617=1.0 → α=90−8.69=81.31°
+    （GEO 可见地盘地心半角 81.3°，对应地表 42%），与工程事实一致。
+    """
+    th = to_f(theta_deg, 0.0)
+    if th <= 0:
+        return 0.0
+    R = R_EARTH
+    s = math.sin(th * math.pi / 180.0) * (R + to_f(h_km, 35786.0)) / R
+    if s >= 1.0:                       # 超出可见地盘（θ > 地平角）
+        return math.degrees(math.acos(R / (R + to_f(h_km, 35786.0))))
+    return math.degrees(math.asin(s)) - th
+
+
+def geocentric_to_offaxis(alpha_deg, h_km):
+    """地心角 α → 离天底角 θ（上一函数逆运算）。
+
+    tanθ = R·sinα / (R+h − R·cosα)
+    """
+    a = to_f(alpha_deg, 0.0) * math.pi / 180.0
+    if a <= 0:
+        return 0.0
+    R = R_EARTH
+    h = to_f(h_km, 35786.0)
+    den = R + h - R * math.cos(a)
+    if den <= 1e-9:
+        return 90.0
+    return math.degrees(math.atan(R * math.sin(a) / den))
+
+
+def angle_to_radius_km(theta_deg, h_km, basis="offaxis", d_slant_km=None):
+    """任意角度口径 → 地面覆盖半径 (km)。"""
+    th = to_f(theta_deg, 0.0)
+    if th <= 0:
+        return 0.0
+    h = to_f(h_km, 35786.0)
+    if basis == "geocentric":
+        return R_EARTH * math.radians(th)
+    if basis == "footprint":
+        d = to_f(d_slant_km, None)
+        if d is None or d <= 0:
+            d = slant_range(h, 30.0)
+        return d * math.radians(th)          # 足迹角 × 斜距
+    # offaxis（默认）：严格球面三角 → 地心角 → 弧长
+    return R_EARTH * math.radians(offaxis_to_geocentric(th, h))
+
+
+def radius_km_to_angle(r_km, h_km, basis="offaxis", d_slant_km=None):
+    """地面覆盖半径 (km) → 指定口径的角度（上一函数逆运算）。"""
+    r = to_f(r_km, 0.0)
+    if r <= 0:
+        return 0.0
+    h = to_f(h_km, 35786.0)
+    alpha = math.degrees(r / R_EARTH)        # 地心角
+    if basis == "geocentric":
+        return alpha
+    if basis == "footprint":
+        d = to_f(d_slant_km, None)
+        if d is None or d <= 0:
+            d = slant_range(h, 30.0)
+        return math.degrees(r / d)
+    return geocentric_to_offaxis(alpha, h)
+
+
+def _ang_dist_deg(lat1, lon1, lat2, lon2):
+    """球面两点角距 (deg)（haversine，数值稳健）。"""
+    p1, p2 = math.radians(to_f(lat1)), math.radians(to_f(lat2))
+    dl = math.radians(to_f(lon2) - to_f(lon1))
+    a = math.sin((p2 - p1) / 2.0) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2.0) ** 2
+    return 2.0 * math.degrees(math.asin(min(max(math.sqrt(a), 0.0), 1.0)))
+
+
+def _circle_overlap_ratio(delta, r_cov, r_obj):
+    """圆-圆相交面积占目标圆比例（平面近似；δ/r 均为角或均为 km，量纲一致即可）。
+
+    δ=圆心角距，r_cov=覆盖圆半径，r_obj=目标圆半径。
+    返回 0~1：1=目标全被覆盖，0=完全不相交。
+    """
+    d, R1, R2 = to_f(delta), to_f(r_cov), to_f(r_obj)
+    if d <= 0:
+        return 1.0 if R1 >= R2 else (R1 / R2) ** 2
+    if d >= R1 + R2:
+        return 0.0
+    if d <= abs(R1 - R2):
+        small = min(R1, R2)
+        big = max(R1, R2)
+        return 1.0 if (R1 >= R2 and d <= R1 - R2) else (small / big) ** 2 if big > 0 else 0.0
+    # 一般相交：圆-圆交面积
+    a1 = R1 * R1 * math.acos(min(max((d * d + R1 * R1 - R2 * R2) / (2 * d * R1), -1.0), 1.0))
+    a2 = R2 * R2 * math.acos(min(max((d * d + R2 * R2 - R1 * R1) / (2 * d * R2), -1.0), 1.0))
+    a3 = 0.5 * math.sqrt(max((-d + R1 + R2) * (d + R1 - R2) * (d - R1 + R2) * (d + R1 + R2), 0.0))
+    inter = a1 + a2 - a3
+    area_obj = math.pi * R2 * R2
+    return min(max(inter / area_obj, 0.0), 1.0) if area_obj > 0 else 0.0
+
+
+def resolve_angle_spec(cfg, geo=None, h_km=None, el_deg=None, d_slant_km=None):
+    """把用户可配置的角度指标（覆盖半角 / 波束宽度）解析为统一的地面 km 口径。
+
+    cfg 读取字段：
+      cov_half_deg   覆盖区半角（±°），如 1.5
+      beam_deg       波束大小（°），如 0.3
+      beam_deg_op    波束约束方向：">="（默认，波束不得窄于此）| "<=" | "="
+      angle_basis    覆盖角口径：offaxis（默认）| geocentric | footprint
+      beam_basis     波束角口径：beamwidth（默认，天线3dB宽度）| offaxis | geocentric
+      cov_r_km / beam_r_km   既有 km 口径（与角度口径共存，角度优先）
+    返回 dict：三口径互查表 + 解析出的 r_cov_km / r_beam_km + 是否与既有 km 口径冲突。
+    """
+    geo = geo or derive_geometry(cfg)
+    h = to_f(h_km, geo.get("orbit_alt_km", 35786.0))
+    el = to_f(el_deg, geo.get("el_deg", 30.0))
+    d_sl = to_f(d_slant_km, geo.get("d_slant", slant_range(h, el)))
+
+    basis = str(cfg.get("angle_basis") or "offaxis").lower()
+    if basis not in ANGLE_BASES:
+        basis = "offaxis"
+    bbasis = str(cfg.get("beam_basis") or "beamwidth").lower()
+    if bbasis not in BEAM_BASES:
+        bbasis = "beamwidth"
+
+    cov_deg = to_f(cfg.get("cov_half_deg"), None)
+    beam_deg = to_f(cfg.get("beam_deg"), None)
+
+    r_cov_lib = to_f(geo.get("cov_r_km"), 0.0)
+    r_beam_lib = to_f(geo.get("beam_r_km"), 0.0)
+
+    # ---- 覆盖半角 → 地面半径（三口径互查）----
+    cov_table = None
+    if cov_deg is not None and cov_deg > 0:
+        r_cov = angle_to_radius_km(cov_deg, h, basis, d_sl)
+        alpha = math.degrees(r_cov / R_EARTH)
+        cov_table = dict(
+            given_deg=cov_deg, given_basis=basis,
+            given_basis_cn=ANGLE_BASES[basis]["cn"],
+            r_km=round(r_cov, 1),
+            offaxis_deg=round(geocentric_to_offaxis(alpha, h), 4),
+            geocentric_deg=round(alpha, 4),
+            footprint_deg=round(math.degrees(r_cov / max(d_sl, 1e-9)), 4),
+            diameter_km=round(2 * r_cov, 1),
+            all_bases={k: dict(cn=v["cn"],
+                               r_km=round(angle_to_radius_km(cov_deg, h, k, d_sl), 1))
+                       for k, v in ANGLE_BASES.items()},
+        )
+        conflict_cov = (r_cov_lib > 0 and abs(r_cov - r_cov_lib) / max(r_cov_lib, 1e-9) > 0.05)
+    else:
+        r_cov = r_cov_lib
+        conflict_cov = False
+
+    # ---- 波束角 → 地面足迹半径 ----
+    beam_table = None
+    if beam_deg is not None and beam_deg > 0:
+        if bbasis == "beamwidth":
+            # 天线 3dB 宽度：地面足迹**直径** = θ × d_slant → 半径取半
+            r_beam = d_sl * math.radians(beam_deg) / 2.0
+            alpha_b = math.degrees(r_beam / R_EARTH)
+            equiv = dict(offaxis_deg=round(geocentric_to_offaxis(alpha_b, h), 4),
+                         geocentric_deg=round(alpha_b, 4),
+                         footprint_diam_deg=round(beam_deg, 4))
+        else:
+            r_beam = angle_to_radius_km(beam_deg, h, bbasis, d_sl)
+            alpha_b = math.degrees(r_beam / R_EARTH)
+            equiv = dict(offaxis_deg=round(geocentric_to_offaxis(alpha_b, h), 4),
+                         geocentric_deg=round(alpha_b, 4),
+                         footprint_diam_deg=round(math.degrees(2 * r_beam / max(d_sl, 1e-9)), 4))
+        th3_ant = (beam_deg if bbasis == "beamwidth"
+                   else math.degrees(2 * r_beam / max(d_sl, 1e-9)))
+        f_dn = to_f(cfg.get("band_freq_dn"), 20.0)
+        lam_b = lam_m(f_dn)
+        D_req = 70.0 * lam_b / max(th3_ant, 1e-6)      # θ3dB≈70λ/D（度）
+        beam_table = dict(
+            given_deg=beam_deg, given_basis=bbasis,
+            given_basis_cn=BEAM_BASES[bbasis]["cn"],
+            op=str(cfg.get("beam_deg_op") or ">="),
+            r_km=round(r_beam, 2), footprint_diam_km=round(2 * r_beam, 1),
+            theta3db_antenna_deg=round(th3_ant, 4),
+            equiv=equiv,
+            D_req_m=round(D_req, 4),
+            D_req_note=("θ3dB≈70λ/D → 达成 %.3f° 需口径 D≥%.3fm（λ=%.2fmm @ %sGHz）"
+                        % (th3_ant, D_req, lam_b * 1000, fmt(f_dn, 1))),
+        )
+        conflict_beam = (r_beam_lib > 0 and
+                         abs(r_beam - r_beam_lib) / max(r_beam_lib, 1e-9) > 0.05)
+    else:
+        r_beam = r_beam_lib
+        conflict_beam = False
+
+    return dict(ok=True, h_km=h, el_deg=el, d_slant_km=round(d_sl, 1),
+                angle_basis=basis, beam_basis=bbasis,
+                r_cov_km=round(r_cov, 1), r_beam_km=round(r_beam, 2),
+                cov_table=cov_table, beam_table=beam_table,
+                conflict_cov_km=bool(conflict_cov), conflict_beam_km=bool(conflict_beam),
+                note=("角度口径已解析：覆盖 %s=%s° → 地面半径 %.0fkm；波束 %s=%s° → "
+                      "足迹半径 %.1fkm。%s"
+                      % (ANGLE_BASES[basis]["cn"], fmt(cov_deg, 2) if cov_deg else "（未给，用库 %.0fkm）" % r_cov_lib,
+                         r_cov, BEAM_BASES[bbasis]["cn"],
+                         fmt(beam_deg, 3) if beam_deg else "（未给，用库 %.1fkm）" % r_beam_lib,
+                         r_beam,
+                         "注意：角度口径与既有 km 配置冲突（差 >5%），本函数以角度口径为准。"
+                         if (conflict_cov or conflict_beam) else "")))
+
+
+# ================================================================
+# 2d 四指标耦合校核（覆盖角 × 波束宽度 × 波束数 × 容量 → 闭合环）
+# ================================================================
+# 四项指标不是独立的，构成一条闭合约束链：
+#   ① 覆盖角 ÷ 波束宽度 → 几何密铺波束数 N_geo = 1.209·(r_cov/r_beam)²（六边形 −3dB 交叠）
+#   ② 波束宽度 → 单波束口径 D_req = 70λ/θ3dB
+#   ③ 波束数 × 单波束带宽 × 频谱效率 × 极化 → 系统容量 C_sys
+#   ④ 波束数 × 单波束带宽 ≤ 频段总带宽 × 复用色数 k（频谱闭合）
+#   ⑤ 波束数 × 馈源占位 → 焦面可容纳馈源数上限（反射面多波束的物理天花板）
+# 任一项改动都会牵动其余三项 —— 本函数逐项算出「可行区间 + 冲突 + 调整建议」。
+HEX_PACK = 1.209          # 六边形密铺系数（−3dB 交叠，N = 1.209(r/R)²）
+ETA_SPEC_NOM = 2.0        # 名义频谱效率 (bit/s/Hz)，与 infoflow_engine c-12 同口径
+FEED_PACK_LAM = 0.7       # 馈源阵最小间距（×λ，避免互耦的工程下限）
+
+
+def spec_consistency(cfg, geo=None, ang=None, params=None, _depth=0):
+    """四指标耦合校核：覆盖角 / 波束宽度 / 波束数 / 容量 → 可行区间与冲突。
+
+    入参 cfg 读取：cov_half_deg、beam_deg、angle_basis、beam_basis、
+                   N_beam、C_req_ovr、B_beam、k_reuse、n_pol、band、
+                   D_ap、f_over_d（反射面焦距比，用于焦面馈源容量校核）。
+    params 若给定（design_all 后的 params/_derived），则用**实际算出的**
+    N_beam/B_beam/η/n_pol 复核，而非仅用用户输入 —— 保证「配置 vs 实现」一致。
+    """
+    geo = geo or derive_geometry(cfg)
+    ang = ang or resolve_angle_spec(cfg, geo)
+    band = cfg.get("band", "Ka")
+    f_up, f_dn = BAND_FREQ.get(band, (30.0, 20.0))
+    f_dn_use = to_f(cfg.get("band_freq_dn"), f_dn)
+    lam = lam_m(f_dn_use)
+    B_total = B_TOTAL_OVR.get(band, BANDS.get(band, {}).get("B_total", 2500))
+
+    r_cov = to_f(ang.get("r_cov_km"), to_f(geo.get("cov_r_km"), 0.0))
+    r_beam = to_f(ang.get("r_beam_km"), to_f(geo.get("beam_r_km"), 1.0))
+    p = params or {}
+    der = p.get("_derived") or {}
+    n_pol = to_f(cfg.get("n_pol"), to_f(p.get("n_pol"), 2.0)) or 2.0
+    k = to_f(cfg.get("k_reuse"), to_f(p.get("k_reuse"),
+               COVERAGE.get(cfg.get("coverage", "区域"), {}).get("k_typ", 4))) or 4.0
+
+    # ---- ① 几何密铺波束数（覆盖角 ÷ 波束宽度）----
+    n_geo = HEX_PACK * (r_cov / max(r_beam, 1e-9)) ** 2 if r_cov > 0 else 0.0
+    n_geo_int = max(int(math.ceil(n_geo)), 1)
+
+    # ---- ② 单波束口径需求（波束宽度 → D）----
+    th3_ant = to_f((ang.get("beam_table") or {}).get("theta3db_antenna_deg"),
+                   to_f(geo.get("θ_beam_deg"), 0.0))
+    D_req = 70.0 * lam / max(th3_ant, 1e-9) if th3_ant > 0 else 0.0
+    D_ap = to_f(cfg.get("D_ap"), to_f(p.get("D_ap"), 0.0))
+
+    # ---- ③④ 容量与频谱（波束数 × 带宽 × η × 极化；≤ B_total×k）----
+    N_beam = to_f(cfg.get("N_beam"), to_f(der.get("N_beam"),
+                    to_f(p.get("N_beam"), 0.0)))
+    B_beam = to_f(cfg.get("B_beam"), to_f(p.get("B_beam"), 0.0))
+    eta_spec = to_f(der.get("eta_spec"), ETA_SPEC_NOM) or ETA_SPEC_NOM
+    C_req = to_f(cfg.get("C_req_ovr"),
+                 SERVICES.get(cfg.get("service", "高通量宽带"), {}).get("C_gbps", 0.0))
+
+    # 反推链条（给定其余三项求第四项）——这是「耦合」的量化表达
+    #   N_from_geo  = 1.209(r_cov/r_beam)²                       ← 覆盖角/波束宽度
+    #   N_from_cap  = C_req·1000/(B_beam·η·n_pol)                ← 容量/带宽
+    #   N_from_spec = B_total·k/B_beam                           ← 频谱上限
+    #   B_from_cap  = C_req·1000/(N_beam·η·n_pol)                ← 容量/波束数
+    #   B_from_spec = B_total·k/N_beam                           ← 频谱/波束数
+    #   k_from_spec = N_beam·B_beam/B_total                      ← 波束数×带宽/总带宽
+    n_from_cap = (C_req * 1000.0 / (B_beam * eta_spec * n_pol)) if B_beam > 0 else None
+    n_from_spec = (B_total * k / B_beam) if B_beam > 0 else None
+    b_from_cap = (C_req * 1000.0 / (N_beam * eta_spec * n_pol)) if N_beam > 0 else None
+    b_from_spec = (B_total * k / N_beam) if N_beam > 0 else None
+    k_from_spec = (N_beam * B_beam / B_total) if B_total > 0 else None
+    C_sys_if = (N_beam * B_beam * eta_spec * n_pol / 1000.0) if (N_beam > 0 and B_beam > 0) else None
+
+    # ---- ⑤ 焦面馈源容量（反射面多波束的物理天花板）----
+    # 焦面半径 R_f = f·tan(θ_cov_offaxis)；馈源最小间距 ≈ 0.7λ →
+    # N_feed_max = π·(R_f/(0.7λ))²·填充率(六边形 0.907)
+    f_over_d = to_f(cfg.get("f_over_d"), 1.0) or 1.0
+    th_cov_off = to_f((ang.get("cov_table") or {}).get("offaxis_deg"),
+                      radius_km_to_angle(r_cov, geo.get("orbit_alt_km", 35786.0),
+                                         "offaxis"))
+    feed_cap = None
+    if D_ap > 0 and th_cov_off > 0:
+        f_len = f_over_d * D_ap
+        R_f = f_len * math.tan(th_cov_off * math.pi / 180.0)
+        pitch = FEED_PACK_LAM * lam
+        feed_cap = dict(f_m=round(f_len, 4), f_over_d=f_over_d,
+                        R_focal_m=round(R_f, 5), pitch_m=round(pitch, 5),
+                        theta_cov_offaxis_deg=round(th_cov_off, 4),
+                        n_feed_max=int(math.pi * (R_f / max(pitch, 1e-9)) ** 2 * 0.907),
+                        formula=("R_f=f·tanθ_cov；N_max=π(R_f/0.7λ)²×0.907（六边形填充）；"
+                                 "f=F/D×D_r=%.3f×%.3f=%.4fm" % (f_over_d, D_ap, f_len)))
+
+    # ---- 逐项判定 ----
+    rows = []
+
+    def row(idx, name, ok, got, need, note, advice=None):
+        rows.append(dict(id=idx, name=name, ok=bool(ok) if ok is not None else None,
+                         got=str(got), need=str(need), note=note,
+                         advice=advice or ""))
+
+    # S1 波束数 vs 几何密铺（覆盖角 ÷ 波束宽度）
+    if N_beam > 0 and n_geo_int > 0:
+        fill = N_beam / n_geo_int
+        ok1 = fill >= 0.85                      # 低于 85% → 边缘有覆盖盲区
+        row("S1", "波束数 vs 几何密铺（覆盖角÷波束宽度）", ok1,
+            "N_beam=%d 个（填充率 %.0f%%）" % (N_beam, fill * 100),
+            "≥ %d 个（1.209×(r_cov/r_beam)²=%.1f）" % (n_geo_int, n_geo),
+            "覆盖半径 %.0fkm ÷ 波束足迹半径 %.1fkm，六边形 −3dB 交叠密铺需 %d 个波束"
+            % (r_cov, r_beam, n_geo_int),
+            "" if ok1 else
+            "波束数不足以密铺覆盖区，边缘将出现覆盖盲区 → 增到 %d 个，"
+            "或放宽波束宽度至 ≥%.3f°（增大足迹），或缩小覆盖角至 ±%.2f°"
+            % (n_geo_int,
+               th3_ant * math.sqrt(n_geo_int / max(N_beam, 1)),
+               radius_km_to_angle(r_cov * math.sqrt(max(N_beam, 1) / n_geo_int),
+                                  to_f(geo.get("orbit_alt_km"), 35786.0),
+                                  ang.get("angle_basis", "offaxis"))))
+    else:
+        row("S1", "波束数 vs 几何密铺（覆盖角÷波束宽度）", None,
+            "N_beam=%s" % (fmt(N_beam, 0) if N_beam > 0 else "未配置"),
+            "几何密铺 %d 个" % n_geo_int,
+            "波束数未配置 → 无法校核耦合（留空时引擎按几何自动建议）", "")
+
+    # S2 波束宽度 vs 天线口径（θ3dB=70λ/D）。beam_deg_op 语义：
+    #   ">="（默认）要求 θ3dB ≥ 目标（波束不得更窄）↔ D ≤ D_req
+    #   "<="          要求 θ3dB ≤ 目标（波束不得更宽）↔ D ≥ D_req
+    #   "="           要求 θ3dB ≈ 目标（±10%）
+    if th3_ant > 0 and D_ap > 0:
+        th3_actual = 70.0 * lam / D_ap
+        beam_op = str(cfg.get("beam_deg_op") or ">=")
+        if beam_op == ">=":
+            ok2 = th3_actual >= th3_ant * 0.95      # 波束至少这么宽
+        elif beam_op == "<=":
+            ok2 = th3_actual <= th3_ant * 1.05      # 波束至多这么宽
+        else:
+            ok2 = abs(th3_actual - th3_ant) <= 0.10 * th3_ant
+        if beam_op == ">=":
+            d_rule = "D ≤ %.3fm（口径越大波束越窄）" % D_req
+        elif beam_op == "<=":
+            d_rule = "D ≥ %.3fm（口径越小波束越宽）" % D_req
+        else:
+            d_rule = "D ≈ %.3fm（±10%%）" % D_req
+        row("S2", "波束宽度 vs 天线口径（θ3dB≈70λ/D）", ok2,
+            "D=%.3fm → θ3dB=%.4f°" % (D_ap, th3_actual),
+            "θ3dB %s %.3f° ↔ %s" % (beam_op, th3_ant, d_rule),
+            "λ=%.2fmm @ %.1fGHz；口径决定波束宽度，波束宽度决定足迹半径 %.1fkm"
+            % (lam * 1000, f_dn_use, r_beam),
+            "" if ok2 else
+            ("波束偏窄（θ3dB=%.3f° < 要求 %s%.3f°）：口径过大 → D 减至 ≤%.3fm"
+             % (th3_actual, beam_op, th3_ant, D_req)
+             if (beam_op == ">=" and th3_actual < th3_ant) else
+             "波束偏宽（θ3dB=%.3f° > 要求 %s%.3f°）：口径过小 → D 增至 ≥%.3fm"
+             % (th3_actual, beam_op, th3_ant, D_req)))
+    else:
+        row("S2", "波束宽度 vs 天线口径（θ3dB≈70λ/D）", None,
+            "D_ap=%s" % (fmt(D_ap, 2) if D_ap > 0 else "未配置"),
+            "θ3dB=%s° → D_req=%s m" % (fmt(th3_ant, 3) if th3_ant > 0 else "—",
+                                        fmt(D_req, 3) if D_req > 0 else "—"),
+            "波束宽度 %.3f° 对应口径需求 %.3fm（λ=%.2fmm）"
+            % (th3_ant, D_req, lam * 1000) if th3_ant > 0 else "波束宽度未配置",
+            "")
+
+    # S3 容量闭合（波束数 × 带宽 × η × 极化 ≥ C_req）
+    if C_sys_if is not None and C_req > 0:
+        ok3 = C_sys_if >= C_req * 0.999
+        gap = C_req - C_sys_if
+        row("S3", "容量闭合（N_beam×B_beam×η×n_pol ≥ C_req）", ok3,
+            "C_sys=%.2f Gbps" % C_sys_if,
+            "C_req=%.2f Gbps" % C_req,
+            "%d 波束 × %.1fMHz × η%.1f × %d 极化 = %.2f Gbps"
+            % (N_beam, B_beam, eta_spec, n_pol, C_sys_if),
+            "" if ok3 else
+            "容量缺口 %.2f Gbps → ①B_beam 提到 %.1fMHz；或②N_beam 提到 %d 个；"
+            "或③启用 Q/V 频段（B_total %.0f→%.0fMHz）；或④降 C_req 到 %.2f Gbps"
+            % (gap,
+               (C_req * 1000.0 / (N_beam * eta_spec * n_pol)) if N_beam > 0 else 0,
+               int(math.ceil(C_req * 1000.0 / (B_beam * eta_spec * n_pol))) if B_beam > 0 else 0,
+               B_total, B_total * 2, C_sys_if))
+    else:
+        row("S3", "容量闭合（N_beam×B_beam×η×n_pol ≥ C_req）", None,
+            "C_sys=%s" % (fmt(C_sys_if, 2) if C_sys_if is not None else "—"),
+            "C_req=%s" % fmt(C_req, 2),
+            "N_beam/B_beam 未同时配置 → 无法校核容量耦合", "")
+
+    # S4 频谱闭合（N_beam×B_beam ≤ B_total×k）
+    if N_beam > 0 and B_beam > 0:
+        used = N_beam * B_beam
+        cap = B_total * k
+        ok4 = used <= cap * 1.0001
+        row("S4", "频谱闭合（N_beam×B_beam ≤ B_total×k）", ok4,
+            "%.0f MHz（%d×%.1f）" % (used, N_beam, B_beam),
+            "≤ %.0f MHz（B_total %.0f × k %.0f）" % (cap, B_total, k),
+            "%s 频段可用带宽 %.0fMHz，%d 色复用 → 总可用 %.0fMHz"
+            % (band, B_total, k, cap),
+            "" if ok4 else
+            ("频谱超限 %.0fMHz → ①复用色数 k 提到 ≥%.2f（%s）；"
+             "或②B_beam 降到 ≤%.1fMHz；或③N_beam 降到 ≤%d 个"
+             % (used - cap, k_from_spec or 0,
+                "Ka/Ku 常用 4~7 色" if k_from_spec and k_from_spec <= 7 else
+                "k>7 工程上罕见，优先考虑换频段或降带宽",
+                b_from_spec or 0, int(n_from_spec or 0))))
+    else:
+        row("S4", "频谱闭合（N_beam×B_beam ≤ B_total×k）", None,
+            "—", "≤ %.0f MHz（B_total %.0f × k %.0f）" % (B_total * k, B_total, k),
+            "N_beam/B_beam 未同时配置", "")
+
+    # S5 焦面馈源容量（反射面多波束物理天花板）
+    if feed_cap and N_beam > 0:
+        ok5 = N_beam <= feed_cap["n_feed_max"]
+        row("S5", "焦面馈源容量（多波束物理天花板）", ok5,
+            "N_beam=%d 个" % N_beam,
+            "≤ %d 个（焦面可容纳）" % feed_cap["n_feed_max"],
+            "F/D=%.2f、f=%.3fm、覆盖离轴角 ±%.3f° → 焦面半径 %.4fm；"
+            "馈源间距 %.1fλ=%.4fm → 六边形可排 %d 个"
+            % (f_over_d, feed_cap["f_m"], th_cov_off, feed_cap["R_focal_m"],
+               FEED_PACK_LAM, feed_cap["pitch_m"], feed_cap["n_feed_max"]),
+            "" if ok5 else
+            ("波束数超焦面容量 → ①加大口径 D_r 至 ≥%.3fm（焦面容量 ∝ D_r²）；"
+             "或②提高 F/D 到 %.2f（容量 ∝ (F/D)²）；或③减小覆盖角到 ±%.3f°；"
+             "或④改用相控阵/多反射面（单反射面焦面装不下）"
+             % (D_ap * math.sqrt(N_beam / max(feed_cap["n_feed_max"], 1)),
+                f_over_d * math.sqrt(N_beam / max(feed_cap["n_feed_max"], 1)),
+                th_cov_off * math.sqrt(max(feed_cap["n_feed_max"], 1) / N_beam))))
+    elif feed_cap:
+        row("S5", "焦面馈源容量（多波束物理天花板）", None,
+            "N_beam 未配置", "≤ %d 个" % feed_cap["n_feed_max"],
+            "口径 %.3fm、F/D=%.2f、覆盖离轴 ±%.3f° → 焦面最多排 %d 个馈源"
+            % (D_ap, f_over_d, th_cov_off, feed_cap["n_feed_max"]), "")
+
+    n_fail = sum(1 for r_ in rows if r_["ok"] is False)
+    n_checked = sum(1 for r_ in rows if r_["ok"] is not None)
+
+    # ---- 可行区间汇总（给用户「各指标可配置范围」）----
+    bounds = dict(
+        N_beam=dict(
+            min_geo=n_geo_int,
+            min_cap=int(math.ceil(n_from_cap)) if n_from_cap else None,
+            max_spec=int(n_from_spec) if n_from_spec else None,
+            max_feed=(feed_cap or {}).get("n_feed_max"),
+            note="下限取 max(几何密铺, 容量需求)；上限取 min(频谱, 焦面馈源容量)"),
+        B_beam_mhz=dict(
+            min_cap=(b_from_cap if b_from_cap else None),
+            max_spec=(b_from_spec if b_from_spec else None),
+            note="下限由容量反推 C_req·1000/(N_beam·η·n_pol)；上限由频谱 B_total·k/N_beam"),
+        k_reuse=dict(
+            min_needed=(k_from_spec if k_from_spec else None),
+            typical=to_f(COVERAGE.get(cfg.get("coverage", "区域"), {}).get("k_typ"), 4),
+            note="k_min = N_beam·B_beam/B_total；工程上 4~7 色（>7 极化/频率双复用）"),
+        C_gbps=dict(
+            achievable=(C_sys_if if C_sys_if is not None else None),
+            required=C_req if C_req > 0 else None,
+            max_spec=(B_total * k * eta_spec * n_pol / 1000.0),
+            note="频谱上限容量 = B_total·k·η·n_pol/1000（波束数不约束时的理论天花板）"),
+        D_ap_m=dict(
+            req_for_beam=(D_req if D_req > 0 else None),
+            configured=(D_ap if D_ap > 0 else None),
+            note="D_req = 70λ/θ3dB；口径同时决定焦面馈源容量（∝D_r²）"),
+        cov_half_deg=dict(
+            given=to_f(cfg.get("cov_half_deg"), None),
+            r_cov_km=round(r_cov, 1),
+            basis=ang.get("angle_basis"),
+            note=("覆盖角与波束数/口径耦合：N_beam ∝ θ_cov²；"
+                  "焦面容量 ∝ θ_cov² → 覆盖角翻倍，波束数与馈源数均×4")),
+        beam_deg=dict(
+            given=to_f(cfg.get("beam_deg"), None),
+            theta3db_antenna_deg=round(th3_ant, 4) if th3_ant > 0 else None,
+            r_beam_km=round(r_beam, 2),
+            basis=ang.get("beam_basis"),
+            note=("波束宽度与口径成反比（θ3dB≈70λ/D）、与波束数成反比"
+                  "（N∝1/θ_beam²）、与容量成正比（足迹小→波束多→复用增益高）")),
+    )
+
+    # ---- 一句话结论 ----
+    if n_checked == 0:
+        verdict = ("四指标耦合校核：N_beam/B_beam/D_ap 均未配置，无法建立耦合链 —— "
+                   "请先填写波束数、单波束带宽与天线口径（或用「一键建议值」自动生成）。")
+    elif n_fail == 0:
+        verdict = ("四指标耦合闭合（%d 项全过）：覆盖 ±%s（%s）→ 半径 %.0fkm；"
+                   "波束 %s° → 足迹半径 %.1fkm、需口径 ≥%.2fm；几何密铺 %d 个波束"
+                   "（配置 %s 个，填充率 %s）；容量 C_sys=%s Gbps vs 需求 %s Gbps；"
+                   "频谱 %s MHz vs 上限 %s MHz。四者自洽。"
+                   % (n_checked, fmt(to_f(cfg.get("cov_half_deg"), 0), 2),
+                      ANGLE_BASES.get(ang.get("angle_basis", "offaxis"), {}).get("cn", ""),
+                      r_cov, fmt(th3_ant, 3), r_beam, D_req, n_geo_int,
+                      fmt(N_beam, 0) if N_beam > 0 else "—",
+                      ("%.0f%%" % (100 * N_beam / n_geo_int)) if (N_beam > 0 and n_geo_int) else "—",
+                      fmt(C_sys_if, 2) if C_sys_if is not None else "—",
+                      fmt(C_req, 2) if C_req > 0 else "—",
+                      fmt(N_beam * B_beam, 0) if (N_beam > 0 and B_beam > 0) else "—",
+                      fmt(B_total * k, 0)))
+    else:
+        verdict = ("四指标耦合有 %d/%d 项冲突：%s"
+                   % (n_fail, n_checked,
+                      "；".join("%s（%s）" % (r_["id"], r_["name"])
+                                for r_ in rows if r_["ok"] is False)))
+
+    # ---- 可执行修复方案：四指标**联立求解**（非顺序，避免自相矛盾）----
+    # 约束联立方程组（同时闭合）：
+    #   S1 几何密铺   N ≥ N_geo = 1.209(r_cov/r_beam)²
+    #   S3 容量       N·B·η·n_pol ≥ C_req·1000   →  B ≥ C_req·1000/(N·η·n_pol)
+    #   S4 频谱       N·B ≤ B_total·k，k ≤ 7（Ka/Ku 工程上限）
+    #   S5 焦面容量   N ≤ N_feed(F/D·D·θ_cov)
+    #   S2 口径       θ3dB=70λ/D 满足波束宽度约束方向
+    # 联立解（波束宽度由 beam_deg 定 → r_beam 定 → N_geo 定，故 N 先定）：
+    #   ① N* = N_geo（几何下限）
+    #   ② B* = C_req·1000/(N*·η·n_pol)（容量下限；不小于用户已配且频谱允许的值）
+    #   ③ k* = ceil(N*·B*/B_total)；k*≤7 → 闭合
+    #   ④ N* 超焦面容量 → 先提 F/D（结构代价小），仍不足再提 D_ap
+    #   ⑤ k*>7 或 B* 超频谱单波束上限 → 如实报不可闭合（须换 Q/V 频段）
+    fix = dict(cfg)
+    steps = []
+    n_fix_fail = 0
+    K_MAX = 7.0                            # Ka/Ku 复用色数工程上限（>7 需极化/频率双复用）
+
+    def _note(field, old, new, why):
+        steps.append(dict(field=field, old=old, new=new, reason=why))
+
+    # ① 波束数 N*：几何密铺下限（容量需求若更高则取容量下限）
+    n_geo_need = n_geo_int
+    b_user = B_beam if B_beam > 0 else (b_from_spec or 0)
+    n_cap_need = int(math.ceil(C_req * 1000.0 / (b_user * eta_spec * n_pol))) \
+        if (b_user > 0 and C_req > 0) else 0
+    N_star = max(n_geo_need, n_cap_need) if (n_geo_need > 0 or n_cap_need > 0) else int(N_beam)
+
+    # ② 焦面容量夹逼：N* 超限 → 提 F/D（∝(F/D)²）或口径（∝D²）
+    n_feed = (feed_cap or {}).get("n_feed_max")
+    if n_feed and N_star > n_feed:
+        ratio = N_star / float(n_feed)
+        fd_need = f_over_d * math.sqrt(ratio)
+        if fd_need <= 2.0:
+            _note("f_over_d", f_over_d, round(fd_need, 3),
+                  "几何密铺需 %d 波束 > 焦面馈源容量 %d → 焦距比 F/D 提到 %.3f"
+                  "（焦面半径 ∝F/D，容量 ∝(F/D)²，结构代价小于改口径）"
+                  % (N_star, n_feed, fd_need))
+            fix["f_over_d"] = round(fd_need, 3)
+        else:
+            d_need = D_ap * math.sqrt(ratio)
+            _note("D_ap", D_ap, round(d_need, 3),
+                  "几何密铺需 %d 波束 > 焦面容量 %d，且 F/D 需 %.2f>2（超工程区间）"
+                  "→ 口径加到 %.3fm（焦面容量 ∝D_r²）" % (N_star, n_feed, fd_need, d_need))
+            fix["D_ap"] = round(d_need, 3)
+
+    # ③ 波束数回填（若与当前配置不同）
+    if N_star > 0 and abs(N_star - N_beam) > 0.5:
+        _note("N_beam", int(N_beam), N_star,
+              "波束数取几何密铺与容量需求的较大者：N_geo=%d（覆盖±%s°÷波束%s°）、"
+              "N_cap=%d（C_req/带宽）→ N*=%d"
+              % (n_geo_need, fmt(to_f(cfg.get("cov_half_deg"), 0), 2),
+                 fmt(th3_ant, 2), n_cap_need, N_star))
+        fix["N_beam"] = N_star
+
+    # ④ 单波束带宽 B*：求**频谱最小占用的可行带宽**
+    #   下界 b_min_cap = C_req·1000/(N*·η·n_pol)（容量闭合下限）
+    #   上界 b_max_spec = B_total·K_MAX/N*（k≤7 时频谱允许的最大单波束带宽）
+    #   可行 ⟺ b_min_cap ≤ b_max_spec；取 B*=b_min_cap（频谱最省，k 最小）
+    #   用户已配带宽若在 [b_min_cap, b_max_spec] 内则尊重用户值，否则收敛到 b_min_cap
+    B_star = B_beam
+    b_min_cap = b_max_spec = None
+    if N_star > 0 and C_req > 0:
+        b_min_cap = C_req * 1000.0 / (N_star * eta_spec * n_pol)
+        b_max_spec = B_total * K_MAX / N_star
+        if b_min_cap <= b_max_spec:                 # 频谱可闭合
+            B_star = int(math.ceil(b_min_cap))      # 取容量下限（频谱最省）
+            if B_beam > 0 and b_min_cap <= B_beam <= b_max_spec:
+                B_star = int(B_beam)                # 用户值本就可行 → 尊重
+        else:                                        # 容量下限已超频谱上限 → 不可闭合
+            B_star = int(math.ceil(b_min_cap))
+            n_fix_fail += 1
+            steps.append(dict(field=None, old=None, new=None, unresolvable=True,
+                              reason="容量与频谱不可同时闭合：N*=%d 时容量下限 B≥%.0fMHz，"
+                                     "但 k≤%d 时频谱上限 B≤%.0fMHz → 须换更宽频段"
+                                     "（Ka 2500→Q/V 5000MHz，上限翻倍）或降容量/缩覆盖角"
+                                     % (N_star, b_min_cap, int(K_MAX), b_max_spec)))
+        if abs(B_star - B_beam) > 0.5:
+            _note("B_beam", B_beam, B_star,
+                  "单波束带宽收敛到频谱最小占用的可行值：容量下限 B*=C_req·1000/(N*·η·n_pol)"
+                  "=%.0fMHz（C_sys=%.1fGbps≥%.0f），频谱上限 %.0fMHz（k≤%d）→ 取 %dMHz 最省频谱"
+                  % (b_min_cap, N_star * B_star * eta_spec * n_pol / 1000.0, C_req,
+                     b_max_spec, int(K_MAX), B_star))
+            fix["B_beam"] = B_star
+
+    # ⑤ 复用色数 k*：频谱闭合 N*·B* ≤ B_total·k，k=ceil(...)，校核 ≤7
+    if N_star > 0 and B_star > 0:
+        k_need = N_star * B_star / B_total
+        k_star = max(int(math.ceil(k_need)), 1)
+        if k_star <= K_MAX:
+            if abs(k_star - k) > 0.5:
+                _note("k_reuse", k, k_star,
+                      "频谱闭合：N*×B*=%dMHz ≤ B_total×k → k=ceil(%d/%d)=%d 色"
+                      "（≤%d 工程上限，Ka/Ku 常用 4~7 色）"
+                      % (N_star * B_star, N_star * B_star, B_total, k_star, int(K_MAX)))
+                fix["k_reuse"] = k_star
+        else:
+            n_fix_fail += 1
+            steps.append(dict(field=None, old=None, new=None, unresolvable=True,
+                              reason="频谱不可闭合：N*=%d×B*=%d=%dMHz 需 k=%.1f>%d 色"
+                                     "（工程罕见）→ 须换更宽频段（Ka 2500MHz→Q/V 5000MHz，"
+                                     "k 减半即闭合）或降容量需求/缩覆盖角减波束数"
+                                     % (N_star, B_star, N_star * B_star, k_need,
+                                        int(K_MAX))))
+
+    # ⑥ 波束宽度 vs 口径（S2）：按约束方向修口径
+    if th3_ant > 0 and D_ap > 0:
+        th3_now = 70.0 * lam / D_ap
+        beam_op = str(cfg.get("beam_deg_op") or ">=")
+        if (beam_op == ">=" and th3_now < th3_ant * 0.95) or \
+           (beam_op == "<=" and th3_now > th3_ant * 1.05):
+            _note("D_ap", D_ap, round(D_req, 3),
+                  "波束宽度不符（θ3dB=%.3f° vs 要求 %s%.3f°）→ 口径改到 %.3fm"
+                  "（D=70λ/θ3dB，λ=%.2fmm）" % (th3_now, beam_op, th3_ant, D_req,
+                                                lam * 1000))
+            fix["D_ap"] = round(D_req, 3)
+
+    # 修复后复核（用修复值重跑校核，确认闭合；不闭合则如实标注）
+    # _depth 护栏：复核调用自身时置 1，复核内不再做修复验证 → 防无限递归
+    fix_verified = None
+    if steps and _depth == 0:
+        try:
+            fix_geo = derive_geometry(fix)
+            fix_ang = resolve_angle_spec(fix, fix_geo)
+            sc2 = spec_consistency(fix, fix_geo, fix_ang, None, _depth=1)
+            fix_verified = dict(ok=bool(sc2.get("ok")),
+                                n_fail=sc2.get("n_fail", -1),
+                                still_failed=[r_["id"] for r_ in sc2.get("rows", [])
+                                              if r_["ok"] is False],
+                                note=("修复后重跑耦合校核：%d 项冲突 → %d 项"
+                                      % (n_fail, sc2.get("n_fail", -1))))
+        except Exception as ex:                                     # noqa: BLE001
+            fix_verified = dict(ok=False, error=str(ex))
+
+    repair = dict(steps=steps, n_steps=len(steps), n_unresolvable=n_fix_fail,
+                  cfg_delta={k_: v for k_, v in fix.items() if fix.get(k_) != cfg.get(k_)},
+                  verified=fix_verified,
+                  joint_solution=dict(N_beam=(int(fix.get("N_beam", N_beam))
+                                              if N_star > 0 else None),
+                                      B_beam=int(fix.get("B_beam", B_beam)) if B_star > 0 else None,
+                                      k_reuse=int(fix.get("k_reuse", k)),
+                                      D_ap=fix.get("D_ap", D_ap),
+                                      f_over_d=fix.get("f_over_d", f_over_d)),
+                  note=("四指标**联立求解**（非顺序调整，避免顾此失彼）：波束宽度→r_beam→几何密铺 N*；"
+                        "容量→B*=C_req/(N*·η·n_pol)；频谱→k*=ceil(N*·B*/B_total)（校核≤7）；"
+                        "焦面容量夹逼 N*（超限先提 F/D 再提口径 D_ap）；波束宽度约束方向定口径。"
+                        "每项给出改前→改后与依据，修复值经重跑校核验证闭合；"
+                        "k*>7 或频谱不可闭合时如实标注（须换 Q/V 频段，不假装达标）。"))
+
+    return dict(ok=(n_fail == 0 and n_checked > 0), n_checked=n_checked,
+                n_fail=n_fail, rows=rows, bounds=bounds, repair=repair,
+                inputs=dict(r_cov_km=round(r_cov, 1), r_beam_km=round(r_beam, 2),
+                            theta3db_deg=round(th3_ant, 4), N_beam=N_beam,
+                            B_beam=B_beam, eta_spec=eta_spec, n_pol=n_pol,
+                            k_reuse=k, B_total=B_total, C_req=C_req,
+                            D_ap=D_ap, D_req=round(D_req, 4), lam_m=lam,
+                            f_dn_ghz=f_dn_use, band=band,
+                            N_geo=n_geo_int, hex_pack=HEX_PACK),
+                feed_capacity=feed_cap,
+                coupling_note=("耦合链：覆盖角→波束数（N∝θ_cov²/θ_beam²）；"
+                               "波束宽度→口径（D=70λ/θ3dB）与波束数（N∝1/θ_beam²）；"
+                               "波束数×带宽→容量（C=N·B·η·n_pol）与频谱（≤B_total·k）；"
+                               "口径×覆盖角→焦面馈源容量（N_max∝D_r²θ_cov²/λ²）。"
+                               "任一项改动都会牵动其余各项，本表逐项给出可行区间。"),
+                verdict=verdict)
+
+
+# ================================================================
+# 2e 覆盖区 ↔ 国家 双向耦合判定
+# ================================================================
+def country_coupling(cfg, geo=None, ang=None):
+    """覆盖区与国家的双向耦合判定。
+
+    正向（算得覆盖区 → 能否覆盖某国）：以**波束指向中心** + 覆盖半径为圆，
+    与各国国土外接圆做相交判定 → 全覆盖/部分覆盖/未覆盖 + 覆盖面积百分比。
+    反向（目标国 → 所需覆盖规格）：由国土半径与指向要求推所需覆盖角/半径，
+    与用户配置比对 → 缺口与调整建议。
+
+    **关键几何（GEO）**：覆盖中心 ≠ 星下点。GEO 星下点恒在赤道 (0°, geo_lon)，
+    但天线可电扫把波束指向任意可见点 —— 覆盖中心应取**目标区中心**（国土中心
+    或用户指定经纬），星下点只决定两件事：①波束指向所需离轴角（扫描角需求）；
+    ②该区用户的最低仰角。把星下点当覆盖中心会导致中纬国家全部误判"未覆盖"。
+
+    LEO/MEO：星下点随时间移动，按"过境时星下点在覆盖中心正上方"处理
+    （此时仰角最高、覆盖最有利），扫描角需求 = 0。
+    """
+    geo = geo or derive_geometry(cfg)
+    ang = ang or resolve_angle_spec(cfg, geo)
+    h = to_f(geo.get("orbit_alt_km"), 35786.0)
+    orbit = str(cfg.get("orbit", "GEO")).upper()
+    r_cov = to_f(ang.get("r_cov_km"), to_f(geo.get("cov_r_km"), 0.0))
+    cov_key = cfg.get("coverage", "区域")
+    cov = COVERAGE.get(cov_key, {})
+
+    # ---- 波束指向中心（覆盖中心）与星下点分离 ----
+    geo_lon = to_f(cfg.get("geo_lon"), to_f(cov.get("geo_lon"), None))
+    c_country = COUNTRY_BY_KEY.get(cov_key)
+    if orbit == "GEO":
+        sub_lon = (geo_lon if (geo_lon is not None and geo_lon != 0)
+                   else (to_f(c_country.get("geo_lon"), to_f(c_country.get("lon"), 100.0))
+                         if c_country else 100.0))
+        sub_lat = 0.0                                  # GEO 星下点恒在赤道
+    else:
+        sub_lon = to_f(cfg.get("geo_lon"), to_f(cov.get("lon"), 100.0))
+        sub_lat = to_f(cfg.get("center_lat"), to_f(cov.get("lat"), 0.0))
+    subpoint = dict(lat=round(sub_lat, 3), lon=round(sub_lon, 3),
+                    cn="GEO 星下点（定点 %.1f°E，赤道）" % sub_lon if orbit == "GEO"
+                    else "%s 星下点（%.1f°N/%.1f°E）" % (orbit, sub_lat, sub_lon))
+
+    # 覆盖中心：优先用户显式指定 → 覆盖区/国土中心
+    c_lat = to_f(cfg.get("center_lat"), None)
+    c_lon = to_f(cfg.get("center_lon"), None)
+    if c_lat is None or c_lon is None:
+        if c_country:
+            c_lat = to_f(c_country.get("lat"), 0.0)
+            c_lon = to_f(c_country.get("lon"), 100.0)
+            center_src = "波束指向 %s 国土中心（%.1f°N/%.1f°E）" % (c_country["cn"], c_lat, c_lon)
+        else:
+            c_lat = to_f(cfg.get("center_lat"), to_f(cov.get("lat"), sub_lat))
+            c_lon = to_f(cfg.get("center_lon"), to_f(cov.get("lon"), sub_lon))
+            center_src = "波束指向覆盖区中心（%.1f°N/%.1f°E）" % (c_lat, c_lon)
+    else:
+        center_src = "波束指向用户指定中心（%.1f°N/%.1f°E）" % (c_lat, c_lon)
+
+    # 波束指向所需离轴角（星下点 → 覆盖中心），GEO 下即电扫角需求
+    point_ang = _ang_dist_deg(sub_lat, sub_lon, c_lat, c_lon)
+    point_offaxis = geocentric_to_offaxis(point_ang, h) if orbit == "GEO" else 0.0
+    center = dict(lat=round(c_lat, 3), lon=round(c_lon, 3), source=center_src,
+                  pointing_offaxis_deg=round(point_offaxis, 4),
+                  pointing_geocentric_deg=round(point_ang, 4),
+                  subpoint=subpoint,
+                  note=("GEO 星下点在赤道 %.1f°E，波束须电扫 %.3f° 离轴（地心角 %.3f°）"
+                        "才能指向 %.1f°N/%.1f°E；该扫描角须 ≤ 天线可用扫描范围，"
+                        "且扫描损耗 cos^1.5(%.2f°)=%.3fdB"
+                        % (sub_lon, point_offaxis, point_ang, c_lat, c_lon,
+                           point_offaxis,
+                           -10 * 1.5 * math.log10(max(math.cos(math.radians(point_offaxis)), 1e-9)))
+                        if orbit == "GEO" else
+                        "%s 过境时星下点在覆盖中心附近，扫描角需求 ≈0" % orbit))
+
+    # ---- 正向：覆盖判定 ----
+    # 单星视域上限（仰角门限）：覆盖角超出则该国用户仰角不足
+    r_cap = to_f(geo.get("cov_r_cap_km"), 0.0)
+    el_min = to_f(cfg.get("el_deg"), to_f(cov.get("el_min_deg"), 30.0))
+    rows = []
+    for c in COUNTRIES:
+        # 圆心距 = 波束指向中心 ↔ 国土中心（覆盖判定用）
+        d_ang = _ang_dist_deg(c_lat, c_lon, c["lat"], c["lon"])
+        d_km = R_EARTH * math.radians(d_ang)
+        r_c = to_f(c.get("r_km"), 0.0)
+        ratio = _circle_overlap_ratio(d_km, r_cov, r_c)
+        if ratio >= 0.995:
+            st, st_cn = "full", "全覆盖"
+        elif ratio > 0.005:
+            st, st_cn = "partial", "部分覆盖"
+        else:
+            st, st_cn = "none", "未覆盖"
+        # 该国用户仰角：**从星下点算**（GEO 星下点在赤道，与波束指向中心不同）
+        el_user = None
+        el_edge = None
+        if orbit == "GEO":
+            d_sub = _ang_dist_deg(sub_lat, sub_lon, c["lat"], c["lon"])   # 星下点↔国土中心
+            a_rad = math.radians(d_sub)
+            den = math.sin(a_rad)
+            el_user = (math.degrees(math.atan(
+                (math.cos(a_rad) - R_EARTH / (R_EARTH + h)) / den))
+                if den > 1e-9 else 90.0)
+            # 国土最远边角（背离星下点侧）的仰角 = 最差用户
+            d_far = d_sub + math.radians(r_c / R_EARTH) * (180.0 / math.pi)
+            af = math.radians(d_far)
+            denf = math.sin(af)
+            el_edge = (math.degrees(math.atan(
+                (math.cos(af) - R_EARTH / (R_EARTH + h)) / denf))
+                if denf > 1e-9 else 90.0)
+        rows.append(dict(
+            key=c["key"], cn=c["cn"], region=c.get("region", ""),
+            lat=c["lat"], lon=c["lon"], r_km=r_c,
+            dist_km=round(d_km, 1), dist_deg=round(d_ang, 3),
+            dist_sub_km=round(R_EARTH * math.radians(
+                _ang_dist_deg(sub_lat, sub_lon, c["lat"], c["lon"])), 1),
+            cover_ratio=round(ratio, 4), cover_pct=round(ratio * 100, 1),
+            status=st, status_cn=st_cn,
+            el_user_deg=(round(el_user, 2) if el_user is not None else None),
+            el_edge_deg=(round(el_edge, 2) if el_edge is not None else None),
+            el_ok=(None if el_edge is None else el_edge >= el_min),
+            in_footprint=bool(d_km <= r_cov + r_c),
+        ))
+    rows.sort(key=lambda r_: (-r_["cover_ratio"], r_["dist_km"]))
+    full = [r_ for r_ in rows if r_["status"] == "full"]
+    partial = [r_ for r_ in rows if r_["status"] == "partial"]
+    none_ = [r_ for r_ in rows if r_["status"] == "none"]
+
+    # 目标国（用户配置的主覆盖区若是国家）判定
+    target = None
+    for r_ in rows:
+        if r_["key"] == cov_key:
+            target = r_
+            break
+    target_verdict = None
+    if target:
+        if target["status"] == "full" and (target["el_ok"] is not False):
+            target_verdict = ("✓ 可覆盖 %s 全境：覆盖半径 %.0fkm ≥ 国土外接圆 %.0fkm"
+                              "（圆心距 %.0fkm，覆盖 %.1f%%）%s"
+                              % (target["cn"], r_cov, target["r_km"],
+                                 target["dist_km"], target["cover_pct"],
+                                 "，国土边角最低仰角 %.1f° ≥ 门限 %.0f°"
+                                 % (target["el_edge_deg"], el_min)
+                                 if target["el_edge_deg"] is not None else ""))
+        else:
+            reasons = []
+            if target["status"] != "full":
+                reasons.append("覆盖 %.1f%%（半径 %.0fkm < 所需 %.0fkm，圆心距 %.0fkm）"
+                               % (target["cover_pct"], r_cov, target["r_km"] + target["dist_km"],
+                                  target["dist_km"]))
+            if target["el_ok"] is False:
+                reasons.append("国土边角仰角 %.1f° < 门限 %.0f°（星下点偏离国土 %.0fkm）"
+                               % (target["el_edge_deg"], el_min, target["dist_sub_km"]))
+            target_verdict = "✗ 不能覆盖 %s：%s" % (target["cn"], "；".join(reasons))
+
+    # ---- 反向：目标国 → 所需覆盖规格 ----
+    need = None
+    if target:
+        # 波束指向国土中心 → 所需覆盖半径 = 国土外接圆半径（不再叠加星下点偏离，
+        # 因为偏离由**扫描角**承担，而非覆盖半径）。加 5% 边缘余量。
+        r_need = target["r_km"] * 1.05
+        a_need_geo = math.degrees(r_need / R_EARTH)
+        # 需要的波束指向离轴角（GEO：星下点在赤道 → 指向国土中心纬度需电扫）
+        scan_need = geocentric_to_offaxis(
+            _ang_dist_deg(sub_lat, sub_lon, target["lat"], target["lon"]), h) \
+            if orbit == "GEO" else 0.0
+        # 覆盖区外缘总离轴角 = 指向角 + 覆盖半角（两者同为离轴口径才能相加）
+        off_have = to_f(cfg.get("cov_half_deg"), None)
+        cov_half_off = geocentric_to_offaxis(a_need_geo, h)      # 所需覆盖半角（离轴口径）
+        off_need_total = scan_need + cov_half_off
+        need = dict(
+            country=target["cn"], r_need_km=round(r_need, 1),
+            geocentric_deg=round(a_need_geo, 4),
+            offaxis_deg=round(geocentric_to_offaxis(a_need_geo, h), 4),
+            footprint_deg=round(math.degrees(r_need / max(to_f(geo.get("d_slant"), 1.0), 1e-9)), 4),
+            r_have_km=round(r_cov, 1),
+            gap_km=round(r_need - r_cov, 1),
+            ok=(r_cov >= r_need * 0.999),
+            pointing_offaxis_need_deg=round(scan_need, 4),
+            offaxis_total_need_deg=round(off_need_total, 4),
+            el_edge_deg=target.get("el_edge_deg"),
+            el_ok=target.get("el_ok"),
+            n_beam_need=int(math.ceil(HEX_PACK * (r_need /
+                                      max(to_f(ang.get("r_beam_km"), 1.0), 1e-9)) ** 2)),
+            note=("覆盖 %s 需覆盖半径 ≥%.0fkm（国土外接圆 %.0fkm ×1.05 边缘余量），"
+                  "波束须电扫 %.3f° 离轴指向国土中心（%.1f°N/%.1f°E），"
+                  "覆盖区外缘总离轴角 %.3f°；当前配置 %s=%.3f°（半径 %.0fkm）→ %s"
+                  % (target["cn"], r_need, target["r_km"], scan_need,
+                     target["lat"], target["lon"], off_need_total,
+                     ANGLE_BASES.get(ang.get("angle_basis", "offaxis"), {}).get("cn", "覆盖角"),
+                     off_have if off_have is not None else radius_km_to_angle(
+                         r_cov, h, ang.get("angle_basis", "offaxis"), geo.get("d_slant")),
+                     r_cov, "满足" if r_cov >= r_need else "不足")),
+        )
+        adv = []
+        if not need["ok"]:
+            adv.append("覆盖半径缺口 %.0fkm → %s 由 %s° 增至 %.3f°"
+                       % (need["gap_km"],
+                          ANGLE_BASES.get(ang.get("angle_basis", "offaxis"), {}).get("cn", "覆盖角"),
+                          fmt(off_have, 3) if off_have is not None else "—",
+                          radius_km_to_angle(r_need, h, ang.get("angle_basis", "offaxis"),
+                                             geo.get("d_slant"))))
+        if target.get("el_ok") is False:
+            adv.append("国土边角仰角 %.1f° < 门限 %.0f° → 星位西移至 %.1f°E"
+                       "（正对国土中心经度）或降仰角门限"
+                       % (target["el_edge_deg"], el_min, target["lon"]))
+        if not adv:
+            adv.append("覆盖半径满足；波束数需 ≥%d 个密铺（当前 %s）"
+                       % (need["n_beam_need"],
+                          fmt(to_f(cfg.get("N_beam"), 0), 0) if to_f(cfg.get("N_beam"), 0) > 0 else "未配置"))
+        need["advice"] = "；".join(adv)
+
+    # ---- 单星视域可行性 ----
+    vis_ok = (r_cov <= r_cap) if r_cap > 0 else True
+    vis_note = ("覆盖半径 %.0fkm %s 单星视域上限 %.0fkm（仰角 ≥%.0f°）"
+                % (r_cov, "≤" if vis_ok else ">", r_cap, el_min))
+    if not vis_ok:
+        vis_note += " → 超出部分用户仰角不足，须多星协同或降仰角门限"
+
+    return dict(ok=True, orbit=orbit, h_km=h, el_min_deg=el_min,
+                center=center, r_cov_km=round(r_cov, 1), r_cap_km=round(r_cap, 1),
+                single_sat_view_ok=bool(vis_ok), view_note=vis_note,
+                countries=rows, n_full=len(full), n_partial=len(partial),
+                n_none=len(none_), target=target, target_verdict=target_verdict,
+                need=need,
+                verdict=("覆盖区↔国家耦合判定：中心 %s，覆盖半径 %.0fkm（%s）→ "
+                         "全覆盖 %d 国、部分覆盖 %d 国、未覆盖 %d 国。%s%s"
+                         % (center_src, r_cov,
+                            ("≤" if vis_ok else ">") + " 单星视域 %.0fkm" % r_cap,
+                            len(full), len(partial), len(none_),
+                            (target_verdict or "") + " " if target_verdict else "",
+                            (need["note"] if need else ""))),
+                note=("覆盖区与国家是双向耦合的：正向由覆盖半径/中心判各国覆盖率"
+                      "（圆-圆相交面积比），反向由目标国推所需覆盖角与波束数。"
+                      "GEO 下星下点固定在赤道，波束靠电扫指向国土中心（扫描角需求"
+                      "= 星下点→国土中心的地心角换算离轴角），覆盖半径只需包住国土"
+                      "外接圆（×1.05 余量）；国土偏离定点经度越远，扫描角越大、"
+                      "用户仰角越低。"))
+
+
+# ================================================================
+# 2f 偏置反射面设计（v4：口径/焦距/中心偏置/馈源口径 → 几何/效率/增益）
+# ================================================================
+def reflector_design(cfg, p, geo=None, ang=None, f_dn=None):
+    """把 reflector_engine 接入设计链路：按 cfg 的反射面参数做正向设计或反解。
+
+    cfg 读取字段（全部可配置，留空自动）：
+      refl_D_r      反射器口径 (m)      —— 留空取 D_ap / 由 beam_deg 反解
+      refl_f        反射器焦距 (m)      —— 留空 = f_over_d × D_r
+      refl_h        发射器中心偏置 (m)  —— 留空 = h_over_d × D_r（默认 0.55，不跨母轴）
+      refl_d_feed   馈源口径 (m)        —— 留空由照射角反推
+      f_over_d      焦距比（默认 1.0）
+      h_over_d      偏置比（默认 0.55）
+      refl_edge_taper_db  边缘锥削（默认 −12dB）
+      refl_feed_model     cosq（默认）| gaussian
+      refl_surface_rms_mm 面精度（Ruze 损耗，可选）
+      beam_deg + beam_basis=beamwidth 时：若 D_r 未给 → 由 θ3dB=70λ/D 反解口径
+    **天线体制门控**：仅反射面族天线（固面/伞状/大容量多波束/混合多波束）输出
+    偏置反射面设计；相控阵等其它体制返回 skipped（前端/报告不渲染反射面面板，
+    避免对非反射面方案弹出无关的偏置面几何）。
+    """
+    # ---- 天线体制门控（用户要求：只有固面/反射面天线才输出偏置反射面设计）----
+    ant_type = str(cfg.get("ant_type") or "")
+    REFLECTOR_TYPES = ("固面", "伞状", "大容量多波束", "混合多波束", "反射面")
+    if ant_type and ant_type not in REFLECTOR_TYPES:
+        return dict(ok=False, skipped=True, ant_type=ant_type,
+                    reason="天线体制为「%s」，非反射面族（%s）——偏置反射面设计不适用，"
+                           "面板与报告节不输出" % (ant_type, "/".join(REFLECTOR_TYPES)),
+                    error=None)
+    geo = geo or derive_geometry(cfg)
+    band = cfg.get("band", "Ka")
+    if f_dn is None:
+        f_dn = BAND_FREQ.get(band, (30.0, 20.0))[1]
+    f_dn = to_f(cfg.get("band_freq_dn"), f_dn) or f_dn
+
+    D_r = to_f(cfg.get("refl_D_r"), None)
+    f_len = to_f(cfg.get("refl_f"), None)
+    h_off = to_f(cfg.get("refl_h"), None)
+    d_feed = to_f(cfg.get("refl_d_feed"), None)
+    f_over_d = to_f(cfg.get("f_over_d"), 1.0) or 1.0
+    h_over_d = to_f(cfg.get("h_over_d"), 0.55) or 0.55
+    taper = to_f(cfg.get("refl_edge_taper_db"), -12.0)
+    feed_model = str(cfg.get("refl_feed_model") or "cosq")
+    rms = to_f(cfg.get("refl_surface_rms_mm"), None)
+
+    # 波束宽度指标（beam_deg）→ 反解口径（synthesize 路径）
+    beam_deg = to_f(cfg.get("beam_deg"), None)
+    bm_basis = str(cfg.get("beam_basis") or "beamwidth").lower()
+    th3_target = beam_deg if (beam_deg and beam_deg > 0 and bm_basis == "beamwidth") else None
+
+    src = "用户显式几何"
+    # 用户是否**显式**给了口径（cfg 里有且 >0）。params 的 D_ap 恒有引擎默认值
+    # （antenna_gain_est 兜底 2.5m），不能用它判断"用户是否配置了口径"，
+    # 否则"给波束宽度指标 → 反解口径"这条路径永远不可达。
+    explicit_ap = ((to_f(cfg.get("refl_D_r"), 0) > 0) or
+                   ("D_ap" in cfg and to_f(cfg.get("D_ap"), 0) > 0))
+    if D_r is None or D_r <= 0:
+        if th3_target and not explicit_ap:
+            # 口径缺省且用户给了波束宽度指标 → 由 θ3dB=70λ/D 反解口径
+            r = RE.synthesize(theta3db_target_deg=th3_target, freq_ghz=f_dn,
+                              edge_taper_db=taper, f_over_d=f_over_d,
+                              h_over_d=h_over_d, feed_model=feed_model,
+                              surface_rms_mm=rms)
+            src = "由波束宽度指标反解（θ3dB=%.3f° → D=70λ/θ）" % th3_target
+        else:
+            D_ap = to_f(cfg.get("D_ap"), to_f((p or {}).get("D_ap"), 0.0))
+            if D_ap > 0:
+                D_r = D_ap
+                src = "取天线面板口径 D_ap"
+            else:
+                return dict(ok=False,
+                            error="反射器口径未配置（refl_D_r / D_ap / beam_deg 至少给一个）")
+    if D_r and D_r > 0:
+        # 正向设计：焦距/偏置缺省按 f_over_d、h_over_d 比例合成
+        f_use = f_len if (f_len and f_len > 0) else f_over_d * D_r
+        h_use = h_off if (h_off and h_off > 0) else h_over_d * D_r
+        r = RE.design(D_r, f_use, h_use, f_dn, d_feed, taper, feed_model,
+                      surface_rms_mm=rms, n_ap=61, n_spill=81, n_ff=41)
+    r["integration"] = dict(source=src, f_dn_ghz=f_dn, band=band,
+                            th3_target_deg=th3_target,
+                            D_r_in=to_f(cfg.get("refl_D_r"), None),
+                            f_in=f_len, h_in=h_off, d_feed_in=d_feed)
+    return r
 
 
 # ================================================================
@@ -395,6 +1441,331 @@ def suggest_constellation(cfg, geo):
                       f"{n_per_plane*n_plane}/{n_plane}/1（倾角 {fmt(incl,0)}°，"
                       f"服务带 |lat|≤{fmt((m or {}).get('lat_cap', incl + sigma),0)}°），"
                       f"数值仿真{'验证连续覆盖（最小重数 %s）' % (m or {}).get('mult_min') if continuous else '仍存间隙，可降最低仰角或增加轨道面'}"))
+
+
+# ================================================================
+# 2d 多星协同覆盖单一服务区（区域星座 · 区别于 Walker 全球纬度带）
+# ================================================================
+def _great_circle_km(lat1, lon1, lat2, lon2):
+    """两地面点大圆距离（km，haversine）。"""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2.0) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2.0) ** 2
+    return 2.0 * R_EARTH * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _region_grid(lat_c, lon_c, r_km, n=15):
+    """服务区圆盘网格：矩形布点后按大圆距离 ≤r_km 过滤（圆内点）。"""
+    cosc = max(0.2, math.cos(math.radians(lat_c)))
+    dlat = r_km / (R_EARTH * math.radians(1.0))
+    dlon = r_km / (R_EARTH * math.radians(1.0) * cosc)
+    pts = []
+    for i in range(n + 1):
+        la = lat_c - dlat + 2.0 * dlat * i / n
+        for j in range(n + 1):
+            lo = lon_c - dlon + 2.0 * dlon * j / n
+            if _great_circle_km(lat_c, lon_c, la, lo) <= r_km * 1.01:
+                pts.append((la, lo))
+    return pts or [(lat_c, lon_c)]
+
+
+def _region_targets(lat_c, lon_c, r_km):
+    """服务区代表点：中心 + 8 方位边缘（半径 0.7·r_km，避开边界奇异）。"""
+    tg = [dict(name="中心", lat=lat_c, lon=lon_c)]
+    rr = 0.7 * r_km
+    dlat = rr / (R_EARTH * math.radians(1.0))
+    cosc = max(0.2, math.cos(math.radians(lat_c)))
+    dlon = rr / (R_EARTH * math.radians(1.0) * cosc)
+    for k in range(8):
+        az = math.radians(45.0 * k)
+        tg.append(dict(name="E%d" % (k + 1),
+                       lat=round(lat_c + dlat * math.cos(az), 4),
+                       lon=round(lon_c + dlon * math.sin(az), 4)))
+    return tg
+
+
+def regional_coverage(cfg, geo):
+    """多星协同覆盖单一服务区（区别于 constellation_metrics 的全球纬度带 Walker）：
+    用户选定一个服务区 + N 颗星，计算 N 星协同对该区的覆盖质量。
+
+      · GEO：N 个星位沿服务区经度跨度均匀展开（空间分区）→ 逐点算仰角，
+        每点取"最佳星仰角"，全域最差点的最佳仰角 = 多星协同的关键指标
+        （单星覆盖边缘仰角低，多星分区后全域 ≥el_min）。反推达标最小星数。
+      · LEO/MEO：N 星相位/轨道面错开数值传播（时间接力）→ 服务区代表点
+        覆盖重数时序 → 覆盖率/连续性/最小重数（复用 orbit_engine）。
+
+    返回 dict（n_sat/region/min_mult/mean_mult/cov_pct/worst_el/sats/
+    min_sat_for_el/feasible/verdict/note）；N_sat<2 返回 None。"""
+    n_sat = int(to_f(cfg.get("N_sat"), 0))
+    if n_sat < 2:
+        return None
+    orbit = str(cfg.get("orbit", "GEO")).upper()
+    cov_key = cfg.get("coverage", "区域")
+    cov = COVERAGE.get(cov_key, COVERAGE["区域"])
+    lat_c = to_f(cov.get("lat"), 0.0)
+    lon_c = to_f(cov.get("lon", cov.get("geo_lon", 0.0)), 0.0)
+    # 覆盖半径与几何推导完全同源（derive_geometry 已按 cfg/库值取定）
+    r_km = to_f(geo.get("cov_r_km"), to_f(cfg.get("cov_r_km"), cov.get("r_km", 800)))
+    el_min = geo["el_deg"]
+    h = geo["orbit_alt_km"]
+    grid = _region_grid(lat_c, lon_c, r_km)
+
+    if orbit == "GEO":
+        lon_gc = to_f(cov.get("geo_lon", lon_c), lon_c)
+        cosc = max(0.2, math.cos(math.radians(lat_c)))
+        dlon_half = math.degrees(r_km / (R_EARTH * cosc))
+        rr = R_EARTH + h
+        w_max = 1.6 * dlon_half + 6.0
+
+        def _eval_lons(sat_lon):
+            """给定星位经度列表 → 逐网格点取"最佳星仰角"，全域最差点仰角=协同覆盖判据。"""
+            ecefs = [(rr * math.cos(math.radians(L)),
+                      rr * math.sin(math.radians(L)), 0.0) for L in sat_lon]
+            mult_min, mult_sum, worst_best = 10 ** 9, 0, 90.0
+            hist = {}
+            for (la, lo) in grid:
+                nv, best = 0, -90.0
+                for ec in ecefs:
+                    e = _elev_deg(la, lo, ec, h)
+                    if e >= el_min:
+                        nv += 1
+                    if e > best:
+                        best = e
+                mult_min = min(mult_min, nv)
+                mult_sum += nv
+                worst_best = min(worst_best, best)
+                hist[nv] = hist.get(nv, 0) + 1
+            ng = len(grid)
+            cov_pts = sum(v for k2, v in hist.items() if k2 >= 1)
+            return dict(worst_el=worst_best, mult_min=mult_min,
+                        mean_mult=mult_sum / max(ng, 1),
+                        cov_pct=100.0 * cov_pts / max(ng, 1),
+                        sat_lon=sat_lon, hist=hist)
+
+        def _lons(n, w):
+            if n <= 1:
+                return [lon_gc]
+            return [lon_gc - w + 2.0 * w * k / (n - 1) for k in range(n)]
+
+        def _best(n):
+            """扫描星位展开半宽 w∈[0,w_max]，取使服务区最差点最佳仰角最大的部署。
+            w→0 星位聚拢（区内单星够→容量/冗余）；w 大星位分区（区超单星视域）。"""
+            best, nw = None, 26
+            for i in range(nw + 1):
+                ev = _eval_lons(_lons(n, w_max * i / nw))
+                ev["w"] = w_max * i / nw
+                if best is None or ev["worst_el"] > best["worst_el"] + 1e-9:
+                    best = ev
+            return best
+
+        cache_ev = {n: _best(n) for n in range(1, n_sat + 1)}
+        ev = cache_ev[n_sat]
+        # 达标最小星数：GEO 星位仅能沿经度展开，纬度方向仰角受几何限制——
+        # 若服务区边缘点（高纬）即便星位对准其经度仍 <el_min，则增加星位无法改善，
+        # min_sat=None（如实反映物理极限，不假装达标）。
+        min_sat = None
+        for n_try in range(1, n_sat + 1):
+            if cache_ev[n_try]["worst_el"] >= el_min - 1e-6:
+                min_sat = n_try
+                break
+        sats = [dict(lat=0.0, lon=round(L, 2), role="GEO 星位") for L in ev["sat_lon"]]
+        ok = ev["worst_el"] >= el_min - 1e-6
+        # 单星在中心星位即全域达标 → 多星为容量/冗余（星位聚拢）
+        single_ok = cache_ev[1]["worst_el"] >= el_min - 1e-6
+        if single_ok and n_sat > 1:
+            deploy = ("服务区在单星视域内（单星 %.1f°E 即全域 ≥%.0f°）；%d 星协同为容量扩展/冗余备份，"
+                      "星位聚拢于 %.1f°E 附近（展开半宽 %.1f°）"
+                      % (lon_gc, el_min, n_sat, lon_gc, ev["w"]))
+        elif ok:
+            deploy = ("%d 星位沿经度展开 ±%.1f° 分区覆盖；达标最小星数 = %d 颗"
+                      % (n_sat, ev["w"], min_sat or n_sat))
+        else:
+            deploy = ("%d 星位最优展开 ±%.1f°；但服务区高纬边缘最差点最佳仰角仅 %.1f° < 门限 %.0f°，"
+                      "GEO 星位限于赤道、沿经度展开无法改善纬度向仰角" % (n_sat, ev["w"], ev["worst_el"], el_min))
+        if ok:
+            tail = "全域达标"
+        elif single_ok:
+            tail = "单星已达标（多星为冗余）"
+        else:
+            tail = ("边缘仰角 %.1f° 受 GEO 几何限制 → 降仰角门限/缩覆盖半径，或边缘补 HEO/地面增强"
+                    % ev["worst_el"])
+        verdict = ("GEO %d 星协同覆盖%s：%s；星位 %s；服务区最差点最佳仰角 %.1f°（门限 %.0f°）→ %s；"
+                   "最小重数 %d、平均 %.2f、覆盖率 %.1f%%。"
+                   % (n_sat, cov.get("cn", cov_key), deploy,
+                      "/".join("%.1f°E" % L for L in ev["sat_lon"]),
+                      ev["worst_el"], el_min, tail,
+                      ev["mult_min"], ev["mean_mult"], ev["cov_pct"]))
+        note = ("多星协同覆盖单一服务区（GEO）：对星位展开半宽扫描寻优（最大化服务区最差点最佳仰角），"
+                "%d 星最优部署展开半宽 %.1f°；全域 ≥%.0f° 达标最小星数 = %s。"
+                % (n_sat, ev["w"], el_min, ("%d 颗" % min_sat) if min_sat else "不可达（纬度向仰角受限）"))
+        return dict(ok=True, orbit="GEO", n_sat=n_sat, region=cov.get("cn", cov_key),
+                    lat_c=round(lat_c, 3), lon_c=round(lon_c, 3), r_km=round(r_km, 0),
+                    el_min=round(el_min, 1), h_km=round(h, 0), grid_pts=len(grid),
+                    spread_half_deg=round(ev["w"], 2), single_sat_ok=bool(single_ok),
+                    min_mult=ev["mult_min"], mean_mult=round(ev["mean_mult"], 2),
+                    cov_pct=round(ev["cov_pct"], 1), worst_el=round(ev["worst_el"], 1),
+                    sats=sats, mult_hist={str(k2): v for k2, v in sorted(ev["hist"].items())},
+                    min_sat_for_el=min_sat, feasible=ok, verdict=verdict, note=note)
+
+
+    # ---- LEO/MEO：N 星数值传播（相位/轨道面错开），服务区代表点重数时序 ----
+    incl = to_f(cfg.get("incl_deg"), 0) or max(abs(lat_c) + 10.0, 35.0)
+    n_plane = int(to_f(cfg.get("N_plane"), 0) or max(1, round(math.sqrt(n_sat))))
+    phase_f = to_f(cfg.get("phase_f"), 1)
+    n_per_plane = max(n_sat // max(n_plane, 1), 1)
+    # LEO/MEO 仰角门限：geo["el_deg"] 源自 GEO 覆盖库（如巴基斯坦 46°），套到过顶 LEO 过苛。
+    # 用户显式给 el_deg 则尊重，否则取 LEO 区域覆盖工程惯例 15°（OneWeb 25°/Iridium 8.2° 之间）。
+    el_min_leo = to_f(cfg.get("el_deg"), 0) or 15.0
+    els = []
+    # 区域覆盖星座：轨道面 RAAN 对准服务区经度（多面在其附近 ±15° 分布），
+    # 而非全球 Walker 的 RAAN 均匀铺满 [0,360)——否则卫星不反复经过目标上空，
+    # 覆盖率失真偏低。相位错开 → 星像"珍珠串"反复过顶（时间接力）。
+    raan_c = to_f(cov.get("geo_lon", lon_c), lon_c)
+    for p in range(n_plane):
+        raan_p = raan_c + (p - (n_plane - 1) / 2.0) * 15.0
+        for j in range(n_per_plane):
+            nu0 = 360.0 * j / n_per_plane + 360.0 * phase_f * p / max(n_sat, 1)
+            els.append(OE.elements_from_altitude(h, incl, raan_deg=raan_p % 360.0,
+                                                 nu0_deg=nu0))
+    targets = _region_targets(lat_c, lon_c, r_km)
+    t0 = OE.J2000_UNIX + 26.0 * 365.25 * 86400.0
+    ts = OE.constellation_timeseries(els, targets, t0, dur_h=24.0, step_s=120.0,
+                                     el_min_deg=el_min_leo, n_required=1)
+    tt = ts["targets"]
+    cov_pct = round(min(t["cov_pct"] for t in tt), 1) if tt else 0.0
+    mean_mult = round(sum(t["mean_mult"] for t in tt) / max(len(tt), 1), 2)
+    per_min = []
+    for t in tt:
+        ks = [int(k2) for k2 in t["hist"].keys()]
+        per_min.append(min(ks) if ks else 0)
+    min_mult = min(per_min) if per_min else 0
+    continuous = bool(ts["all_continuous"])
+    sats = [dict(lat=round(incl, 1), lon=None, role="LEO 相位接力") for _ in els]
+    ok = continuous and min_mult >= 1
+    verdict = ("%s %d 星协同覆盖%s（倾角 %.0f°、%d 轨道面）：服务区代表点覆盖率 %.1f%%、"
+               "最小重数 %d、平均 %.2f → %s。"
+               % (orbit, len(els), cov.get("cn", cov_key), incl, n_plane, cov_pct,
+                  min_mult, mean_mult,
+                  "连续覆盖成立" if ok else "存在间隙 → 增加星数/轨道面（转星座建议反推 Walker）"))
+    note = ("多星协同覆盖单一服务区（%s 时间接力）：%d 颗星相位/轨道面错开数值传播，"
+            "对服务区中心+8 方位代表点统计 24h 覆盖重数；覆盖率取最差代表点。"
+            % (orbit, len(els)))
+    return dict(ok=True, orbit=orbit, n_sat=len(els), region=cov.get("cn", cov_key),
+                lat_c=round(lat_c, 3), lon_c=round(lon_c, 3), r_km=round(r_km, 0),
+                el_min=round(el_min_leo, 1), h_km=round(h, 0), incl_deg=round(incl, 1),
+                n_plane=n_plane, grid_pts=len(targets),
+                min_mult=min_mult, mean_mult=mean_mult, cov_pct=cov_pct,
+                worst_el=None, sats=sats, continuous=continuous,
+                min_sat_for_el=None, feasible=ok, verdict=verdict, note=note,
+                targets=[dict(name=t["target"], cov_pct=t["cov_pct"],
+                              mean_mult=t["mean_mult"], continuous=t["continuous"])
+                         for t in tt])
+
+
+# ================================================================
+# 2e 在轨卫星对标（参考当前在轨卫星校准设计基准）
+# ================================================================
+def orbital_benchmark(cfg, R):
+    """设计方案 vs 在轨同类卫星对标：按 轨道+频段 过滤 ORBITAL_REFS，
+    对比容量/载荷质量/波束数等公开维度，给出定位结论与设计基准提示。
+
+    判据（第一性原理 + 工程对标）：
+      · 容量 C_sys：与在轨同轨同频段星的容量区间比较（低于最值→容量偏保守提示，
+        高于中位→先进提示）；GEO 高通量对标 100Gbps 级、LEO 单星对标数十 Gbps 级。
+      · 波束数 N_beam：与在轨同频段星波束数量级对比（多波束 HTS 特征）。
+      · 载荷质量/供电：与同轨平台级对标（是否落在合理平台档）。
+    返回 dict（refs[]/dim{}/position/verdict/note）；无同类在轨星返回 ok=False。"""
+    orbit = str(cfg.get("orbit", "GEO")).upper()
+    band = str(cfg.get("band", "Ka"))
+    try:
+        from design_data import orbital_refs_for
+        refs = orbital_refs_for(orbit=orbit, band=band)
+    except Exception:                                        # noqa: BLE001
+        refs = []
+    if not refs:
+        return dict(ok=False, orbit=orbit, band=band, refs=[],
+                    verdict="在轨参考库无同轨（%s）同频段（%s）卫星，无法对标" % (orbit, band),
+                    note="可扩展 design_data.ORBITAL_REFS 增加对标星")
+
+    res = (R or {}).get("res") or {}
+    summary = res.get("summary") or {}
+    totals = (R or {}).get("totals") or {}
+    params = (R or {}).get("params") or {}
+    c_sys = to_f(summary.get("C_sys"), 0)
+    n_beam = to_f(params.get("N_beam"), to_f(cfg.get("N_beam"), 0))
+    m_pay = to_f(totals.get("m_pay"), 0)
+
+    def _vals(key):
+        return sorted(v[key] for v in refs if isinstance(v.get(key), (int, float)) and v[key] > 0)
+
+    caps = _vals("capacity_gbps")
+    masses = _vals("mass_kg")
+    nbeams = _vals("n_beam")
+
+    def _pos(v, arr, unit, name):
+        """v 在在轨区间 arr 中的定位描述。"""
+        if not arr or v <= 0:
+            return dict(name=name, value=v, unit=unit, ref_min=None, ref_max=None,
+                        ref_median=None, tag="无对标数据")
+        lo, hi = arr[0], arr[-1]
+        mid = arr[len(arr) // 2]
+        if v < lo * 0.7:
+            tag = "低于在轨区间下限（偏保守/小容量）"
+        elif v <= hi * 1.15:
+            tag = "落在在轨区间内（对标合理）"
+        else:
+            tag = "高于在轨区间上限（激进/超大容量）"
+        return dict(name=name, value=round(v, 1), unit=unit,
+                    ref_min=round(lo, 1), ref_max=round(hi, 1), ref_median=round(mid, 1),
+                    tag=tag)
+
+    dims = [_pos(c_sys, caps, "Gbps", "整星容量 C_sys"),
+            _pos(n_beam, nbeams, "个", "波束数 N_beam"),
+            _pos(m_pay, masses, "kg", "载荷质量")]
+
+    # 平台级对标（同轨在轨平台整星质量）
+    plat = ((R or {}).get("platform") or [None, {}])
+    plat_cn = (plat[1] or {}).get("cn") if isinstance(plat, (list, tuple)) and len(plat) > 1 and plat[1] else "—"
+    plat_m = to_f((plat[1] or {}).get("m_sat"), 0) if isinstance(plat, (list, tuple)) and len(plat) > 1 and plat[1] else 0
+
+    # 综合定位
+    cap_dim = dims[0]
+    if cap_dim["ref_median"] and c_sys > 0:
+        ratio = c_sys / cap_dim["ref_median"]
+        if ratio >= 1.0:
+            position = "先进（容量达在轨同类中位及以上）"
+        elif ratio >= 0.5:
+            position = "主流（容量接近在轨同类中位）"
+        else:
+            position = "保守（容量低于在轨同类中位一半）"
+    else:
+        position = "未定（容量或对标数据缺失）"
+
+    ref_tbl = [dict(id=s["id"], cn=s["cn"], operator=s.get("operator"),
+                    capacity_gbps=s.get("capacity_gbps"), mass_kg=s.get("mass_kg"),
+                    n_beam=s.get("n_beam"), platform=s.get("platform"),
+                    band=s.get("band"), feat=s.get("feat"), launch=s.get("launch"),
+                    src=s.get("src")) for s in refs]
+
+    verdict = ("本方案（%s/%s，整星容量 %s Gbps、%s 波束、载荷 %s kg，平台 %s）对标在轨 %d 颗同类星"
+               "（容量区间 %s~%s Gbps、中位 %s）：定位【%s】。%s"
+               % (orbit, band, fmt(c_sys, 1), fmt(n_beam, 0), fmt(m_pay, 0), plat_cn,
+                  len(refs),
+                  fmt(caps[0], 0) if caps else "—", fmt(caps[-1], 0) if caps else "—",
+                  fmt(cap_dim["ref_median"], 0) if cap_dim["ref_median"] else "—",
+                  position, cap_dim["tag"]))
+    note = ("在轨对标参考 design_data.ORBITAL_REFS（公开发布参数，%s）；"
+            "用于校准设计基准——GEO 高通量对标中星26号（100Gbps/94+11波束）、"
+            "SES-17（200Gbps/~200可重构波束）、卫讯3（1Tbps Ka+Q/V）；"
+            "LEO 对标星链V2 Mini（~80Gbps/800kg）、千帆G60（48Gbps级）、国网GW。"
+            % "/".join(sorted(set(s.get("src", "") for s in refs if s.get("src")))))
+    return dict(ok=True, orbit=orbit, band=band, n_refs=len(refs), refs=ref_tbl,
+                dims=dims, position=position, plat_cn=plat_cn, plat_m_kg=plat_m,
+                c_sys=round(c_sys, 1), n_beam=round(n_beam, 0), m_pay=round(m_pay, 0),
+                cap_range=[round(caps[0], 0) if caps else None,
+                           round(caps[-1], 0) if caps else None],
+                verdict=verdict, note=note)
 
 
 def antenna_gain_est(cfg, f_dn):
@@ -1149,6 +2520,10 @@ def block_diagram(cfg, p, trp, rows):
     der = p.get("_derived", {})
     N_beam = trp["N_beam"]
     G_used = to_f(der.get("G_ant_used"), der.get("G_ant_est", 0))
+    # T_sys 按当前天线族取（勿硬编码固面；相控阵含 T/R 组件噪声）
+    fam = {"固面": "固面", "伞状": "伞状", "大容量多波束": "固面",
+           "混合多波束": "固面"}.get(ant, "相控阵")
+    t_sys_v = to_f((der.get("t_sys") or {}).get(fam), 0)
     cols = [dict(id="col_ant", cn="天线分系统", x=0),
             dict(id="col_rx", cn="接收通道（上行）", x=1),
             dict(id="col_proc", cn=f"处理/交换（{mode}）", x=2),
@@ -1162,6 +2537,20 @@ def block_diagram(cfg, p, trp, rows):
 
     node("col_ant", "ANT", f"用户天线\n{ANT_TYPES.get(ant,{}).get('cn','天线')}·{band}", 1,
          f"G={fmt(G_used,1)}dBi · N_beam={N_beam} · θ3dB={fmt(der.get('θ_3dB_est'),2)}°", "ant")
+    if ant == "相控阵":
+        # 相控阵：馈电网络=波束成形（模拟移相/数字 DBF），与体制相关
+        sub = cfg.get("array_subtype", "数字模拟混合")
+        bfn_cn = {"纯数字": "数字波束成形 DBF\n（全数字阵）", "模拟拼接": "模拟波束成形网络 BFN\n（透镜/巴特勒矩阵）"}.get(
+            sub, "波束成形网络 BFN\n（模拟移相 + 子阵 DBF）")
+        node("col_ant", "BFN", bfn_cn, N_beam,
+             f"{sub} · {N_beam} 波束并行成形", "rf")
+    elif ant in ("固面", "伞状", "大容量多波束", "混合多波束"):
+        # 反射面：多馈源馈电网络（每波束 1 馈源，成形面固化/混合体制馈电阵电扫）
+        n_feed = 1 if N_beam <= 1 else min(N_beam, 128)
+        feed_cn = ("馈电阵列（电扫重构）" if ant == "混合多波束"
+                   else ("多馈源馈电网络" if n_feed > 1 else "单馈源馈电网络"))
+        node("col_ant", "FEED", feed_cn, n_feed,
+             f"每波束独立馈源 · 收发共用（环行器隔离）", "rf")
     if fband != band:
         node("col_ant", "FANT", f"馈电天线\n{fband}", 1, "馈电链路专用", "ant")
     if cfg.get("isl_on"):
@@ -1206,10 +2595,18 @@ def block_diagram(cfg, p, trp, rows):
     if mode != "透明":
         node("col_ttc", "RC", "在轨重构控制器", 1, f"重构生效 {to_f(p.get('t_rec'),5):.0f}s", "ctrl")
 
+    # 馈电网络节点（相控阵=BFN / 反射面=FEED），插入天线与环行器之间
+    feed_id = ("BFN" if ant == "相控阵" else "FEED") if any(
+        nd["id"] in ("BFN", "FEED") for nd in nodes) else None
+
     edges += [
-        dict(f="ANT", t="CIRC", label=f"用户上行 {band}", kind="rf_up"),
+        dict(f="ANT", t=(feed_id or "CIRC"), label=f"用户上行 {band}", kind="rf_up"),
+    ]
+    if feed_id:
+        edges.append(dict(f=feed_id, t="CIRC", label="", kind="rf_up"))
+    edges += [
         dict(f="CIRC", t="LNA", label="", kind="rf_up"),
-        dict(f="LNA", t="DCON", label=f"T_sys={fmt(der.get('t_sys',{}).get('固面',0),0)}K", kind="rf_up"),
+        dict(f="LNA", t="DCON", label=f"T_sys={fmt(t_sys_v,0)}K", kind="rf_up"),
         dict(f="DCON", t=("IMUX" if mode == "透明" else ("ADC" if mode == "数字透明" else "DEM")),
              label="", kind="if"),
     ]
@@ -1226,8 +2623,10 @@ def block_diagram(cfg, p, trp, rows):
         dict(f=proc_out, t="HPA", label="", kind="if"),
         dict(f="HPA", t="UCON", label=f"EIRP={fmt(der.get('EIRP_req'),1)}dBW", kind="rf_dn"),
         dict(f="UCON", t="OMUX", label="", kind="rf_dn"),
-        dict(f="OMUX", t="ANT", label="用户下行", kind="rf_dn"),
+        dict(f="OMUX", t=(feed_id or "ANT"), label="用户下行", kind="rf_dn"),
     ]
+    if feed_id:
+        edges.append(dict(f=feed_id, t="ANT", label="", kind="rf_dn"))
     if fband != band:
         edges += [dict(f="FANT", t="CIRC", label=f"馈电上行 {fband}", kind="rf_up"),
                   dict(f="OMUX", t="FANT", label="馈电下行", kind="rf_dn")]
@@ -1278,20 +2677,46 @@ FLOW_STAGES = [
 
 
 def _flow_stages(path):
-    """把流路径文本拆为分层节点链 stages=[{layer,layer_cn,node},...]（按层号排序）。"""
-    nodes = [x.strip() for x in re.split(r"→|⇄|↔", str(path or "")) if x.strip()]
-    out = []
-    for nd in nodes:
-        clean = re.sub(r"〔[^〕]*〕", "", nd).strip("（）() ")
-        lay, lay_cn = "L5", "处理/交换层"      # 未识别节点默认归处理层
-        for lid, lcn, kws in FLOW_STAGES:
-            if any(kw in clean for kw in kws):
-                lay, lay_cn = lid, lcn
-                break
-        out.append(dict(layer=lay, layer_cn=lay_cn, node=clean[:14]))
-    # 按层号稳定排序（同层保持原顺序）——呈现"L1→L2→…"的真实信号链层次
-    out.sort(key=lambda s: s["layer"])
-    return out
+    """把流路径文本拆为【保序】节点链 stages=[{layer,layer_cn,node,seq,sub}]。
+
+    严格保留路径书写顺序（不排序）——排序会反转真实流向：
+      供能流 一次电源(L8)→EPC(L6)→功放(L6) 若按层号排会变成 功放→EPC→一次电源（反向）。
+    同时输出 hops=[{f,t,fwd,bid,sub}] 逐跳转移，供渲染器按真实方向画箭头：
+      fwd=True 正向跳（源层号 ≤ 目标层号，箭头向右）；否则反向跳（箭头向左，画回线）。
+    `；`/`;` 为子链分隔（如 主供能链；二次电源链），跨子链不产生跳。
+    """
+    out, hops = [], []
+    # 按子链分隔符切分，各子链内部再按箭头切分
+    for sub_i, chunk in enumerate(re.split(r"[；;]", str(path or ""))):
+        if not chunk.strip():
+            continue
+        # 记录每个节点前的分隔符类型（→ 单向 / ⇄ ↔ 双向）
+        parts = re.split(r"(→|⇄|↔)", chunk)
+        seq_nodes, seps = [], []
+        for seg in parts:
+            seg = seg.strip()
+            if not seg:
+                continue
+            if seg in ("→", "⇄", "↔"):
+                seps.append(seg)
+            else:
+                seq_nodes.append(seg)
+        prev_layer = None
+        for i, nd in enumerate(seq_nodes):
+            clean = re.sub(r"〔[^〕]*〕", "", nd).strip("（）() ")
+            lay, lay_cn = "L5", "处理/交换层"      # 未识别节点默认归处理层
+            for lid, lcn, kws in FLOW_STAGES:
+                if any(kw in clean for kw in kws):
+                    lay, lay_cn = lid, lcn
+                    break
+            out.append(dict(layer=lay, layer_cn=lay_cn, node=clean[:14],
+                            seq=len(out), sub=sub_i))
+            if i > 0 and prev_layer is not None:
+                sep = seps[i - 1] if i - 1 < len(seps) else "→"
+                hops.append(dict(f=prev_layer, t=lay, fwd=(lay >= prev_layer),
+                                 bid=(sep in ("⇄", "↔")), sub=sub_i))
+            prev_layer = lay
+    return out, hops
 
 
 def info_flows(cfg, p, res, totals, trp):
@@ -1416,7 +2841,8 @@ def info_flows(cfg, p, res, totals, trp):
                 f["tier"] = "data"
             else:
                 f["tier"] = "service"
-            f["stages"] = _flow_stages(f.get("path", ""))
+            f["stages"], f["hops"] = _flow_stages(f.get("path", ""))
+            f["bidir"] = any(hp.get("bid") for hp in f["hops"])
     allf = sg + si + sn
     # 层次矩阵：tier × level → 流名称列表（前端/报告分层概览）
     matrix = {}
@@ -1918,6 +3344,8 @@ def _design_all(cfg, kg, skip_compare=False):
         if constellation:
             flows["constellation"] = constellation
             diagram["constellation"] = constellation
+    # ---- 多星协同覆盖单一服务区（区域星座 · GEO 空间分区 / LEO 时间接力）----
+    regional = regional_coverage(cfg, geo) if to_f(cfg.get("N_sat"), 0) >= 2 else None
     if multi:
         flows["multi_coverage"] = multi
         diagram["multi_coverage"] = multi
@@ -1944,6 +3372,28 @@ def _design_all(cfg, kg, skip_compare=False):
     # ---- 稳健性分析（P0-2 MC / P0-3 星蚀 / P1-4 XPD / P2-3 位保 / P3-1 干扰 / P3-2 可靠性）----
     robust = _robustness_analyses(cfg, p, res, rows, totals, geo, plat_rec)
 
+    # ---- v4：角度口径解析 + 四指标耦合校核 + 覆盖区↔国家判定 + 偏置反射面设计 ----
+    # 全部 try 包裹：任一项异常只记 error，不阻断主链路。
+    f_up_v4, f_dn_v4 = BAND_FREQ.get(cfg.get("band", "Ka"), (30.0, 20.0))
+    cfg_v4 = dict(cfg)
+    cfg_v4.setdefault("band_freq_dn", f_dn_v4)
+    try:
+        angle_spec = resolve_angle_spec(cfg_v4, geo)
+    except Exception as e:                                          # noqa: BLE001
+        angle_spec = dict(ok=False, error="resolve_angle_spec failed: %s" % e)
+    try:
+        spec_check = spec_consistency(cfg_v4, geo, angle_spec, p)
+    except Exception as e:                                          # noqa: BLE001
+        spec_check = dict(ok=False, error="spec_consistency failed: %s" % e)
+    try:
+        country_cov = country_coupling(cfg_v4, geo, angle_spec)
+    except Exception as e:                                          # noqa: BLE001
+        country_cov = dict(ok=False, error="country_coupling failed: %s" % e)
+    try:
+        reflector = reflector_design(cfg_v4, p, geo, angle_spec, f_dn_v4)
+    except Exception as e:                                          # noqa: BLE001
+        reflector = dict(ok=False, error="reflector_design failed: %s" % e)
+
     R = dict(cfg=cfg, req=req, geo=geo, params=p, res=res, transponder=trp,
              ant_cands=ant_cands, ant_rec=ant_rec, is_custom_ant=is_custom_ant,
              custom_ant=custom_ant, equipment=rows, totals=totals,
@@ -1951,11 +3401,19 @@ def _design_all(cfg, kg, skip_compare=False):
              launchers=launch_cands, launcher=launch_rec,
              diagram=diagram, flows=flows, principles=principles,
              multi_coverage=multi, constellation=constellation,
+             regional_coverage=regional,
+             angle_spec=angle_spec, spec_check=spec_check,
+             country_coupling=country_cov, reflector=reflector,
              mode_info=MODES.get(cfg.get("mode"), {}),
              ant_info=ANT_TYPES.get(cfg.get("ant_type"), {}),
              sub_info=ARRAY_SUBTYPES.get(cfg.get("array_subtype", ""), {}),
              score=score, compare=compare, diagnosis=diag, robust=robust)
     R["eval"] = evaluate_scheme(R)      # 方案评价标准（E1~E10 → 评级/可行性结论）
+    # ---- 在轨卫星对标（参考当前在轨同类星校准设计基准）----
+    try:
+        R["orbital_benchmark"] = orbital_benchmark(cfg, R)
+    except Exception:                                       # noqa: BLE001
+        R["orbital_benchmark"] = dict(ok=False, error="benchmark failed")
     return R
 
 
@@ -2683,6 +4141,311 @@ def evaluate_scheme(R):
 # ================================================================
 _MODE_ORDER = ["数字透明", "透明", "再生"]
 
+# 救援方案的参数中文名（前端/报告共用）
+_RESCUE_LABELS = {
+    "platform_pref": "平台（指定更大承载）", "ant_type": "天线类型", "D_ap": "天线口径D(m)",
+    "N_el": "阵元数N_el", "mode": "转发体制", "k_reuse": "复用色数k", "B_beam": "单波束带宽(MHz)",
+    "B_carrier": "单载波带宽(MHz)", "N_beam": "波束数", "EIRP_gs": "关口站EIRP(dBW)",
+    "M_target": "余量门限(dB)", "η_ill": "口径效率(%)", "amp_type": "功放类型",
+    "P_out": "功放功率(W)", "array_subtype": "相控阵子体制",
+}
+
+
+def _biggest_platform(orbit):
+    """该轨道承载(m_pay)与供电(p_pay)综合最大的平台。"""
+    cands = [pl for pl in PLATFORMS if pl["orbit"] == orbit]
+    if not cands:
+        return None
+    return max(cands, key=lambda pl: (pl["m_pay"] * pl["p_pay"]))
+
+
+def _rescue_ladders(R, cfg, values, kg):
+    """按未过硬准则生成救援方案阶梯（温和→激进），每级为 dict(修改值)。
+
+    只动设计变量（平台/天线/体制/频谱/关口站），不动用户需求字段
+    （service/orbit/coverage/band/C_req_ovr/GT_term）。
+
+    冲突消解原则：c-17（承载/功耗超限）要"减配"、c-22/c-10（增益不足）要"增配"，
+    二者在固面口径上冲突 → 优先【换更大平台承载更大天线】，而非缩天线；
+    仅当天线是相控阵（功率墙内禀）且增益未同时失败时才减口径。
+    """
+    ev = evaluate_scheme(R)
+    fails = set((R.get("res") or {}).get("summary", {}).get("fail") or [])
+    p = R.get("params") or {}
+    s = (R.get("res") or {}).get("summary") or {}
+    der = p.get("_derived") or {}
+    band = cfg.get("band", "Ka")
+    orbit = cfg.get("orbit", "GEO")
+    B_tot = B_TOTAL_OVR.get(band, BANDS.get(band, {}).get("B_total", 2500))
+    lam = lam_m(BAND_FREQ.get(band, (30.0, 20.0))[1])
+    big = _biggest_platform(orbit)
+    ant0 = values.get("ant_type", cfg.get("ant_type", "相控阵"))
+    P_budget = to_f(big["p_pay"] if big else p.get("P_budget"), 1e9)
+    ladders = []
+
+    gain_fail = ("c-10" in fails) or ("c-22" in fails) or bool(
+        (R.get("res") or {}).get("loop", {}).get("need"))
+    power_fail = ("c-17" in fails) or bool(p.get("_plat_gap"))
+    C_sys0 = to_f(s.get("C_sys"), 0)
+    # C_req 在 R["req"]（与 evaluate_scheme E4 同口径），_derived 兜底
+    C_req0 = to_f((R.get("req") or {}).get("C_req"), to_f(der.get("C_req"), 0))
+    # 当前所用平台是否已是该轨道最大（无升级余地才考虑减口径降配）
+    cur_plat_id = (R.get("platform") or [None, {}])[1].get("id")
+    cur_plat_m = to_f((R.get("platform") or [None, {}])[1].get("m_pay"), 0)
+    plat_at_max = bool(big) and (cur_plat_id == big["id"]
+                                 or cur_plat_m >= to_f(big["m_pay"], 0))
+
+    def cur(v, k, dflt):
+        """当前有效值：累积字典 v 优先，其次建议值 values，再次用户 cfg。"""
+        if k in v and v[k] != "":
+            return to_f(v[k], dflt)
+        return to_f(values.get(k), to_f(cfg.get(k), dflt))
+
+    # ---- 单准则修复动作（均读累积 v，避免互相覆盖）----
+    def fix_platform(v):
+        if big and v.get("platform_pref") != big["id"]:
+            v["platform_pref"] = big["id"]
+        return v
+
+    def fit_spectrum(v):
+        """频谱闭合守卫：任何 N_beam/B_beam 改动后调用，保证 N×B ≤ B_tot×k。"""
+        k_r = max(cur(v, "k_reuse", 4), 4)
+        n_b = max(cur(v, "N_beam", 1), 1)
+        b_b = cur(v, "B_beam", 125)
+        if n_b * b_b > B_tot * k_r:
+            k_r = max(k_r, 7)
+            v["k_reuse"] = k_r
+            b_cap = B_tot * k_r / n_b
+            if b_b > b_cap:
+                v["B_beam"] = max(5.0, math.floor(b_cap))
+        return v
+
+    def fix_spectrum(v):
+        # c-13：k 提到 7 + B_beam 压到上限
+        k_r = max(cur(v, "k_reuse", 4), 7)
+        v["k_reuse"] = k_r
+        n_b = max(cur(v, "N_beam", 1), 1)
+        b_cap = B_tot * k_r / n_b
+        v["B_beam"] = max(5.0, math.floor(min(cur(v, "B_beam", 125), b_cap)))
+        return v
+
+    def fix_capacity(v):
+        # c-12：先扩频谱（k=7）再增波束；波束超频谱上限时联动压 B_beam
+        k_r = max(cur(v, "k_reuse", 4), 7)
+        v["k_reuse"] = k_r
+        b_b = max(cur(v, "B_beam", 125), 1e-9)
+        n_now = int(max(cur(v, "N_beam", max(to_f(der.get("N_beam"), 1), 1)), 1))
+        n_cap = int(B_tot * k_r / b_b)
+        if C_sys0 > 0 and C_req0 > C_sys0:
+            n_need = int(math.ceil(n_now * C_req0 / C_sys0 / 8.0) * 8)
+        else:
+            n_need = n_now
+        if n_need > n_cap:
+            b_b = max(5.0, math.floor(B_tot * k_r / n_need))
+            v["B_beam"] = b_b
+            n_cap = int(B_tot * k_r / b_b)
+        v["N_beam"] = min(max(n_need, n_now), max(n_cap, n_now), 480)
+        return v
+
+    def fix_downsize(v, margin=1.05):
+        # c-17 且容量有富余 → 减波束降质量/功耗（保 C_req×margin）
+        if C_sys0 <= 0 or C_req0 <= 0:
+            return v
+        n_now = int(max(cur(v, "N_beam", 1), 1))
+        # 当前累积值相对原方案的容量比例（B_beam 压缩会降单波束容量）
+        b_ratio = min(cur(v, "B_beam", 125) / max(to_f(p.get("B_beam"), 125), 1e-9), 1.0)
+        c_now = C_sys0 * (n_now / max(int(to_f(der.get("N_beam"), n_now)), 1)) * b_ratio
+        if c_now > C_req0 * margin:
+            n_min = int(math.ceil(n_now * C_req0 * margin / max(c_now, 1e-9) / 8.0) * 8)
+            if 8 <= n_min < n_now:
+                v["N_beam"] = n_min
+        return fit_spectrum(v)
+
+    def fix_gain(v, aggressive=False):
+        # c-10/c-22：体制升级 + 天线增益提升（固面增口径/相控阵增元）+ 关口站增强
+        if v.get("mode", cfg.get("mode")) != "再生":
+            v["mode"] = "再生"
+        a_now = v.get("ant_type", ant0)
+        if a_now in ("固面", "伞状", "大容量多波束", "混合多波束"):
+            D_now = cur(v, "D_ap", 2.5)
+            gap = max(to_f(der.get("EIRP_req"), 0) - to_f(s.get("EIRP"), 0),
+                      to_f(der.get("GT_req"), 0) - to_f(s.get("GT"), 0),
+                      to_f((R.get("res") or {}).get("loop", {}).get("deficit"), 0), 0.5)
+            D_max = 4.5 if not aggressive else (6.0 if orbit == "GEO" else 3.5)
+            D_new = round(min(max(D_now * 10 ** (gap / 20.0) * 1.08, D_now + 0.2), D_max), 1)
+            v["D_ap"] = max(D_new, to_f(v.get("D_ap"), 0))   # 只增不减
+            v["η_ill"] = 70
+        elif a_now == "相控阵":
+            sub = v.get("array_subtype", cfg.get("array_subtype", "数字模拟混合"))
+            p_el = ARR_P_PER_EL.get(sub, 0.9)
+            n_max = int(P_budget / max(p_el, 0.1))
+            N_now = cur(v, "N_el", 1024)
+            gap = max(to_f((R.get("res") or {}).get("loop", {}).get("deficit"), 0), 0.5)
+            N_new = int(min(max(N_now * 10 ** (gap / 10.0) * 1.15, N_now * 1.4),
+                            max(n_max, 64), ARRAY_SUBTYPES.get(sub, {}).get("n_el_max", 8192)))
+            N_new = int(math.ceil(N_new / 64.0) * 64)
+            if N_new > N_now:
+                v["N_el"] = N_new
+                v["D_ap"] = round(math.sqrt(N_new) * (lam / 2) * 1.1, 2)
+        if aggressive:
+            v["EIRP_gs"] = min(cur(v, "EIRP_gs", 75) + 3, 82)
+        return v
+
+    def fix_power_wall(v, aggressive=False):
+        # c-17 功率墙/承载：相控阵→固面；固面视增益是否并发失败决定减口径 or 挂大平台
+        fix_platform(v)
+        a_now = v.get("ant_type", ant0)
+        if a_now == "相控阵":
+            # 相控阵功率墙内禀 → 换固面，口径按等效增益（不低于增益需求）
+            G_now = to_f((R.get("res") or {}).get("antenna", {}).get("G_ant"),
+                         to_f(der.get("EIRP_req"), 50))
+            D_eq = lam / math.pi * math.sqrt(max(10 ** (G_now / 10), 1) / 0.65)
+            v["ant_type"] = "固面"
+            D_cap = 4.5 if not aggressive else (6.0 if orbit == "GEO" else 3.5)
+            v["D_ap"] = round(min(max(D_eq, 1.2), D_cap), 1)
+            v.pop("N_el", None)
+            v["η_ill"] = 68
+        elif power_fail and not gain_fail and plat_at_max:
+            # 纯承载超限、增益足够、且已在最大平台（无升级余地）→ 减口径降配
+            D_now = cur(v, "D_ap", 2.5)
+            v["D_ap"] = round(max(D_now * (0.75 if not aggressive else 0.6), 1.0), 1)
+        # 否则（增益也失败 / 平台还能升级）：不减口径，靠大平台承载 + 保/增口径
+        return v
+
+    # ---- 阶梯 1（温和）：只修未过项；容量增波束后做频谱守卫 ----
+    L1 = {}
+    if power_fail:
+        fix_power_wall(L1)
+    if "c-13" in fails:
+        fix_spectrum(L1)
+    if "c-12" in fails:
+        fix_capacity(L1)
+    if gain_fail:
+        fix_gain(L1)
+    if power_fail:
+        fix_downsize(L1)                          # 承载超限且容量富余 → 减波束
+    fit_spectrum(L1)
+    if not L1:                                    # 仅 E10/E6 等 → 通用增强
+        fix_gain(L1)
+    ladders.append(L1)
+
+    # ---- 阶梯 2（中等）：累积阶梯1 + 最大平台 + 再生体制 + 关口站增强 ----
+    L2 = dict(L1)
+    fix_platform(L2)
+    L2["mode"] = "再生"
+    if gain_fail and "ant_type" not in L2:        # 未换体制 → 增益再提一档
+        fix_gain(L2, aggressive=False)
+    L2["EIRP_gs"] = min(cur(L2, "EIRP_gs", 75) + 3, 82)
+    if power_fail:
+        fix_downsize(L2, margin=1.0)              # 承载仍超 → 容量按需求下限保
+    fit_spectrum(L2)
+    ladders.append(L2)
+
+    # ---- 阶梯 3（激进）：累积阶梯2 + 固面大口径（增益反推，质量感知封顶）----
+    L3 = dict(L2)
+    fix_platform(L3)
+    L3["mode"] = "再生"
+    fix_spectrum(L3)
+    if "c-12" in fails:
+        fix_capacity(L3)
+    if gain_fail or ant0 == "相控阵":
+        G_need = max(to_f(der.get("EIRP_req"), 52) - to_f(cur(L3, "P_out", 20), 20) + 12.0,
+                     to_f(s.get("EIRP"), 0))
+        D_need = lam / math.pi * math.sqrt(max(10 ** (G_need / 10), 1) / 0.68)
+        D_max = 6.0 if orbit == "GEO" else 3.5
+        L3["ant_type"] = "固面"
+        L3["D_ap"] = round(min(max(D_need, cur(L3, "D_ap", 1.5)), D_max), 1)
+        L3.pop("N_el", None)
+        L3["η_ill"] = 70
+    if power_fail:
+        fix_downsize(L3, margin=1.0)
+    fit_spectrum(L3)
+    L3["EIRP_gs"] = min(cur(L3, "EIRP_gs", 75) + 3, 82)
+    ladders.append(L3)
+    return ladders, ev
+
+
+def _build_applyable(last_R, cfg, values, kg):
+    """D 级救援：按未过硬准则反推可实现参数方案，逐级 design_all 验证，返回首个可行级。
+
+    返回 dict(ok, ladder, grade, conclusion, values{k:v},
+              items[{k,label,v,cur,note}], verify{grade,pass_hard,worst_M,fail})
+    ok=False 时 values 仍给最激进级（尽力方案），items 附诚实标注。
+    """
+    ladders, ev = _rescue_ladders(last_R, cfg, values, kg)
+    failed_hard = [c for c in ev["criteria"] if c["kind"] == "hard" and not c["ok"]]
+    head = "未过硬准则：%s" % ("、".join("%s(%s)" % (c["id"], c["name"]) for c in failed_hard) or "—")
+    best = None
+    for i, lad in enumerate(ladders):
+        if not lad:
+            continue
+        merged = dict(values)
+        for k, v in lad.items():
+            if v != "":
+                merged[k] = v
+        c2 = dict(cfg)
+        for k, v in merged.items():
+            if v != "":
+                c2[k] = v
+        try:
+            R2 = design_all(c2, kg, skip_compare=True)
+        except Exception as e:                          # noqa: BLE001
+            best = best or dict(ok=False, ladder=i + 1, error=repr(e), values=lad)
+            continue
+        ev2 = evaluate_scheme(R2)
+        s2 = (R2.get("res") or {}).get("summary") or {}
+        rec = dict(ok=bool(ev2["feasible"]), ladder=i + 1,
+                   grade=ev2["grade"], conclusion=ev2["conclusion"],
+                   values={k: v for k, v in lad.items()},
+                   verify=dict(grade=ev2["grade"], pass_hard=ev2["pass_hard"],
+                               pass_soft=ev2["pass_soft"],
+                               worst_M=round(min(to_f(s2.get("M_up"), 0), to_f(s2.get("M_dn"), 0)), 2),
+                               EIRP=to_f(s2.get("EIRP"), 0), GT=to_f(s2.get("GT"), 0),
+                               C_sys=to_f(s2.get("C_sys"), 0),
+                               m_pay=to_f((R2.get("totals") or {}).get("m_pay"), 0),
+                               p_pay=to_f((R2.get("totals") or {}).get("p_pay"), 0),
+                               fail=list(s2.get("fail") or [])))
+        items = []
+        for k, v in lad.items():
+            cur_v = cfg.get(k, values.get(k, ""))
+            big_pl = _biggest_platform(cfg.get("orbit", "GEO"))
+            note = ""
+            if k == "platform_pref" and big_pl:
+                note = "指定 %s（%skg/%sW，该轨道承载最大）" % (big_pl["cn"], big_pl["m_pay"], big_pl["p_pay"])
+            elif k == "ant_type":
+                note = "相控阵功率墙/承载超限 → 改固面反射面（增益等效、功耗降一个量级）"
+            elif k == "D_ap":
+                note = "增益缺口按 G∝D² 反推口径（G=η(πD/λ)²）"
+            elif k == "N_el":
+                note = "功耗墙上限内增阵元提增益"
+            elif k == "mode":
+                note = "体制升级至再生（解调重发，+%sdB 再生增益）" % fmt(MODES.get(v, {}).get("regen_bonus"), 1)
+            elif k == "k_reuse":
+                note = "复用色数提升 → 可用频谱×k，闭合 N_beam×B_beam ≤ B_total×k"
+            elif k == "B_beam":
+                note = "单波束带宽压至频谱上限内"
+            elif k == "N_beam":
+                note = "容量缺口按 C_sys∝N_beam 反推波束数（受频谱上限约束）"
+            elif k == "EIRP_gs":
+                note = "关口站 EIRP 增强（加大地面站口径/功放，工程常规手段）"
+            elif k == "η_ill":
+                note = "口径效率取精密馈电典型值"
+            items.append(dict(k=k, label=_RESCUE_LABELS.get(k, k), v=v, cur=cur_v, note=note))
+        rec["items"] = items
+        rec["head"] = head
+        if ev2["feasible"]:
+            return rec
+        # 择优：过硬准则数多者胜（同数取剩余 fail 少者）
+        ph = int(ev2["pass_hard"].split("/")[0])
+        if best is None:
+            best, best_key = rec, (ph, -len(ev2["criteria"]))
+        else:
+            bph = int((best.get("verify") or {}).get("pass_hard", "0/0").split("/")[0])
+            if ph > bph:
+                best = rec
+    return best or dict(ok=False, ladder=0, values={}, items=[], head=head,
+                        conclusion="无可行救援方案：需求超出该轨道/频段物理极限，建议调整覆盖区、频段或容量需求")
+
 
 def suggest_closed_loop(cfg, kg, max_iter=3):
     """一键建议值闭环：建议 → 全流程验证 → 按未闭合约束自动修正 → 重试（≤max_iter 轮）。
@@ -2864,6 +4627,7 @@ def suggest_closed_loop(cfg, kg, max_iter=3):
             last_ev = None
     auto = {k: v for k, v in values.items() if v != ""}
     closed = None
+    applyable = None
     if last_ev is not None:
         s2 = (last_R.get("res") or {}).get("summary") or {}
         closed = dict(iters=len(adjustments) + 1, ok=last_ev["feasible"],
@@ -2874,7 +4638,12 @@ def suggest_closed_loop(cfg, kg, max_iter=3):
                       worst_M=min(to_f(s2.get("M_up"), 0), to_f(s2.get("M_dn"), 0)),
                       fail=list(s2.get("fail") or []),
                       advice=last_ev["advice"], adjustments=adjustments)
-    out = dict(values=values, notes=notes, auto=auto, closed=closed)
+        if not last_ev["feasible"]:
+            # D 级：按未过硬准则反推可实现的具体参数修改方案（前端可一键带入）
+            applyable = _build_applyable(last_R, cfg, values, kg)
+            closed["applyable"] = applyable
+    out = dict(values=values, notes=notes, auto=auto, closed=closed,
+               applyable=applyable)
     # 透传体制推断/星座建议/多覆盖区合成（前端建议弹窗展示依据）
     for k in ("arch", "constellation", "multi_coverage"):
         if base.get(k):

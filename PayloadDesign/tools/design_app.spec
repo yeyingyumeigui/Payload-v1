@@ -25,7 +25,7 @@ a = Analysis(
         'design_data', 'design_engine', 'infoflow_data', 'infoflow_engine', 'grasp_bridge',
         'protocol_gen', 'report_gen',
         'pattern_engine', 'coverage_engine', 'orbit_engine',
-        'analysis_engine', 'propagation',
+        'analysis_engine', 'propagation', 'reflector_engine',
     ],
     hookspath=[],
     hooksconfig={},
